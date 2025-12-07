@@ -218,7 +218,7 @@ fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> Vec<Consta
         let tag = ConstantPoolTag::from(reader.read_u8().unwrap());
         cp.push(parse_constant_pool_info(reader, tag));
     }
-    return cp;
+    cp
 }
 
 fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> ConstantPoolInfo {

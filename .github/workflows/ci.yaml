@@ -1,0 +1,52 @@
+name: jobfuscator CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  debug_profile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Build
+        run: cargo build
+
+      - name: Lint
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Test
+        run: cargo test
+
+      - name: Docs
+        run: cargo doc --no-deps
+
+  release_profile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Lint
+        run: cargo clippy --all-targets --all-features --release -- -D warnings
+
+      - name: Test
+        run: cargo test --release
+
+      - name: Docs
+        run: cargo doc --release --no-deps
