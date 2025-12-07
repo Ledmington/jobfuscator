@@ -24,7 +24,7 @@ impl<'a> BinaryReader<'a> {
     }
 
     fn read_bytes(&mut self, count: usize) -> io::Result<&'a [u8]> {
-        assert!(count > 0);
+        debug_assert!(count > 0);
         if self.pos + count > self.buf.len() {
             return Err(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
@@ -49,10 +49,10 @@ impl<'a> BinaryReader<'a> {
     }
 
     pub fn read_u16_vec(&mut self, count: usize) -> io::Result<Vec<u16>> {
-        assert!(count > 0);
+        debug_assert!(count > 0);
         let mut res: Vec<u16> = vec![0u16; count];
-        for i in 0..count {
-            res[i] = self.read_u16().unwrap();
+        for x in res.iter_mut().take(count) {
+            *x = self.read_u16().unwrap();
         }
         Ok(res)
     }
@@ -73,17 +73,26 @@ struct ClassFile {
     absolute_file_path: String,
     minor_version: u16,
     major_version: u16,
-    constant_pool: Vec<ConstantPoolEntry>,
+    constant_pool: Vec<ConstantPoolInfo>,
     access_flags: u16,
     this_class: u16,
     super_class: u16,
     interfaces: Vec<u16>,
+    fields: Vec<FieldInfo>,
+    methods: Vec<MethodInfo>,
+    attributes: Vec<AttributeInfo>,
 }
 
-struct ConstantPoolEntry {
+struct ConstantPoolInfo {
     tag: u8,
     info: Vec<u8>,
 }
+
+struct FieldInfo {}
+
+struct MethodInfo {}
+
+struct AttributeInfo {}
 
 fn absolute_no_symlinks(p: &Path) -> std::io::Result<PathBuf> {
     if p.is_absolute() {
@@ -97,7 +106,7 @@ fn parse_class_file(filename: String) -> ClassFile {
     let abs_file_path = absolute_no_symlinks(Path::new(&filename)).unwrap();
     let file = File::open(&abs_file_path).expect("File does not exist");
     let mut file_reader = BufReader::new(file);
-    let mut file_bytes: Vec<u8> = vec![0u8; file_reader.capacity()];
+    let mut file_bytes: Vec<u8> = Vec::with_capacity(file_reader.capacity());
     file_reader
         .read_to_end(&mut file_bytes)
         .expect("Could not read whole file");
@@ -107,7 +116,7 @@ fn parse_class_file(filename: String) -> ClassFile {
     let actual_magic_number: u32 = reader.read_u32().unwrap();
     const EXPECTED_MAGIC_NUMBER: u32 = 0xcafebabe;
     if actual_magic_number != EXPECTED_MAGIC_NUMBER {
-        eprintln!(
+        panic!(
             "Wrong magic number: expected 0x{:08x} but was 0x{:08x}.",
             EXPECTED_MAGIC_NUMBER, actual_magic_number
         );
@@ -117,7 +126,7 @@ fn parse_class_file(filename: String) -> ClassFile {
     let major_version: u16 = reader.read_u16().unwrap();
 
     let cp_count: u16 = reader.read_u16().unwrap();
-    let cp: Vec<ConstantPoolEntry> = Vec::with_capacity((cp_count - 1).into());
+    let cp: Vec<ConstantPoolInfo> = Vec::with_capacity((cp_count - 1).into());
 
     let flags: u16 = reader.read_u16().unwrap();
 
@@ -127,25 +136,45 @@ fn parse_class_file(filename: String) -> ClassFile {
     let interfaces_count: u16 = reader.read_u16().unwrap();
     let interfaces: Vec<u16> = reader.read_u16_vec(interfaces_count.into()).unwrap();
 
-    return ClassFile {
+    let fields_count: u16 = reader.read_u16().unwrap();
+    let fields: Vec<FieldInfo> = Vec::with_capacity(fields_count.into());
+
+    let methods_count: u16 = reader.read_u16().unwrap();
+    let methods: Vec<MethodInfo> = Vec::with_capacity(methods_count.into());
+
+    let attributes_count: u16 = reader.read_u16().unwrap();
+    let attributes: Vec<AttributeInfo> = Vec::with_capacity(attributes_count.into());
+
+    ClassFile {
         absolute_file_path: abs_file_path.to_str().unwrap().to_string(),
-        minor_version: minor_version,
-        major_version: major_version,
+        minor_version,
+        major_version,
         constant_pool: cp,
         access_flags: flags,
-        this_class: this_class,
-        super_class: super_class,
-        interfaces: interfaces,
-    };
+        this_class,
+        super_class,
+        interfaces,
+        fields,
+        methods,
+        attributes,
+    }
 }
 
-fn print_class_file(classfile: &ClassFile) -> () {
+fn print_class_file(classfile: &ClassFile) {
     println!("Classfile {}", classfile.absolute_file_path);
     println!("  minor version: {}", classfile.minor_version);
     println!("  major version: {}", classfile.major_version);
-    println!("  flags: {:04x}", classfile.access_flags);
-    println!("  this class: {}", classfile.this_class);
-    println!("  super class: {}", classfile.super_class);
+    println!("  flags: 0x{:04x}", classfile.access_flags);
+    println!("  this class: #{}", classfile.this_class);
+    println!("  super class: #{}", classfile.super_class);
+    println!(
+        " interfaces: {}, fields: {}, methods: {}, attributes: {}",
+        classfile.interfaces.len(),
+        classfile.fields.len(),
+        classfile.methods.len(),
+        classfile.attributes.len()
+    );
+    println!("Constant pool:");
 }
 
 fn main() -> io::Result<()> {

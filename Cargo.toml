@@ -7,6 +7,8 @@ edition = "2024"
 
 [profile.dev]
 opt-level = 0
+debug-assertions = true
 
 [profile.release]
 opt-level = 3
+debug-assertions = false
