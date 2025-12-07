@@ -46,7 +46,6 @@ impl<'a> BinaryReader<'a> {
     }
 
     pub fn read_u16_vec(&mut self, count: usize) -> Result<Vec<u16>> {
-        debug_assert!(count > 0);
         let mut res: Vec<u16> = vec![0u16; count];
         for x in res.iter_mut().take(count) {
             *x = self.read_u16().unwrap();

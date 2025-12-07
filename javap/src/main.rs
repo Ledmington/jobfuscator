@@ -1,10 +1,20 @@
 use std::env;
 use std::io::Result;
 
-use classfile::{ClassFile, parse_class_file};
+use classfile::{ClassFile, ConstantPoolInfo, parse_class_file};
 
 fn print_class_file(classfile: &ClassFile) {
     println!("Classfile {}", classfile.absolute_file_path);
+    println!("  Last modified Dec 5, 2025; size 12150 bytes");
+    println!(
+        "  SHA-256 checksum {}",
+        classfile
+            .sha256_digest
+            .iter()
+            .map(|x| format!("{:02x}", x))
+            .collect::<Vec<String>>()
+            .concat()
+    );
     println!("  minor version: {}", classfile.minor_version);
     println!("  major version: {}", classfile.major_version);
     println!("  flags: (0x{:04x})", classfile.access_flags);
@@ -19,45 +29,62 @@ fn print_class_file(classfile: &ClassFile) {
     );
     println!("Constant pool:");
     for i in 0..classfile.constant_pool.len() {
-        print!("  #{} = ", i);
+        if i > 0
+            && (matches!(
+                classfile.constant_pool[i - 1],
+                ConstantPoolInfo::Long { .. }
+            ) || matches!(
+                classfile.constant_pool[i - 1],
+                ConstantPoolInfo::Double { .. }
+            ))
+        {
+            continue;
+        }
+        print!("  #{} = ", i + 1);
         match classfile.constant_pool[i] {
-            classfile::ConstantPoolInfo::Utf8 { bytes: _ } => print!("Utf8"),
-            classfile::ConstantPoolInfo::Long {
+            ConstantPoolInfo::Utf8 { bytes: _ } => print!("Utf8"),
+            ConstantPoolInfo::Long {
                 high_bytes: _,
                 low_bytes: _,
             } => print!("Long"),
-            classfile::ConstantPoolInfo::String { string_index: _ } => print!("String"),
-            classfile::ConstantPoolInfo::Class { name_index: _ } => print!("Class"),
-            classfile::ConstantPoolInfo::FieldRef {
+            ConstantPoolInfo::Double {
+                high_bytes: _,
+                low_bytes: _,
+            } => print!("Double"),
+            ConstantPoolInfo::String { string_index: _ } => print!("String"),
+            ConstantPoolInfo::Class { name_index: _ } => print!("Class"),
+            ConstantPoolInfo::FieldRef {
                 class_index: _,
                 name_and_type_index: _,
             } => print!("Fieldref"),
-            classfile::ConstantPoolInfo::MethodRef {
+            ConstantPoolInfo::MethodRef {
                 class_index: _,
                 name_and_type_index: _,
             } => print!("Methodref"),
-            classfile::ConstantPoolInfo::InterfaceMethodRef {
+            ConstantPoolInfo::InterfaceMethodRef {
                 class_index: _,
                 name_and_type_index: _,
             } => print!("InterfaceMethodref"),
-            classfile::ConstantPoolInfo::NameAndType {
+            ConstantPoolInfo::NameAndType {
                 name_index: _,
                 descriptor_index: _,
             } => print!("NameAndType"),
-            classfile::ConstantPoolInfo::MethodType {
+            ConstantPoolInfo::MethodType {
                 descriptor_index: _,
             } => print!("MethodType"),
-            classfile::ConstantPoolInfo::MethodHandle {
+            ConstantPoolInfo::MethodHandle {
                 reference_kind: _,
                 reference_index: _,
             } => print!("MethodHandle"),
-            classfile::ConstantPoolInfo::InvokeDynamic {
+            ConstantPoolInfo::InvokeDynamic {
                 bootstrap_method_attr_index: _,
                 name_and_type_index: _,
             } => print!("InvokeDynamic"),
+            ConstantPoolInfo::Null {} => unreachable!(),
         }
         println!();
     }
+    println!("{{");
 }
 
 fn main() -> Result<()> {

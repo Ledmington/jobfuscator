@@ -4,12 +4,14 @@ use std::io::{BufReader, Read, Result};
 use std::path::{Path, PathBuf};
 
 use binary_reader::{BinaryReader, Endian};
+use sha2::{Digest, Sha256};
 
 /**
  * Specification available at <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html>
  */
 pub struct ClassFile {
     pub absolute_file_path: String,
+    pub sha256_digest: Vec<u8>,
     pub minor_version: u16,
     pub major_version: u16,
     pub constant_pool: Vec<ConstantPoolInfo>,
@@ -23,10 +25,18 @@ pub struct ClassFile {
 }
 
 pub enum ConstantPoolInfo {
+    /**
+     * The type of constant pool entry which can be found right after a Long or Double one.
+     */
+    Null {},
     Utf8 {
         bytes: Vec<u8>,
     },
     Long {
+        high_bytes: u32,
+        low_bytes: u32,
+    },
+    Double {
         high_bytes: u32,
         low_bytes: u32,
     },
@@ -65,7 +75,7 @@ pub enum ConstantPoolInfo {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ConstantPoolTag {
     Utf8,
     Integer,
@@ -163,6 +173,8 @@ pub fn parse_class_file(filename: String) -> ClassFile {
         .read_to_end(&mut file_bytes)
         .expect("Could not read whole file");
 
+    let digest = Sha256::digest(&file_bytes);
+
     let mut reader = BinaryReader::new(&file_bytes, Endian::Big);
 
     let actual_magic_number: u32 = reader.read_u32().unwrap();
@@ -199,6 +211,7 @@ pub fn parse_class_file(filename: String) -> ClassFile {
 
     ClassFile {
         absolute_file_path: abs_file_path.to_str().unwrap().to_string(),
+        sha256_digest: digest.to_vec(),
         minor_version,
         major_version,
         constant_pool: cp,
@@ -214,9 +227,15 @@ pub fn parse_class_file(filename: String) -> ClassFile {
 
 fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> Vec<ConstantPoolInfo> {
     let mut cp: Vec<ConstantPoolInfo> = Vec::with_capacity(cp_count);
-    for _ in 0..cp_count {
+    let mut i = 0;
+    while i < cp_count {
         let tag = ConstantPoolTag::from(reader.read_u8().unwrap());
-        cp.push(parse_constant_pool_info(reader, tag));
+        cp.push(parse_constant_pool_info(reader, tag.clone()));
+        if matches!(tag, ConstantPoolTag::Long) || matches!(tag, ConstantPoolTag::Double) {
+            cp.push(ConstantPoolInfo::Null {});
+            i += 1;
+        }
+        i += 1;
     }
     cp
 }

@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 binary_reader = { path = "../binary_reader" }
+sha2 = "0.10.9"
