@@ -11,7 +11,7 @@ INPUT=$(realpath "$1")
 
 DIFF=$(realpath "$(which diff)")
 JAVAP=$(realpath "$(which javap)")
-JOBFUSCATOR=$(realpath ./target/debug/jobfuscator)
+JOBFUSCATOR=$(realpath ./target/debug/javap)
 
 EXPECTED_OUTPUT=$(mktemp)
 ${JAVAP} -l -v -p "${INPUT}" > "${EXPECTED_OUTPUT}"
