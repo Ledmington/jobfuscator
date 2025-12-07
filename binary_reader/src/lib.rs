@@ -21,7 +21,6 @@ impl<'a> BinaryReader<'a> {
     }
 
     fn read_bytes(&mut self, count: usize) -> Result<&'a [u8]> {
-        debug_assert!(count > 0);
         if self.pos + count > self.buf.len() {
             return Err(Error::new(ErrorKind::UnexpectedEof, "Not enough bytes"));
         }
@@ -32,6 +31,10 @@ impl<'a> BinaryReader<'a> {
 
     pub fn read_u8(&mut self) -> Result<u8> {
         Ok(self.read_bytes(1)?[0])
+    }
+
+    pub fn read_u8_vec(&mut self, count: usize) -> Result<Vec<u8>> {
+        Ok(self.read_bytes(count)?.to_vec())
     }
 
     pub fn read_u16(&mut self) -> Result<u16> {

@@ -1,6 +1,6 @@
 use std::env;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Result};
 use std::path::{Path, PathBuf};
 
 use binary_reader::{BinaryReader, Endian};
@@ -22,9 +22,122 @@ pub struct ClassFile {
     pub attributes: Vec<AttributeInfo>,
 }
 
-pub struct ConstantPoolInfo {
-    pub tag: u8,
-    pub info: Vec<u8>,
+pub enum ConstantPoolInfo {
+    Utf8 {
+        bytes: Vec<u8>,
+    },
+    Long {
+        high_bytes: u32,
+        low_bytes: u32,
+    },
+    String {
+        string_index: u16,
+    },
+    Class {
+        name_index: u16,
+    },
+    FieldRef {
+        class_index: u16,
+        name_and_type_index: u16,
+    },
+    MethodRef {
+        class_index: u16,
+        name_and_type_index: u16,
+    },
+    InterfaceMethodRef {
+        class_index: u16,
+        name_and_type_index: u16,
+    },
+    NameAndType {
+        name_index: u16,
+        descriptor_index: u16,
+    },
+    MethodType {
+        descriptor_index: u16,
+    },
+    MethodHandle {
+        reference_kind: ReferenceKind,
+        reference_index: u16,
+    },
+    InvokeDynamic {
+        bootstrap_method_attr_index: u16,
+        name_and_type_index: u16,
+    },
+}
+
+#[derive(Debug)]
+pub enum ConstantPoolTag {
+    Utf8,
+    Integer,
+    Float,
+    Long,
+    Double,
+    String,
+    Class,
+    Fieldref,
+    Methodref,
+    InterfaceMethodref,
+    NameAndType,
+    MethodHandle,
+    MethodType,
+    Dynamic,
+    InvokeDynamic,
+    Module,
+    Package,
+}
+
+impl From<u8> for ConstantPoolTag {
+    fn from(value: u8) -> Self {
+        match value {
+            1 => ConstantPoolTag::Utf8,
+            3 => ConstantPoolTag::Integer,
+            4 => ConstantPoolTag::Float,
+            5 => ConstantPoolTag::Long,
+            6 => ConstantPoolTag::Double,
+            8 => ConstantPoolTag::String,
+            7 => ConstantPoolTag::Class,
+            9 => ConstantPoolTag::Fieldref,
+            10 => ConstantPoolTag::Methodref,
+            11 => ConstantPoolTag::InterfaceMethodref,
+            12 => ConstantPoolTag::NameAndType,
+            15 => ConstantPoolTag::MethodHandle,
+            16 => ConstantPoolTag::MethodType,
+            17 => ConstantPoolTag::Dynamic,
+            18 => ConstantPoolTag::InvokeDynamic,
+            19 => ConstantPoolTag::Module,
+            20 => ConstantPoolTag::Package,
+            _ => panic!("Unknown constant pool tag value {}.", value),
+        }
+    }
+}
+
+pub enum ReferenceKind {
+    GetField,
+    GetStatic,
+    PutField,
+    PutStatic,
+    InvokeVirtual,
+    InvokeStatic,
+    InvokeSpecial,
+    NewInvokeSpecial,
+    InvokeInterface,
+}
+
+impl From<u8> for ReferenceKind {
+    fn from(value: u8) -> Self {
+        match value {
+            1 => ReferenceKind::GetField,
+            2 => ReferenceKind::GetStatic,
+            3 => ReferenceKind::PutField,
+            4 => ReferenceKind::PutStatic,
+            5 => ReferenceKind::InvokeVirtual,
+            6 => ReferenceKind::InvokeStatic,
+            7 => ReferenceKind::InvokeSpecial,
+            8 => ReferenceKind::NewInvokeSpecial,
+            9 => ReferenceKind::InvokeInterface,
+            _ => panic!("Unknwon reference_kind value {}.", value),
+        }
+    }
 }
 
 pub struct FieldInfo {}
@@ -33,7 +146,7 @@ pub struct MethodInfo {}
 
 pub struct AttributeInfo {}
 
-fn absolute_no_symlinks(p: &Path) -> std::io::Result<PathBuf> {
+fn absolute_no_symlinks(p: &Path) -> Result<PathBuf> {
     if p.is_absolute() {
         Ok(p.to_path_buf())
     } else {
@@ -65,7 +178,7 @@ pub fn parse_class_file(filename: String) -> ClassFile {
     let major_version: u16 = reader.read_u16().unwrap();
 
     let cp_count: u16 = reader.read_u16().unwrap();
-    let cp: Vec<ConstantPoolInfo> = Vec::with_capacity((cp_count - 1).into());
+    let cp: Vec<ConstantPoolInfo> = parse_constant_pool(&mut reader, (cp_count - 1).into());
 
     let flags: u16 = reader.read_u16().unwrap();
 
@@ -96,5 +209,63 @@ pub fn parse_class_file(filename: String) -> ClassFile {
         fields,
         methods,
         attributes,
+    }
+}
+
+fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> Vec<ConstantPoolInfo> {
+    let mut cp: Vec<ConstantPoolInfo> = Vec::with_capacity(cp_count);
+    for _ in 0..cp_count {
+        let tag = ConstantPoolTag::from(reader.read_u8().unwrap());
+        cp.push(parse_constant_pool_info(reader, tag));
+    }
+    return cp;
+}
+
+fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> ConstantPoolInfo {
+    match tag {
+        ConstantPoolTag::Utf8 => {
+            let length: u16 = reader.read_u16().unwrap();
+            ConstantPoolInfo::Utf8 {
+                bytes: reader.read_u8_vec(length.into()).unwrap(),
+            }
+        }
+        ConstantPoolTag::Long => ConstantPoolInfo::Long {
+            high_bytes: reader.read_u32().unwrap(),
+            low_bytes: reader.read_u32().unwrap(),
+        },
+        ConstantPoolTag::String => ConstantPoolInfo::String {
+            string_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::Class => ConstantPoolInfo::Class {
+            name_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::Fieldref => ConstantPoolInfo::FieldRef {
+            class_index: reader.read_u16().unwrap(),
+            name_and_type_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::Methodref => ConstantPoolInfo::MethodRef {
+            class_index: reader.read_u16().unwrap(),
+            name_and_type_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::InterfaceMethodref => ConstantPoolInfo::InterfaceMethodRef {
+            class_index: reader.read_u16().unwrap(),
+            name_and_type_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::NameAndType => ConstantPoolInfo::NameAndType {
+            name_index: reader.read_u16().unwrap(),
+            descriptor_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::MethodHandle => ConstantPoolInfo::MethodHandle {
+            reference_kind: ReferenceKind::from(reader.read_u8().unwrap()),
+            reference_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::MethodType => ConstantPoolInfo::MethodType {
+            descriptor_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::InvokeDynamic => ConstantPoolInfo::InvokeDynamic {
+            bootstrap_method_attr_index: reader.read_u16().unwrap(),
+            name_and_type_index: reader.read_u16().unwrap(),
+        },
+        _ => panic!("Unknown constant pool tag {:?}.", tag),
     }
 }
