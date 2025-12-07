@@ -1,5 +1,5 @@
-use std::env;
 use std::io::Result;
+use std::{env, path::MAIN_SEPARATOR};
 
 use classfile::{ClassFile, ConstantPoolInfo, parse_class_file};
 
@@ -14,6 +14,19 @@ fn print_class_file(classfile: &ClassFile) {
             .map(|x| format!("{:02x}", x))
             .collect::<Vec<String>>()
             .concat()
+    );
+    println!(
+        "  Compiled from \"{}\"",
+        classfile
+            .absolute_file_path
+            .split(MAIN_SEPARATOR)
+            .next_back()
+            .unwrap()
+            .split('.')
+            .next()
+            .unwrap()
+            .to_owned()
+            + ".java"
     );
     println!("  minor version: {}", classfile.minor_version);
     println!("  major version: {}", classfile.major_version);
@@ -41,34 +54,55 @@ fn print_class_file(classfile: &ClassFile) {
             continue;
         }
         print!("  #{} = ", i + 1);
-        match classfile.constant_pool[i] {
-            ConstantPoolInfo::Utf8 { bytes: _ } => print!("Utf8"),
+        match &classfile.constant_pool[i] {
+            ConstantPoolInfo::Utf8 { bytes } => {
+                print!(
+                    "Utf8               {}",
+                    String::from_utf8(bytes.to_vec())
+                        .unwrap()
+                        .replace("\n", "\\n")
+                )
+            }
             ConstantPoolInfo::Long {
-                high_bytes: _,
-                low_bytes: _,
-            } => print!("Long"),
+                high_bytes,
+                low_bytes,
+            } => print!(
+                "Long               {}l",
+                ((*high_bytes as u64) << 32) | (*low_bytes as u64)
+            ),
             ConstantPoolInfo::Double {
                 high_bytes: _,
                 low_bytes: _,
             } => print!("Double"),
-            ConstantPoolInfo::String { string_index: _ } => print!("String"),
-            ConstantPoolInfo::Class { name_index: _ } => print!("Class"),
+            ConstantPoolInfo::String { string_index } => {
+                print!("String             #{}", string_index)
+            }
+            ConstantPoolInfo::Class { name_index } => print!("Class              #{}", name_index),
             ConstantPoolInfo::FieldRef {
-                class_index: _,
-                name_and_type_index: _,
-            } => print!("Fieldref"),
+                class_index,
+                name_and_type_index,
+            } => print!(
+                "Fieldref           #{}.#{}",
+                class_index, name_and_type_index
+            ),
             ConstantPoolInfo::MethodRef {
-                class_index: _,
-                name_and_type_index: _,
-            } => print!("Methodref"),
+                class_index,
+                name_and_type_index,
+            } => print!(
+                "Methodref          #{}.#{}",
+                class_index, name_and_type_index
+            ),
             ConstantPoolInfo::InterfaceMethodRef {
-                class_index: _,
-                name_and_type_index: _,
-            } => print!("InterfaceMethodref"),
+                class_index,
+                name_and_type_index,
+            } => print!(
+                "InterfaceMethodref #{}.#{}",
+                class_index, name_and_type_index
+            ),
             ConstantPoolInfo::NameAndType {
-                name_index: _,
-                descriptor_index: _,
-            } => print!("NameAndType"),
+                name_index,
+                descriptor_index,
+            } => print!("NameAndType        #{}:#{}", name_index, descriptor_index),
             ConstantPoolInfo::MethodType {
                 descriptor_index: _,
             } => print!("MethodType"),
@@ -77,9 +111,12 @@ fn print_class_file(classfile: &ClassFile) {
                 reference_index: _,
             } => print!("MethodHandle"),
             ConstantPoolInfo::InvokeDynamic {
-                bootstrap_method_attr_index: _,
-                name_and_type_index: _,
-            } => print!("InvokeDynamic"),
+                bootstrap_method_attr_index,
+                name_and_type_index,
+            } => print!(
+                "InvokeDynamic      #{}:#{}",
+                bootstrap_method_attr_index, name_and_type_index
+            ),
             ConstantPoolInfo::Null {} => unreachable!(),
         }
         println!();

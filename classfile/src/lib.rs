@@ -160,7 +160,7 @@ fn absolute_no_symlinks(p: &Path) -> Result<PathBuf> {
     if p.is_absolute() {
         Ok(p.to_path_buf())
     } else {
-        Ok(env::current_dir()?.join(p))
+        Ok(env::current_dir()?.join(p).canonicalize()?)
     }
 }
 
