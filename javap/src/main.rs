@@ -92,22 +92,36 @@ fn print_class_file(classfile: &ClassFile) {
                 low_bytes: _,
             } => print!("Double"),
             ConstantPoolInfo::String { string_index } => {
-                print!("String             #{}", string_index)
+                print!(
+                    "String             #{}           // {}",
+                    string_index,
+                    classfile.get_utf8_content(*string_index)
+                )
             }
-            ConstantPoolInfo::Class { name_index } => print!("Class              #{}", name_index),
+            ConstantPoolInfo::Class { name_index } => print!(
+                "Class              #{}            // {}",
+                name_index,
+                classfile.get_utf8_content(*name_index)
+            ),
             ConstantPoolInfo::FieldRef {
                 class_index,
                 name_and_type_index,
             } => print!(
-                "Fieldref           #{}.#{}",
-                class_index, name_and_type_index
+                "Fieldref           #{}.#{}         // {}.{}",
+                class_index,
+                name_and_type_index,
+                classfile.get_class_name(*class_index),
+                classfile.get_name_and_type(*name_and_type_index)
             ),
             ConstantPoolInfo::MethodRef {
                 class_index,
                 name_and_type_index,
             } => print!(
-                "Methodref          #{}.#{}",
-                class_index, name_and_type_index
+                "Methodref          #{}.#{}         // {}.{}",
+                class_index,
+                name_and_type_index,
+                classfile.get_class_name(*class_index),
+                classfile.get_name_and_type(*name_and_type_index)
             ),
             ConstantPoolInfo::InterfaceMethodRef {
                 class_index,
@@ -119,7 +133,12 @@ fn print_class_file(classfile: &ClassFile) {
             ConstantPoolInfo::NameAndType {
                 name_index,
                 descriptor_index,
-            } => print!("NameAndType        #{}:#{}", name_index, descriptor_index),
+            } => print!(
+                "NameAndType        #{}:#{}       // {}",
+                name_index,
+                descriptor_index,
+                classfile.get_name_and_type_string(*name_index, *descriptor_index)
+            ),
             ConstantPoolInfo::MethodType {
                 descriptor_index: _,
             } => print!("MethodType"),
