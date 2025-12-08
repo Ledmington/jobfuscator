@@ -76,7 +76,7 @@ impl ClassFile {
     }
 }
 
-pub fn convert_utf8(utf8_bytes: &Vec<u8>) -> String {
+pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
     String::from_utf8(utf8_bytes.to_vec())
         .unwrap()
         .replace("\n", "\\n")

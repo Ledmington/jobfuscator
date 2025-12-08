@@ -25,7 +25,7 @@ pub const ALL_CLASS_FLAGS: &[(AccessFlag, u16)] = &[
 
 // TODO: Convert into a trait?
 pub fn java_repr(flag: AccessFlag) -> String {
-    return match flag {
+    match flag {
         AccessFlag::Public => "ACC_PUBLIC",
         AccessFlag::Final => "ACC_FINAL",
         AccessFlag::Super => "ACC_SUPER",
@@ -36,12 +36,12 @@ pub fn java_repr(flag: AccessFlag) -> String {
         AccessFlag::Enum => "ACC_ENUM",
         AccessFlag::Module => "ACC_MODULE",
     }
-    .to_string();
+    .to_string()
 }
 
 // TODO: Convert into a trait?
 pub fn modifier_repr(flag: AccessFlag) -> String {
-    return match flag {
+    match flag {
         AccessFlag::Public => "public",
         AccessFlag::Final => "final",
         AccessFlag::Super => "class",
@@ -50,7 +50,7 @@ pub fn modifier_repr(flag: AccessFlag) -> String {
         AccessFlag::Enum => "enum",
         _ => "unknown",
     }
-    .to_string();
+    .to_string()
 }
 
 pub fn parse_access_flags(flags: u16) -> Vec<AccessFlag> {
@@ -60,5 +60,5 @@ pub fn parse_access_flags(flags: u16) -> Vec<AccessFlag> {
             result.push(*f);
         }
     }
-    return result;
+    result
 }

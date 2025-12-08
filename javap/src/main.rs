@@ -3,6 +3,16 @@ use std::{env, path::MAIN_SEPARATOR};
 
 use classfile::{ClassFile, ConstantPoolInfo, parse_class_file};
 
+/**
+ * The index of the column (on the terminal) where the index of each constant pool entry ends.
+ */
+const CP_INDEX_WIDTH: usize = 6;
+
+/**
+ * The index of the column (on the terminal) where the comments (the '//') starts
+ */
+const CP_COMMENT_START_INDEX: usize = 42;
+
 fn print_class_file(cf: &ClassFile) {
     println!("Classfile {}", cf.absolute_file_path);
     println!("  Last modified Dec 5, 2025; size 12150 bytes");
@@ -51,14 +61,16 @@ fn print_class_file(cf: &ClassFile) {
             .join(", ")
     );
     println!(
-        "  this_class: #{}                         // {}",
-        cf.this_class,
-        cf.get_class_name(cf.this_class)
+        "{:<width$}// {}",
+        format!("  this_class: #{}", cf.this_class),
+        cf.get_class_name(cf.this_class),
+        width = CP_COMMENT_START_INDEX,
     );
     println!(
-        "  super_class: #{}                         // {}",
-        cf.super_class,
-        cf.get_class_name(cf.super_class)
+        "{:<width$}// {}",
+        format!("  super_class: #{}", cf.super_class),
+        cf.get_class_name(cf.super_class),
+        width = CP_COMMENT_START_INDEX
     );
     println!(
         " interfaces: {}, fields: {}, methods: {}, attributes: {}",
@@ -75,7 +87,12 @@ fn print_class_file(cf: &ClassFile) {
         {
             continue;
         }
-        print!("  #{} = ", i + 1);
+
+        print!(
+            "{:>width$} = ",
+            format!("#{}", i + 1),
+            width = CP_INDEX_WIDTH
+        );
         match &cf.constant_pool[i] {
             ConstantPoolInfo::Utf8 { bytes } => {
                 print!("Utf8               {}", classfile::convert_utf8(bytes))
