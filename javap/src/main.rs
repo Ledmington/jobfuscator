@@ -1,7 +1,8 @@
 use std::io::Result;
 use std::{env, path::MAIN_SEPARATOR};
 
-use classfile::{ClassFile, ConstantPoolInfo, parse_class_file};
+use classfile::constant_pool::ConstantPoolInfo;
+use classfile::{ClassFile, parse_class_file};
 
 /**
  * The index of the column (on the terminal) where the index of each constant pool entry ends.
