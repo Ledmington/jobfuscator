@@ -1,4 +1,5 @@
 pub mod access_flags;
+pub mod reference_kind;
 
 use std::env;
 use std::fs::File;
@@ -10,6 +11,7 @@ use sha2::{Digest, Sha256};
 
 use crate::access_flags::AccessFlag;
 use crate::access_flags::parse_access_flags;
+use crate::reference_kind::ReferenceKind;
 
 /**
  * Specification available at <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html>
@@ -41,6 +43,24 @@ impl ClassFile {
         }
     }
 
+    pub fn get_method_ref(&self, cp_index: u16) -> String {
+        let method_ref_entry: &ConstantPoolInfo = &self.constant_pool[(cp_index - 1) as usize];
+        match method_ref_entry {
+            ConstantPoolInfo::MethodRef {
+                class_index,
+                name_and_type_index,
+            } => self.get_method_ref_string(*class_index, *name_and_type_index),
+            _ => panic!(
+                "Expected entry #{} to be of Methodref type but it wasn't.",
+                cp_index
+            ),
+        }
+    }
+
+    pub fn get_method_ref_string(&self, class_index: u16, name_and_type_index: u16) -> String {
+        self.get_class_name(class_index) + "." + &self.get_name_and_type(name_and_type_index)
+    }
+
     pub fn get_name_and_type(&self, cp_index: u16) -> String {
         let name_and_type_entry: &ConstantPoolInfo = &self.constant_pool[(cp_index - 1) as usize];
         match name_and_type_entry {
@@ -67,7 +87,14 @@ impl ClassFile {
     pub fn get_utf8_content(&self, cp_index: u16) -> String {
         let name_entry: &ConstantPoolInfo = &self.constant_pool[(cp_index - 1) as usize];
         match name_entry {
-            ConstantPoolInfo::Utf8 { bytes } => convert_utf8(bytes),
+            ConstantPoolInfo::Utf8 { bytes } => {
+                let content = convert_utf8(bytes);
+                if content.starts_with('[') {
+                    "\"".to_owned() + &content + "\""
+                } else {
+                    content
+                }
+            }
             _ => panic!(
                 "Expected entry #{} to be of Utf8 type but it wasn't.",
                 cp_index
@@ -81,6 +108,7 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
         .unwrap()
         .replace("\n", "\\n")
         .replace("'", "\\'")
+        .replace("\u{0001}", "\\u0001")
 }
 
 pub enum ConstantPoolInfo {
@@ -176,35 +204,6 @@ impl From<u8> for ConstantPoolTag {
             19 => ConstantPoolTag::Module,
             20 => ConstantPoolTag::Package,
             _ => panic!("Unknown constant pool tag value {}.", value),
-        }
-    }
-}
-
-pub enum ReferenceKind {
-    GetField,
-    GetStatic,
-    PutField,
-    PutStatic,
-    InvokeVirtual,
-    InvokeStatic,
-    InvokeSpecial,
-    NewInvokeSpecial,
-    InvokeInterface,
-}
-
-impl From<u8> for ReferenceKind {
-    fn from(value: u8) -> Self {
-        match value {
-            1 => ReferenceKind::GetField,
-            2 => ReferenceKind::GetStatic,
-            3 => ReferenceKind::PutField,
-            4 => ReferenceKind::PutStatic,
-            5 => ReferenceKind::InvokeVirtual,
-            6 => ReferenceKind::InvokeStatic,
-            7 => ReferenceKind::InvokeSpecial,
-            8 => ReferenceKind::NewInvokeSpecial,
-            9 => ReferenceKind::InvokeInterface,
-            _ => panic!("Unknwon reference_kind value {}.", value),
         }
     }
 }

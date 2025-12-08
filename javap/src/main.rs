@@ -9,6 +9,11 @@ use classfile::{ClassFile, ConstantPoolInfo, parse_class_file};
 const CP_INDEX_WIDTH: usize = 6;
 
 /**
+ * The index of the column (on the terminal) where the information of each entry is displayed.
+ */
+const CP_INFO_START_INDEX: usize = 28;
+
+/**
  * The index of the column (on the terminal) where the comments (the '//') starts
  */
 const CP_COMMENT_START_INDEX: usize = 42;
@@ -88,91 +93,200 @@ fn print_class_file(cf: &ClassFile) {
             continue;
         }
 
-        print!(
-            "{:>width$} = ",
-            format!("#{}", i + 1),
-            width = CP_INDEX_WIDTH
-        );
         match &cf.constant_pool[i] {
             ConstantPoolInfo::Utf8 { bytes } => {
-                print!("Utf8               {}", classfile::convert_utf8(bytes))
+                println!(
+                    "{:<width$}{}",
+                    format!(
+                        "{:>width$} = Utf8",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
+                    classfile::convert_utf8(bytes),
+                    width = CP_INFO_START_INDEX
+                )
             }
             ConstantPoolInfo::Long {
                 high_bytes,
                 low_bytes,
-            } => print!(
-                "Long               {}l",
-                ((*high_bytes as u64) << 32) | (*low_bytes as u64)
+            } => println!(
+                "{:<width$}{}l",
+                format!(
+                    "{:>width$} = Long",
+                    format!("#{}", i + 1),
+                    width = CP_INDEX_WIDTH
+                ),
+                ((*high_bytes as u64) << 32) | (*low_bytes as u64),
+                width = CP_INFO_START_INDEX
             ),
             ConstantPoolInfo::Double {
                 high_bytes: _,
                 low_bytes: _,
             } => print!("Double"),
-            ConstantPoolInfo::String { string_index } => {
-                print!(
-                    "String             #{}           // {}",
+            ConstantPoolInfo::String { string_index } => println!(
+                "{:<width$}// {}",
+                format!(
+                    "{:<width$}#{}",
+                    format!(
+                        "{:>width$} = String",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
                     string_index,
-                    cf.get_utf8_content(*string_index)
-                )
-            }
-            ConstantPoolInfo::Class { name_index } => print!(
-                "Class              #{}            // {}",
-                name_index,
-                cf.get_utf8_content(*name_index)
+                    width = CP_INFO_START_INDEX
+                ),
+                cf.get_utf8_content(*string_index),
+                width = CP_COMMENT_START_INDEX
+            ),
+            ConstantPoolInfo::Class { name_index } => println!(
+                "{:<width$}// {}",
+                format!(
+                    "{:<width$}#{}",
+                    format!(
+                        "{:>width$} = Class",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
+                    name_index,
+                    width = CP_INFO_START_INDEX
+                ),
+                cf.get_utf8_content(*name_index),
+                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::FieldRef {
                 class_index,
                 name_and_type_index,
-            } => print!(
-                "Fieldref           #{}.#{}         // {}.{}",
-                class_index,
-                name_and_type_index,
+            } => println!(
+                "{:<width$}// {}.{}",
+                format!(
+                    "{:<width$}#{}.#{}",
+                    format!(
+                        "{:>width$} = Fieldref",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
+                    class_index,
+                    name_and_type_index,
+                    width = CP_INFO_START_INDEX
+                ),
                 cf.get_class_name(*class_index),
-                cf.get_name_and_type(*name_and_type_index)
+                cf.get_name_and_type(*name_and_type_index),
+                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodRef {
                 class_index,
                 name_and_type_index,
-            } => print!(
-                "Methodref          #{}.#{}         // {}.{}",
-                class_index,
-                name_and_type_index,
-                cf.get_class_name(*class_index),
-                cf.get_name_and_type(*name_and_type_index)
+            } => println!(
+                "{:<width$}// {}",
+                format!(
+                    "{:<width$}#{}.#{}",
+                    format!(
+                        "{:>width$} = Methodref",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
+                    class_index,
+                    name_and_type_index,
+                    width = CP_INFO_START_INDEX
+                ),
+                cf.get_method_ref_string(*class_index, *name_and_type_index),
+                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::InterfaceMethodRef {
                 class_index,
                 name_and_type_index,
-            } => print!(
-                "InterfaceMethodref #{}.#{}",
-                class_index, name_and_type_index
+            } => println!(
+                "{:<width$}// {}",
+                format!(
+                    "{:<width$}#{}.#{}",
+                    format!(
+                        "{:>width$} = InterfaceMethodref",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
+                    class_index,
+                    name_and_type_index,
+                    width = CP_INFO_START_INDEX
+                ),
+                cf.get_method_ref_string(*class_index, *name_and_type_index),
+                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::NameAndType {
                 name_index,
                 descriptor_index,
-            } => print!(
-                "NameAndType        #{}:#{}       // {}",
-                name_index,
-                descriptor_index,
-                cf.get_name_and_type_string(*name_index, *descriptor_index)
+            } => println!(
+                "{:<width$}// {}",
+                format!(
+                    "{:<width$}#{}:#{}",
+                    format!(
+                        "{:>width$} = NameAndType",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
+                    name_index,
+                    descriptor_index,
+                    width = CP_INFO_START_INDEX
+                ),
+                cf.get_name_and_type_string(*name_index, *descriptor_index),
+                width = CP_COMMENT_START_INDEX
             ),
-            ConstantPoolInfo::MethodType {
-                descriptor_index: _,
-            } => print!("MethodType"),
+            ConstantPoolInfo::MethodType { descriptor_index } => println!(
+                "{:<width$}//  {}",
+                format!(
+                    "{:<width$}#{}",
+                    format!(
+                        "{:>width$} = MethodType",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
+                    descriptor_index,
+                    width = CP_INFO_START_INDEX
+                ),
+                cf.get_utf8_content(*descriptor_index),
+                width = CP_COMMENT_START_INDEX
+            ),
             ConstantPoolInfo::MethodHandle {
-                reference_kind: _,
-                reference_index: _,
-            } => print!("MethodHandle"),
+                reference_kind,
+                reference_index,
+            } => println!(
+                "{:<width$}// {} {}",
+                format!(
+                    "{:<width$}{}:#{}",
+                    format!(
+                        "{:>width$} = MethodHandle",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
+                    *reference_kind as u8,
+                    reference_index,
+                    width = CP_INFO_START_INDEX
+                ),
+                classfile::reference_kind::java_repr(*reference_kind),
+                cf.get_method_ref(*reference_index),
+                width = CP_COMMENT_START_INDEX
+            ),
             ConstantPoolInfo::InvokeDynamic {
                 bootstrap_method_attr_index,
                 name_and_type_index,
-            } => print!(
-                "InvokeDynamic      #{}:#{}",
-                bootstrap_method_attr_index, name_and_type_index
+            } => println!(
+                "{:<width$}// #{}:{}",
+                format!(
+                    "{:<width$}#{}:#{}",
+                    format!(
+                        "{:>width$} = InvokeDynamic",
+                        format!("#{}", i + 1),
+                        width = CP_INDEX_WIDTH
+                    ),
+                    bootstrap_method_attr_index,
+                    name_and_type_index,
+                    width = CP_INFO_START_INDEX
+                ),
+                bootstrap_method_attr_index,
+                cf.get_name_and_type(*name_and_type_index),
+                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::Null {} => unreachable!(),
         }
-        println!();
     }
     println!("{{");
 }
