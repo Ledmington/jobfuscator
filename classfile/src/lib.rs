@@ -1,5 +1,6 @@
 pub mod access_flags;
 pub mod constant_pool;
+pub mod fields;
 pub mod reference_kind;
 
 use std::env;
@@ -13,6 +14,7 @@ use sha2::{Digest, Sha256};
 use crate::access_flags::AccessFlag;
 use crate::access_flags::parse_access_flags;
 use crate::constant_pool::{ConstantPoolInfo, ConstantPoolTag};
+use crate::fields::{FieldInfo, parse_fields};
 use crate::reference_kind::ReferenceKind;
 
 /**
@@ -111,13 +113,6 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
         .replace("\n", "\\n")
         .replace("'", "\\'")
         .replace("\u{0001}", "\\u0001")
-}
-
-pub struct FieldInfo {
-    access_flags: Vec<AccessFlag>,
-    name_index: u16,
-    descriptor_index: u16,
-    attributes: Vec<AttributeInfo>,
 }
 
 pub struct MethodInfo {}
@@ -256,24 +251,6 @@ fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> 
         },
         _ => panic!("Unknown constant pool tag {:?}.", tag),
     }
-}
-
-fn parse_fields(reader: &mut BinaryReader, num_fields: usize) -> Vec<FieldInfo> {
-    let mut fields: Vec<FieldInfo> = Vec::with_capacity(num_fields);
-    for i in 0..num_fields {
-        let access_flags = access_flags::parse_access_flags(reader.read_u16().unwrap());
-        let name_index = reader.read_u16().unwrap();
-        let descriptor_index = reader.read_u16().unwrap();
-        let attributes_count: u16 = reader.read_u16().unwrap();
-        let attributes: Vec<AttributeInfo> = parse_attributes(reader, attributes_count.into());
-        fields[i] = FieldInfo {
-            access_flags,
-            name_index,
-            descriptor_index,
-            attributes,
-        };
-    }
-    return fields;
 }
 
 fn parse_attributes(reader: &mut BinaryReader, num_attributes: usize) -> Vec<AttributeInfo> {
