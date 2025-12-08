@@ -45,8 +45,16 @@ fn print_class_file(classfile: &ClassFile) {
             .collect::<Vec<String>>()
             .join(", ")
     );
-    println!("  this_class: #{}", classfile.this_class);
-    println!("  super_class: #{}", classfile.super_class);
+    println!(
+        "  this_class: #{}                         // {}",
+        classfile.this_class,
+        classfile.get_class_name(classfile.this_class)
+    );
+    println!(
+        "  super_class: #{}                         // {}",
+        classfile.super_class,
+        classfile.get_class_name(classfile.super_class)
+    );
     println!(
         " interfaces: {}, fields: {}, methods: {}, attributes: {}",
         classfile.interfaces.len(),
@@ -70,12 +78,7 @@ fn print_class_file(classfile: &ClassFile) {
         print!("  #{} = ", i + 1);
         match &classfile.constant_pool[i] {
             ConstantPoolInfo::Utf8 { bytes } => {
-                print!(
-                    "Utf8               {}",
-                    String::from_utf8(bytes.to_vec())
-                        .unwrap()
-                        .replace("\n", "\\n")
-                )
+                print!("Utf8               {}", classfile::convert_utf8(bytes))
             }
             ConstantPoolInfo::Long {
                 high_bytes,

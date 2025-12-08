@@ -29,6 +29,34 @@ pub struct ClassFile {
     pub attributes: Vec<AttributeInfo>,
 }
 
+impl ClassFile {
+    pub fn get_class_name(&self, cp_index: u16) -> String {
+        let class_entry: &ConstantPoolInfo = &self.constant_pool[(cp_index - 1) as usize];
+        match class_entry {
+            ConstantPoolInfo::Class { name_index } => {
+                let name_entry: &ConstantPoolInfo = &self.constant_pool[(*name_index - 1) as usize];
+                match name_entry {
+                    ConstantPoolInfo::Utf8 { bytes } => convert_utf8(bytes),
+                    _ => panic!(
+                        "Expected entry #{} to be of Utf8 type but it wasn't.",
+                        name_index
+                    ),
+                }
+            }
+            _ => panic!(
+                "Expected entry #{} to be of Class type but it wasn't.",
+                cp_index
+            ),
+        }
+    }
+}
+
+pub fn convert_utf8(utf8_bytes: &Vec<u8>) -> String {
+    String::from_utf8(utf8_bytes.to_vec())
+        .unwrap()
+        .replace("\n", "\\n")
+}
+
 pub enum ConstantPoolInfo {
     /**
      * The type of constant pool entry which can be found right after a Long or Double one.
