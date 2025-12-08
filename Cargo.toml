@@ -1,8 +1,5 @@
 [workspace]
-members = ["binary_reader",
-    "classfile",
-    "javap",
-]
+members = ["binary_reader", "classfile", "javap"]
 resolver = "3"
 
 [profile.dev]
