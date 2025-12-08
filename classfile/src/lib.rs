@@ -113,7 +113,12 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
         .replace("\u{0001}", "\\u0001")
 }
 
-pub struct FieldInfo {}
+pub struct FieldInfo {
+    access_flags: Vec<AccessFlag>,
+    name_index: u16,
+    descriptor_index: u16,
+    attributes: Vec<AttributeInfo>,
+}
 
 pub struct MethodInfo {}
 
@@ -153,7 +158,8 @@ pub fn parse_class_file(filename: String) -> ClassFile {
     let major_version: u16 = reader.read_u16().unwrap();
 
     let cp_count: u16 = reader.read_u16().unwrap();
-    let cp: Vec<ConstantPoolInfo> = parse_constant_pool(&mut reader, (cp_count - 1).into());
+    let constant_pool: Vec<ConstantPoolInfo> =
+        parse_constant_pool(&mut reader, (cp_count - 1).into());
 
     let access_flags: Vec<AccessFlag> = parse_access_flags(reader.read_u16().unwrap());
 
@@ -164,7 +170,7 @@ pub fn parse_class_file(filename: String) -> ClassFile {
     let interfaces: Vec<u16> = reader.read_u16_vec(interfaces_count.into()).unwrap();
 
     let fields_count: u16 = reader.read_u16().unwrap();
-    let fields: Vec<FieldInfo> = Vec::with_capacity(fields_count.into());
+    let fields: Vec<FieldInfo> = parse_fields(&mut reader, fields_count.into());
 
     let methods_count: u16 = reader.read_u16().unwrap();
     let methods: Vec<MethodInfo> = Vec::with_capacity(methods_count.into());
@@ -177,7 +183,7 @@ pub fn parse_class_file(filename: String) -> ClassFile {
         sha256_digest: digest.to_vec(),
         minor_version,
         major_version,
-        constant_pool: cp,
+        constant_pool,
         access_flags,
         this_class,
         super_class,
@@ -250,4 +256,26 @@ fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> 
         },
         _ => panic!("Unknown constant pool tag {:?}.", tag),
     }
+}
+
+fn parse_fields(reader: &mut BinaryReader, num_fields: usize) -> Vec<FieldInfo> {
+    let mut fields: Vec<FieldInfo> = Vec::with_capacity(num_fields);
+    for i in 0..num_fields {
+        let access_flags = access_flags::parse_access_flags(reader.read_u16().unwrap());
+        let name_index = reader.read_u16().unwrap();
+        let descriptor_index = reader.read_u16().unwrap();
+        let attributes_count: u16 = reader.read_u16().unwrap();
+        let attributes: Vec<AttributeInfo> = parse_attributes(reader, attributes_count.into());
+        fields[i] = FieldInfo {
+            access_flags,
+            name_index,
+            descriptor_index,
+            attributes,
+        };
+    }
+    return fields;
+}
+
+fn parse_attributes(reader: &mut BinaryReader, num_attributes: usize) -> Vec<AttributeInfo> {
+    return Vec::new();
 }
