@@ -30,7 +30,21 @@ fn print_class_file(classfile: &ClassFile) {
     );
     println!("  minor version: {}", classfile.minor_version);
     println!("  major version: {}", classfile.major_version);
-    println!("  flags: (0x{:04x})", classfile.access_flags);
+    println!(
+        "  flags: (0x{:04x}) {}",
+        classfile
+            .access_flags
+            .iter()
+            .map(|f| *f as u16)
+            .reduce(|a, b| a | b)
+            .unwrap(),
+        classfile
+            .access_flags
+            .iter()
+            .map(|f| classfile::java_repr(*f))
+            .collect::<Vec<String>>()
+            .join(", ")
+    );
     println!("  this_class: #{}", classfile.this_class);
     println!("  super_class: #{}", classfile.super_class);
     println!(
