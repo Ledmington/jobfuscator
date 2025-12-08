@@ -41,7 +41,7 @@ fn print_class_file(classfile: &ClassFile) {
         classfile
             .access_flags
             .iter()
-            .map(|f| classfile::java_repr(*f))
+            .map(|f| classfile::access_flags::java_repr(*f))
             .collect::<Vec<String>>()
             .join(", ")
     );
