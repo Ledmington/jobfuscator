@@ -39,6 +39,20 @@ pub fn java_repr(flag: AccessFlag) -> String {
     .to_string();
 }
 
+// TODO: Convert into a trait?
+pub fn modifier_repr(flag: AccessFlag) -> String {
+    return match flag {
+        AccessFlag::Public => "public",
+        AccessFlag::Final => "final",
+        AccessFlag::Super => "class",
+        AccessFlag::Interface => "interface",
+        AccessFlag::Abstract => "abstract",
+        AccessFlag::Enum => "enum",
+        _ => "unknown",
+    }
+    .to_string();
+}
+
 pub fn parse_access_flags(flags: u16) -> Vec<AccessFlag> {
     let mut result: Vec<AccessFlag> = Vec::new();
     for (f, mask) in ALL_CLASS_FLAGS {

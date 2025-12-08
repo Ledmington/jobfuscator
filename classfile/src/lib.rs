@@ -80,6 +80,7 @@ pub fn convert_utf8(utf8_bytes: &Vec<u8>) -> String {
     String::from_utf8(utf8_bytes.to_vec())
         .unwrap()
         .replace("\n", "\\n")
+        .replace("'", "\\'")
 }
 
 pub enum ConstantPoolInfo {

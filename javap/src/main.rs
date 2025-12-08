@@ -3,13 +3,12 @@ use std::{env, path::MAIN_SEPARATOR};
 
 use classfile::{ClassFile, ConstantPoolInfo, parse_class_file};
 
-fn print_class_file(classfile: &ClassFile) {
-    println!("Classfile {}", classfile.absolute_file_path);
+fn print_class_file(cf: &ClassFile) {
+    println!("Classfile {}", cf.absolute_file_path);
     println!("  Last modified Dec 5, 2025; size 12150 bytes");
     println!(
         "  SHA-256 checksum {}",
-        classfile
-            .sha256_digest
+        cf.sha256_digest
             .iter()
             .map(|x| format!("{:02x}", x))
             .collect::<Vec<String>>()
@@ -17,8 +16,7 @@ fn print_class_file(classfile: &ClassFile) {
     );
     println!(
         "  Compiled from \"{}\"",
-        classfile
-            .absolute_file_path
+        cf.absolute_file_path
             .split(MAIN_SEPARATOR)
             .next_back()
             .unwrap()
@@ -28,18 +26,25 @@ fn print_class_file(classfile: &ClassFile) {
             .to_owned()
             + ".java"
     );
-    println!("  minor version: {}", classfile.minor_version);
-    println!("  major version: {}", classfile.major_version);
+    println!(
+        "{} {}",
+        cf.access_flags
+            .iter()
+            .map(|f| classfile::access_flags::modifier_repr(*f))
+            .collect::<Vec<String>>()
+            .join(" "),
+        cf.get_class_name(cf.this_class).replace('/', ".")
+    );
+    println!("  minor version: {}", cf.minor_version);
+    println!("  major version: {}", cf.major_version);
     println!(
         "  flags: (0x{:04x}) {}",
-        classfile
-            .access_flags
+        cf.access_flags
             .iter()
             .map(|f| *f as u16)
             .reduce(|a, b| a | b)
             .unwrap(),
-        classfile
-            .access_flags
+        cf.access_flags
             .iter()
             .map(|f| classfile::access_flags::java_repr(*f))
             .collect::<Vec<String>>()
@@ -47,36 +52,31 @@ fn print_class_file(classfile: &ClassFile) {
     );
     println!(
         "  this_class: #{}                         // {}",
-        classfile.this_class,
-        classfile.get_class_name(classfile.this_class)
+        cf.this_class,
+        cf.get_class_name(cf.this_class)
     );
     println!(
         "  super_class: #{}                         // {}",
-        classfile.super_class,
-        classfile.get_class_name(classfile.super_class)
+        cf.super_class,
+        cf.get_class_name(cf.super_class)
     );
     println!(
         " interfaces: {}, fields: {}, methods: {}, attributes: {}",
-        classfile.interfaces.len(),
-        classfile.fields.len(),
-        classfile.methods.len(),
-        classfile.attributes.len()
+        cf.interfaces.len(),
+        cf.fields.len(),
+        cf.methods.len(),
+        cf.attributes.len()
     );
     println!("Constant pool:");
-    for i in 0..classfile.constant_pool.len() {
+    for i in 0..cf.constant_pool.len() {
         if i > 0
-            && (matches!(
-                classfile.constant_pool[i - 1],
-                ConstantPoolInfo::Long { .. }
-            ) || matches!(
-                classfile.constant_pool[i - 1],
-                ConstantPoolInfo::Double { .. }
-            ))
+            && (matches!(cf.constant_pool[i - 1], ConstantPoolInfo::Long { .. })
+                || matches!(cf.constant_pool[i - 1], ConstantPoolInfo::Double { .. }))
         {
             continue;
         }
         print!("  #{} = ", i + 1);
-        match &classfile.constant_pool[i] {
+        match &cf.constant_pool[i] {
             ConstantPoolInfo::Utf8 { bytes } => {
                 print!("Utf8               {}", classfile::convert_utf8(bytes))
             }
@@ -95,13 +95,13 @@ fn print_class_file(classfile: &ClassFile) {
                 print!(
                     "String             #{}           // {}",
                     string_index,
-                    classfile.get_utf8_content(*string_index)
+                    cf.get_utf8_content(*string_index)
                 )
             }
             ConstantPoolInfo::Class { name_index } => print!(
                 "Class              #{}            // {}",
                 name_index,
-                classfile.get_utf8_content(*name_index)
+                cf.get_utf8_content(*name_index)
             ),
             ConstantPoolInfo::FieldRef {
                 class_index,
@@ -110,8 +110,8 @@ fn print_class_file(classfile: &ClassFile) {
                 "Fieldref           #{}.#{}         // {}.{}",
                 class_index,
                 name_and_type_index,
-                classfile.get_class_name(*class_index),
-                classfile.get_name_and_type(*name_and_type_index)
+                cf.get_class_name(*class_index),
+                cf.get_name_and_type(*name_and_type_index)
             ),
             ConstantPoolInfo::MethodRef {
                 class_index,
@@ -120,8 +120,8 @@ fn print_class_file(classfile: &ClassFile) {
                 "Methodref          #{}.#{}         // {}.{}",
                 class_index,
                 name_and_type_index,
-                classfile.get_class_name(*class_index),
-                classfile.get_name_and_type(*name_and_type_index)
+                cf.get_class_name(*class_index),
+                cf.get_name_and_type(*name_and_type_index)
             ),
             ConstantPoolInfo::InterfaceMethodRef {
                 class_index,
@@ -137,7 +137,7 @@ fn print_class_file(classfile: &ClassFile) {
                 "NameAndType        #{}:#{}       // {}",
                 name_index,
                 descriptor_index,
-                classfile.get_name_and_type_string(*name_index, *descriptor_index)
+                cf.get_name_and_type_string(*name_index, *descriptor_index)
             ),
             ConstantPoolInfo::MethodType {
                 descriptor_index: _,
