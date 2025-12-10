@@ -49,7 +49,9 @@ fn print_class_file(cf: &ClassFile) {
             .map(|f| classfile::access_flags::modifier_repr(*f))
             .collect::<Vec<String>>()
             .join(" "),
-        cf.get_class_name(cf.this_class).replace('/', ".")
+        cf.constant_pool
+            .get_class_name(cf.this_class)
+            .replace('/', ".")
     );
     println!("  minor version: {}", cf.minor_version);
     println!("  major version: {}", cf.major_version);
@@ -69,13 +71,13 @@ fn print_class_file(cf: &ClassFile) {
     println!(
         "{:<width$}// {}",
         format!("  this_class: #{}", cf.this_class),
-        cf.get_class_name(cf.this_class),
+        cf.constant_pool.get_class_name(cf.this_class),
         width = CP_COMMENT_START_INDEX,
     );
     println!(
         "{:<width$}// {}",
         format!("  super_class: #{}", cf.super_class),
-        cf.get_class_name(cf.super_class),
+        cf.constant_pool.get_class_name(cf.super_class),
         width = CP_COMMENT_START_INDEX
     );
     println!(
@@ -103,7 +105,7 @@ fn print_class_file(cf: &ClassFile) {
                         format!("#{}", i + 1),
                         width = CP_INDEX_WIDTH
                     ),
-                    classfile::convert_utf8(bytes),
+                    classfile::constant_pool::convert_utf8(bytes),
                     width = CP_INFO_START_INDEX
                 )
             }
@@ -136,7 +138,7 @@ fn print_class_file(cf: &ClassFile) {
                     string_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.get_utf8_content(*string_index),
+                cf.constant_pool.get_utf8_content(*string_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::Class { name_index } => println!(
@@ -151,7 +153,7 @@ fn print_class_file(cf: &ClassFile) {
                     name_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.get_utf8_content(*name_index),
+                cf.constant_pool.get_utf8_content(*name_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::FieldRef {
@@ -170,8 +172,8 @@ fn print_class_file(cf: &ClassFile) {
                     name_and_type_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.get_class_name(*class_index),
-                cf.get_name_and_type(*name_and_type_index),
+                cf.constant_pool.get_class_name(*class_index),
+                cf.constant_pool.get_name_and_type(*name_and_type_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodRef {
@@ -190,7 +192,8 @@ fn print_class_file(cf: &ClassFile) {
                     name_and_type_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.get_method_ref_string(*class_index, *name_and_type_index),
+                cf.constant_pool
+                    .get_method_ref_string(*class_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::InterfaceMethodRef {
@@ -209,7 +212,8 @@ fn print_class_file(cf: &ClassFile) {
                     name_and_type_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.get_method_ref_string(*class_index, *name_and_type_index),
+                cf.constant_pool
+                    .get_method_ref_string(*class_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::NameAndType {
@@ -228,7 +232,8 @@ fn print_class_file(cf: &ClassFile) {
                     descriptor_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.get_name_and_type_string(*name_index, *descriptor_index),
+                cf.constant_pool
+                    .get_name_and_type_string(*name_index, *descriptor_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodType { descriptor_index } => println!(
@@ -243,7 +248,7 @@ fn print_class_file(cf: &ClassFile) {
                     descriptor_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.get_utf8_content(*descriptor_index),
+                cf.constant_pool.get_utf8_content(*descriptor_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodHandle {
@@ -263,7 +268,7 @@ fn print_class_file(cf: &ClassFile) {
                     width = CP_INFO_START_INDEX
                 ),
                 classfile::reference_kind::java_repr(*reference_kind),
-                cf.get_method_ref(*reference_index),
+                cf.constant_pool.get_method_ref(*reference_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::InvokeDynamic {
@@ -283,7 +288,7 @@ fn print_class_file(cf: &ClassFile) {
                     width = CP_INFO_START_INDEX
                 ),
                 bootstrap_method_attr_index,
-                cf.get_name_and_type(*name_and_type_index),
+                cf.constant_pool.get_name_and_type(*name_and_type_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::Null {} => unreachable!(),

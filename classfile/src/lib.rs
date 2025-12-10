@@ -1,4 +1,5 @@
 pub mod access_flags;
+pub mod attributes;
 pub mod constant_pool;
 pub mod fields;
 pub mod reference_kind;
@@ -13,7 +14,8 @@ use sha2::{Digest, Sha256};
 
 use crate::access_flags::AccessFlag;
 use crate::access_flags::parse_access_flags;
-use crate::constant_pool::{ConstantPoolInfo, ConstantPoolTag};
+use crate::attributes::AttributeInfo;
+use crate::constant_pool::{ConstantPool, ConstantPoolInfo, ConstantPoolTag};
 use crate::fields::{FieldInfo, parse_fields};
 use crate::reference_kind::ReferenceKind;
 
@@ -25,7 +27,7 @@ pub struct ClassFile {
     pub sha256_digest: Vec<u8>,
     pub minor_version: u16,
     pub major_version: u16,
-    pub constant_pool: Vec<ConstantPoolInfo>,
+    pub constant_pool: ConstantPool,
     pub access_flags: Vec<AccessFlag>,
     pub this_class: u16,
     pub super_class: u16,
@@ -35,89 +37,7 @@ pub struct ClassFile {
     pub attributes: Vec<AttributeInfo>,
 }
 
-impl ClassFile {
-    pub fn get_class_name(&self, cp_index: u16) -> String {
-        let class_entry: &ConstantPoolInfo = &self.constant_pool[(cp_index - 1) as usize];
-        match class_entry {
-            ConstantPoolInfo::Class { name_index } => self.get_utf8_content(*name_index),
-            _ => panic!(
-                "Expected entry #{} to be of Class type but it wasn't.",
-                cp_index
-            ),
-        }
-    }
-
-    pub fn get_method_ref(&self, cp_index: u16) -> String {
-        let method_ref_entry: &ConstantPoolInfo = &self.constant_pool[(cp_index - 1) as usize];
-        match method_ref_entry {
-            ConstantPoolInfo::MethodRef {
-                class_index,
-                name_and_type_index,
-            } => self.get_method_ref_string(*class_index, *name_and_type_index),
-            _ => panic!(
-                "Expected entry #{} to be of Methodref type but it wasn't.",
-                cp_index
-            ),
-        }
-    }
-
-    pub fn get_method_ref_string(&self, class_index: u16, name_and_type_index: u16) -> String {
-        self.get_class_name(class_index) + "." + &self.get_name_and_type(name_and_type_index)
-    }
-
-    pub fn get_name_and_type(&self, cp_index: u16) -> String {
-        let name_and_type_entry: &ConstantPoolInfo = &self.constant_pool[(cp_index - 1) as usize];
-        match name_and_type_entry {
-            ConstantPoolInfo::NameAndType {
-                name_index,
-                descriptor_index,
-            } => self.get_name_and_type_string(*name_index, *descriptor_index),
-            _ => panic!(
-                "Expected entry #{} to be of NameAndType type but it wasn't.",
-                cp_index
-            ),
-        }
-    }
-
-    pub fn get_name_and_type_string(&self, name_index: u16, descriptor_index: u16) -> String {
-        let name = self.get_utf8_content(name_index);
-        if name.starts_with('<') {
-            "\"".to_owned() + &name + "\":" + &self.get_utf8_content(descriptor_index)
-        } else {
-            name + ":" + &self.get_utf8_content(descriptor_index)
-        }
-    }
-
-    pub fn get_utf8_content(&self, cp_index: u16) -> String {
-        let name_entry: &ConstantPoolInfo = &self.constant_pool[(cp_index - 1) as usize];
-        match name_entry {
-            ConstantPoolInfo::Utf8 { bytes } => {
-                let content = convert_utf8(bytes);
-                if content.starts_with('[') {
-                    "\"".to_owned() + &content + "\""
-                } else {
-                    content
-                }
-            }
-            _ => panic!(
-                "Expected entry #{} to be of Utf8 type but it wasn't.",
-                cp_index
-            ),
-        }
-    }
-}
-
-pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
-    String::from_utf8(utf8_bytes.to_vec())
-        .unwrap()
-        .replace("\n", "\\n")
-        .replace("'", "\\'")
-        .replace("\u{0001}", "\\u0001")
-}
-
 pub struct MethodInfo {}
-
-pub struct AttributeInfo {}
 
 fn absolute_no_symlinks(p: &Path) -> Result<PathBuf> {
     if p.is_absolute() {
@@ -153,8 +73,7 @@ pub fn parse_class_file(filename: String) -> ClassFile {
     let major_version: u16 = reader.read_u16().unwrap();
 
     let cp_count: u16 = reader.read_u16().unwrap();
-    let constant_pool: Vec<ConstantPoolInfo> =
-        parse_constant_pool(&mut reader, (cp_count - 1).into());
+    let constant_pool: ConstantPool = parse_constant_pool(&mut reader, (cp_count - 1).into());
 
     let access_flags: Vec<AccessFlag> = parse_access_flags(reader.read_u16().unwrap());
 
@@ -165,7 +84,7 @@ pub fn parse_class_file(filename: String) -> ClassFile {
     let interfaces: Vec<u16> = reader.read_u16_vec(interfaces_count.into()).unwrap();
 
     let fields_count: u16 = reader.read_u16().unwrap();
-    let fields: Vec<FieldInfo> = parse_fields(&mut reader, fields_count.into());
+    let fields: Vec<FieldInfo> = parse_fields(&mut reader, &constant_pool, fields_count.into());
 
     let methods_count: u16 = reader.read_u16().unwrap();
     let methods: Vec<MethodInfo> = Vec::with_capacity(methods_count.into());
@@ -189,19 +108,19 @@ pub fn parse_class_file(filename: String) -> ClassFile {
     }
 }
 
-fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> Vec<ConstantPoolInfo> {
-    let mut cp: Vec<ConstantPoolInfo> = Vec::with_capacity(cp_count);
+fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> ConstantPool {
+    let mut entries: Vec<ConstantPoolInfo> = Vec::with_capacity(cp_count);
     let mut i = 0;
     while i < cp_count {
         let tag = ConstantPoolTag::from(reader.read_u8().unwrap());
-        cp.push(parse_constant_pool_info(reader, tag.clone()));
+        entries.push(parse_constant_pool_info(reader, tag.clone()));
         if matches!(tag, ConstantPoolTag::Long) || matches!(tag, ConstantPoolTag::Double) {
-            cp.push(ConstantPoolInfo::Null {});
+            entries.push(ConstantPoolInfo::Null {});
             i += 1;
         }
         i += 1;
     }
-    cp
+    ConstantPool { entries }
 }
 
 fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> ConstantPoolInfo {
@@ -251,8 +170,4 @@ fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> 
         },
         _ => panic!("Unknown constant pool tag {:?}.", tag),
     }
-}
-
-fn parse_attributes(reader: &mut BinaryReader, num_attributes: usize) -> Vec<AttributeInfo> {
-    return Vec::new();
 }
