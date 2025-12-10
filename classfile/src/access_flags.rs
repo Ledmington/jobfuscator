@@ -2,6 +2,8 @@
 #[derive(Copy, Clone)]
 pub enum AccessFlag {
     Public = 0x0001,
+    Private = 0x0002,
+    Protected = 0x0004,
     Final = 0x0010,
     Super = 0x0020,
     Interface = 0x0200,
@@ -27,6 +29,8 @@ pub const ALL_CLASS_FLAGS: &[(AccessFlag, u16)] = &[
 pub fn java_repr(flag: AccessFlag) -> String {
     match flag {
         AccessFlag::Public => "ACC_PUBLIC",
+        AccessFlag::Private => "ACC_PRIVATE",
+        AccessFlag::Protected => "ACC_PROTECTED",
         AccessFlag::Final => "ACC_FINAL",
         AccessFlag::Super => "ACC_SUPER",
         AccessFlag::Interface => "ACC_INTERFACE",
@@ -43,12 +47,16 @@ pub fn java_repr(flag: AccessFlag) -> String {
 pub fn modifier_repr(flag: AccessFlag) -> String {
     match flag {
         AccessFlag::Public => "public",
+        AccessFlag::Private => "private",
+        AccessFlag::Protected => "protected",
         AccessFlag::Final => "final",
         AccessFlag::Super => "class",
         AccessFlag::Interface => "interface",
         AccessFlag::Abstract => "abstract",
         AccessFlag::Enum => "enum",
-        _ => "unknown",
+        AccessFlag::Synthetic => todo!(),
+        AccessFlag::Annotation => todo!(),
+        AccessFlag::Module => todo!(),
     }
     .to_string()
 }

@@ -8,10 +8,10 @@ use crate::{
 };
 
 pub struct FieldInfo {
-    access_flags: Vec<AccessFlag>,
-    name_index: u16,
-    descriptor_index: u16,
-    attributes: Vec<AttributeInfo>,
+    pub access_flags: Vec<AccessFlag>,
+    pub name_index: u16,
+    pub descriptor_index: u16,
+    pub attributes: Vec<AttributeInfo>,
 }
 
 pub fn parse_fields(
@@ -33,5 +33,5 @@ pub fn parse_fields(
             attributes,
         });
     }
-    return fields;
+    fields
 }

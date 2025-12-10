@@ -13,7 +13,7 @@ pub fn parse_attributes(
     for _ in 0..num_attributes {
         attributes.push(parse_attribute(reader, cp));
     }
-    return attributes;
+    attributes
 }
 
 fn parse_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {

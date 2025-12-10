@@ -2,6 +2,7 @@ use std::io::Result;
 use std::{env, path::MAIN_SEPARATOR};
 
 use classfile::constant_pool::ConstantPoolInfo;
+use classfile::fields::FieldInfo;
 use classfile::{ClassFile, parse_class_file};
 
 /**
@@ -20,6 +21,14 @@ const CP_INFO_START_INDEX: usize = 28;
 const CP_COMMENT_START_INDEX: usize = 42;
 
 fn print_class_file(cf: &ClassFile) {
+    print_header(cf);
+    print_constant_pool(cf);
+    println!("{{");
+    print_fields(cf);
+    println!("}}");
+}
+
+fn print_header(cf: &ClassFile) {
     println!("Classfile {}", cf.absolute_file_path);
     println!("  Last modified Dec 5, 2025; size 12150 bytes");
     println!(
@@ -87,6 +96,9 @@ fn print_class_file(cf: &ClassFile) {
         cf.methods.len(),
         cf.attributes.len()
     );
+}
+
+fn print_constant_pool(cf: &ClassFile) {
     println!("Constant pool:");
     for i in 0..cf.constant_pool.len() {
         if i > 0
@@ -294,7 +306,41 @@ fn print_class_file(cf: &ClassFile) {
             ConstantPoolInfo::Null {} => unreachable!(),
         }
     }
-    println!("{{");
+}
+
+fn print_fields(cf: &ClassFile) {
+    for i in 0..cf.fields.len() {
+        let field: &FieldInfo = &cf.fields[i];
+        let descriptor: String = cf.constant_pool.get_utf8_content(field.descriptor_index);
+        println!(
+            "  {} {} {};",
+            field
+                .access_flags
+                .iter()
+                .map(|f| classfile::access_flags::modifier_repr(*f))
+                .collect::<Vec<String>>()
+                .join(" "),
+            descriptor,
+            cf.constant_pool.get_utf8_content(field.name_index)
+        );
+        println!("    descriptor: {}", descriptor);
+        println!(
+            "    flags: (0x{:04x}) {}",
+            field
+                .access_flags
+                .iter()
+                .map(|f| *f as u16)
+                .reduce(|a, b| a | b)
+                .unwrap(),
+            field
+                .access_flags
+                .iter()
+                .map(|f| classfile::access_flags::java_repr(*f))
+                .collect::<Vec<String>>()
+                .join(", ")
+        );
+        println!();
+    }
 }
 
 fn main() -> Result<()> {
