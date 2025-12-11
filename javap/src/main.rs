@@ -3,6 +3,7 @@ use std::{env, path::MAIN_SEPARATOR};
 
 use classfile::constant_pool::ConstantPoolInfo;
 use classfile::fields::FieldInfo;
+use classfile::methods::MethodInfo;
 use classfile::{ClassFile, parse_class_file};
 
 /**
@@ -25,6 +26,7 @@ fn print_class_file(cf: &ClassFile) {
     print_constant_pool(cf);
     println!("{{");
     print_fields(cf);
+    print_methods(cf);
     println!("}}");
 }
 
@@ -333,6 +335,40 @@ fn print_fields(cf: &ClassFile) {
                 .reduce(|a, b| a | b)
                 .unwrap(),
             field
+                .access_flags
+                .iter()
+                .map(|f| classfile::access_flags::java_repr(*f))
+                .collect::<Vec<String>>()
+                .join(", ")
+        );
+        println!();
+    }
+}
+
+fn print_methods(cf: &ClassFile) {
+    for i in 0..cf.methods.len() {
+        let method: &MethodInfo = &cf.methods[i];
+        let descriptor: String = cf.constant_pool.get_utf8_content(method.descriptor_index);
+        println!(
+            "  {} {}",
+            method
+                .access_flags
+                .iter()
+                .map(|f| classfile::access_flags::modifier_repr(*f))
+                .collect::<Vec<String>>()
+                .join(" "),
+            classfile::convert_descriptor(descriptor.clone())
+        );
+        println!("    descriptor: {}", descriptor);
+        println!(
+            "    flags: (0x{:04x}) {}",
+            method
+                .access_flags
+                .iter()
+                .map(|f| *f as u16)
+                .reduce(|a, b| a | b)
+                .unwrap(),
+            method
                 .access_flags
                 .iter()
                 .map(|f| classfile::access_flags::java_repr(*f))
