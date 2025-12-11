@@ -1,5 +1,7 @@
 use std::ops::Index;
 
+use binary_reader::BinaryReader;
+
 use crate::reference_kind::ReferenceKind;
 
 pub struct ConstantPool {
@@ -196,5 +198,69 @@ impl From<u8> for ConstantPoolTag {
             20 => ConstantPoolTag::Package,
             _ => panic!("Unknown constant pool tag value {}.", value),
         }
+    }
+}
+
+pub fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> ConstantPool {
+    let mut entries: Vec<ConstantPoolInfo> = Vec::with_capacity(cp_count);
+    let mut i = 0;
+    while i < cp_count {
+        let tag = ConstantPoolTag::from(reader.read_u8().unwrap());
+        entries.push(parse_constant_pool_info(reader, tag.clone()));
+        if matches!(tag, ConstantPoolTag::Long) || matches!(tag, ConstantPoolTag::Double) {
+            entries.push(ConstantPoolInfo::Null {});
+            i += 1;
+        }
+        i += 1;
+    }
+    ConstantPool { entries }
+}
+
+fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> ConstantPoolInfo {
+    match tag {
+        ConstantPoolTag::Utf8 => {
+            let length: u16 = reader.read_u16().unwrap();
+            ConstantPoolInfo::Utf8 {
+                bytes: reader.read_u8_vec(length.into()).unwrap(),
+            }
+        }
+        ConstantPoolTag::Long => ConstantPoolInfo::Long {
+            high_bytes: reader.read_u32().unwrap(),
+            low_bytes: reader.read_u32().unwrap(),
+        },
+        ConstantPoolTag::String => ConstantPoolInfo::String {
+            string_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::Class => ConstantPoolInfo::Class {
+            name_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::Fieldref => ConstantPoolInfo::FieldRef {
+            class_index: reader.read_u16().unwrap(),
+            name_and_type_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::Methodref => ConstantPoolInfo::MethodRef {
+            class_index: reader.read_u16().unwrap(),
+            name_and_type_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::InterfaceMethodref => ConstantPoolInfo::InterfaceMethodRef {
+            class_index: reader.read_u16().unwrap(),
+            name_and_type_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::NameAndType => ConstantPoolInfo::NameAndType {
+            name_index: reader.read_u16().unwrap(),
+            descriptor_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::MethodHandle => ConstantPoolInfo::MethodHandle {
+            reference_kind: ReferenceKind::from(reader.read_u8().unwrap()),
+            reference_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::MethodType => ConstantPoolInfo::MethodType {
+            descriptor_index: reader.read_u16().unwrap(),
+        },
+        ConstantPoolTag::InvokeDynamic => ConstantPoolInfo::InvokeDynamic {
+            bootstrap_method_attr_index: reader.read_u16().unwrap(),
+            name_and_type_index: reader.read_u16().unwrap(),
+        },
+        _ => panic!("Unknown constant pool tag {:?}.", tag),
     }
 }
