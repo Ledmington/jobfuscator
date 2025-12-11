@@ -4,7 +4,6 @@ use crate::constant_pool::ConstantPool;
 
 pub enum AttributeInfo {
     Code {
-        attribute_name_index: u16,
         max_stack: u16,
         max_locals: u16,
         code: Vec<u8>,
@@ -31,27 +30,27 @@ pub enum AttributeInfo {
     },
 }
 
-struct ExceptionTableEntry {
-    start_pc: u16,
-    end_pc: u16,
-    handler_pc: u16,
-    catch_type: u16,
+pub struct ExceptionTableEntry {
+    pub start_pc: u16,
+    pub end_pc: u16,
+    pub handler_pc: u16,
+    pub catch_type: u16,
 }
 
-struct LineNumberTableEntry {
-    start_pc: u16,
-    line_number: u16,
+pub struct LineNumberTableEntry {
+    pub start_pc: u16,
+    pub line_number: u16,
 }
 
-struct LocalVariableTableEntry {
-    start_pc: u16,
-    length: u16,
-    name_index: u16,
-    descriptor_index: u16,
-    index: u16,
+pub struct LocalVariableTableEntry {
+    pub start_pc: u16,
+    pub length: u16,
+    pub name_index: u16,
+    pub descriptor_index: u16,
+    pub index: u16,
 }
 
-enum StackMapFrame {
+pub enum StackMapFrame {
     SameFrame {
         frame_type: u8,
     },
@@ -82,7 +81,8 @@ enum StackMapFrame {
     },
 }
 
-enum VerificationTypeInfo {
+#[derive(Debug)]
+pub enum VerificationTypeInfo {
     TopVariable,
     IntegerVariable,
     FloatVariable,
@@ -94,17 +94,17 @@ enum VerificationTypeInfo {
     UninitializedVariable { offset: u16 },
 }
 
-struct BootstrapMethod {
-    bootstrap_method_ref: u16,
-    bootstrap_arguments: Vec<u16>,
+pub struct BootstrapMethod {
+    pub bootstrap_method_ref: u16,
+    pub bootstrap_arguments: Vec<u16>,
 }
 
 // TODO: find a better name
-struct Class {
-    inner_class_info_index: u16,
-    outer_class_info_index: u16,
-    inner_name_index: u16,
-    inner_class_access_flags: u16,
+pub struct Class {
+    pub inner_class_info_index: u16,
+    pub outer_class_info_index: u16,
+    pub inner_name_index: u16,
+    pub inner_class_access_flags: u16,
 }
 
 pub fn parse_attributes(
@@ -148,7 +148,6 @@ fn parse_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInf
             let attributes: Vec<AttributeInfo> =
                 parse_attributes(reader, cp, attribute_count.into());
             AttributeInfo::Code {
-                attribute_name_index,
                 max_stack,
                 max_locals,
                 code,

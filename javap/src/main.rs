@@ -1,9 +1,8 @@
 use std::io::Result;
 use std::{env, path::MAIN_SEPARATOR};
 
-use classfile::constant_pool::ConstantPoolInfo;
-use classfile::fields::FieldInfo;
-use classfile::methods::MethodInfo;
+use classfile::attributes::AttributeInfo;
+use classfile::constant_pool::{ConstantPool, ConstantPoolInfo};
 use classfile::{ClassFile, parse_class_file};
 
 /**
@@ -311,8 +310,7 @@ fn print_constant_pool(cf: &ClassFile) {
 }
 
 fn print_fields(cf: &ClassFile) {
-    for i in 0..cf.fields.len() {
-        let field: &FieldInfo = &cf.fields[i];
+    for field in cf.fields.iter() {
         let descriptor: String = cf.constant_pool.get_utf8_content(field.descriptor_index);
         println!(
             "  {} {} {};",
@@ -346,8 +344,7 @@ fn print_fields(cf: &ClassFile) {
 }
 
 fn print_methods(cf: &ClassFile) {
-    for i in 0..cf.methods.len() {
-        let method: &MethodInfo = &cf.methods[i];
+    for method in cf.methods.iter() {
         let descriptor: String = cf.constant_pool.get_utf8_content(method.descriptor_index);
         println!(
             "  {} {}",
@@ -375,7 +372,104 @@ fn print_methods(cf: &ClassFile) {
                 .collect::<Vec<String>>()
                 .join(", ")
         );
+
+        print_attributes(&cf.constant_pool, &method.attributes);
+
         println!();
+    }
+}
+
+fn print_attributes(cp: &ConstantPool, attributes: &Vec<AttributeInfo>) {
+    for attribute in attributes.iter() {
+        match attribute {
+            AttributeInfo::Code {
+                max_stack,
+                max_locals,
+                code,
+                exception_table,
+                attributes,
+            } => {
+                println!("    Code:");
+                println!(
+                    "      stack={}, locals={}, args_size={}",
+                    max_stack, max_locals, 0
+                );
+                for i in 0..code.len() {
+                    println!("       {}: {}",i,code[i]);
+                }
+                print_attributes(cp, attributes);
+                if !exception_table.is_empty() {
+                println!("      Exception table:");
+                println!("         from    to  target type");
+                for exception in exception_table.iter() {
+                    println!("          {}  {}  {}   Class {}",exception.start_pc,exception.end_pc,exception.handler_pc,exception.catch_type);
+                }}
+            }
+            AttributeInfo::LineNumberTable { line_number_table } => {
+                println!("      LineNumberTable:");
+                for entry in line_number_table.iter() {
+                    println!("        line {}: {}", entry.line_number, entry.start_pc);
+                }
+            }
+            AttributeInfo::LocalVariableTable {
+                local_variable_table,
+            } => {
+                println!("      LocalVariableTable:");
+                println!("        Start  Length  Slot  Name   Signature");
+                for entry in local_variable_table.iter() {
+                    println!(
+                        "         {:4}    {:4}    {:2} {:>5}   {}",
+                        entry.start_pc,
+                        entry.length,
+                        entry.index,
+                        cp.get_utf8_content(entry.name_index),
+                        cp.get_utf8_content(entry.descriptor_index)
+                    );
+                }
+            }
+            AttributeInfo::StackMapTable { stack_map_table } => {
+                println!(
+                    "      StackMapTable: number_of_entries = {}",
+                    stack_map_table.len()
+                );
+                for frame in stack_map_table.iter() {
+                    match frame {
+                        classfile::attributes::StackMapFrame::SameFrame { frame_type } => 
+                            println!("        frame_type = {} /* same */",frame_type)
+                        ,
+                        classfile::attributes::StackMapFrame::SameLocals1StackItemFrame { frame_type, stack } => {
+                            println!("        frame_type = {} /* same_locals_1_stack_item */",frame_type);
+                            println!("          stack = [ {:?} ]",stack);
+                        },
+                        classfile::attributes::StackMapFrame::SameLocals1StackItemFrameExtended { offset_delta, stack } => {
+                            println!("        frame_type = 247 /* same_locals_1_stack_item_frame_extended */");
+                            println!("          offset_delta = {}",offset_delta);
+                            println!("          stack = [ {:?} ]",stack);
+                        },
+                        classfile::attributes::StackMapFrame::ChopFrame { frame_type, offset_delta } => {
+                            println!("        frame_type = {} /* chop */",frame_type);
+                            println!("          offset_delta = {}",offset_delta);
+                        },
+                        classfile::attributes::StackMapFrame::SameFrameExtended { offset_delta } => {
+                            println!("        frame_type = 251 /* same_frame_extended */");
+                            println!("          offset_delta = {}",offset_delta);
+                        },
+                        classfile::attributes::StackMapFrame::AppendFrame { frame_type, offset_delta, locals } => {
+                            println!("        frame_type = {} /* append */",frame_type);
+                            println!("          offset_delta = {}",offset_delta);
+                            println!("          locals = [ {} ]",locals.iter().map(|x| format!("{:?}", x)).collect::<Vec<String>>().join(", "));
+                        },
+                        classfile::attributes::StackMapFrame::FullFrame { offset_delta, locals, stack } => {
+                            println!("        frame_type = 255 /* full_frame */");
+                            println!("          offset_delta = {}",offset_delta);
+                            println!("          locals = [ {} ]",locals.iter().map(|x| format!("{:?}", x)).collect::<Vec<String>>().join(", "));
+                            println!("          stack = [ {} ]",stack.iter().map(|x| format!("{:?}", x)).collect::<Vec<String>>().join(", "));
+                        },
+                    }
+                }
+            }
+            _ => todo!(),
+        }
     }
 }
 
