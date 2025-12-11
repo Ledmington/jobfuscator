@@ -320,7 +320,7 @@ fn print_fields(cf: &ClassFile) {
                 .map(|f| classfile::access_flags::modifier_repr(*f))
                 .collect::<Vec<String>>()
                 .join(" "),
-            descriptor,
+            classfile::convert_descriptor(descriptor.clone()),
             cf.constant_pool.get_utf8_content(field.name_index)
         );
         println!("    descriptor: {}", descriptor);

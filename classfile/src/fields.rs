@@ -22,8 +22,8 @@ pub fn parse_fields(
     let mut fields: Vec<FieldInfo> = Vec::with_capacity(num_fields);
     for _ in 0..num_fields {
         let access_flags = access_flags::parse_access_flags(reader.read_u16().unwrap());
-        let name_index = reader.read_u16().unwrap();
-        let descriptor_index = reader.read_u16().unwrap();
+        let name_index: u16 = reader.read_u16().unwrap();
+        let descriptor_index: u16 = reader.read_u16().unwrap();
         let attributes_count: u16 = reader.read_u16().unwrap();
         let attributes: Vec<AttributeInfo> = parse_attributes(reader, cp, attributes_count.into());
         fields.push(FieldInfo {

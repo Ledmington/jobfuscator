@@ -4,6 +4,7 @@ pub enum AccessFlag {
     Public = 0x0001,
     Private = 0x0002,
     Protected = 0x0004,
+    Static = 0x0008,
     Final = 0x0010,
     Super = 0x0020,
     Interface = 0x0200,
@@ -16,6 +17,9 @@ pub enum AccessFlag {
 
 pub const ALL_CLASS_FLAGS: &[(AccessFlag, u16)] = &[
     (AccessFlag::Public, AccessFlag::Public as u16),
+    (AccessFlag::Private, AccessFlag::Private as u16),
+    (AccessFlag::Protected, AccessFlag::Protected as u16),
+    (AccessFlag::Static, AccessFlag::Static as u16),
     (AccessFlag::Final, AccessFlag::Final as u16),
     (AccessFlag::Super, AccessFlag::Super as u16),
     (AccessFlag::Interface, AccessFlag::Interface as u16),
@@ -31,6 +35,7 @@ pub fn java_repr(flag: AccessFlag) -> String {
         AccessFlag::Public => "ACC_PUBLIC",
         AccessFlag::Private => "ACC_PRIVATE",
         AccessFlag::Protected => "ACC_PROTECTED",
+        AccessFlag::Static => "ACC_STATIC",
         AccessFlag::Final => "ACC_FINAL",
         AccessFlag::Super => "ACC_SUPER",
         AccessFlag::Interface => "ACC_INTERFACE",
@@ -49,6 +54,7 @@ pub fn modifier_repr(flag: AccessFlag) -> String {
         AccessFlag::Public => "public",
         AccessFlag::Private => "private",
         AccessFlag::Protected => "protected",
+        AccessFlag::Static => "static",
         AccessFlag::Final => "final",
         AccessFlag::Super => "class",
         AccessFlag::Interface => "interface",

@@ -171,3 +171,11 @@ fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> 
         _ => panic!("Unknown constant pool tag {:?}.", tag),
     }
 }
+
+pub fn convert_descriptor(descriptor: String) -> String {
+    if descriptor.starts_with('L') && descriptor.ends_with(';') {
+        descriptor[1..(descriptor.len() - 1)].replace('/', ".")
+    } else {
+        descriptor
+    }
+}
