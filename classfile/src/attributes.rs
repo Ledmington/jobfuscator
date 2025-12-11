@@ -2,7 +2,110 @@ use binary_reader::BinaryReader;
 
 use crate::constant_pool::ConstantPool;
 
-pub struct AttributeInfo {}
+pub enum AttributeInfo {
+    Code {
+        attribute_name_index: u16,
+        max_stack: u16,
+        max_locals: u16,
+        code: Vec<u8>,
+        exception_table: Vec<ExceptionTableEntry>,
+        attributes: Vec<AttributeInfo>,
+    },
+    LineNumberTable {
+        line_number_table: Vec<LineNumberTableEntry>,
+    },
+    LocalVariableTable {
+        local_variable_table: Vec<LocalVariableTableEntry>,
+    },
+    StackMapTable {
+        stack_map_table: Vec<StackMapFrame>,
+    },
+    SourceFile {
+        source_file_index: u16,
+    },
+    BootstrapMethods {
+        methods: Vec<BootstrapMethod>,
+    },
+    InnerClasses {
+        classes: Vec<Class>,
+    },
+}
+
+struct ExceptionTableEntry {
+    start_pc: u16,
+    end_pc: u16,
+    handler_pc: u16,
+    catch_type: u16,
+}
+
+struct LineNumberTableEntry {
+    start_pc: u16,
+    line_number: u16,
+}
+
+struct LocalVariableTableEntry {
+    start_pc: u16,
+    length: u16,
+    name_index: u16,
+    descriptor_index: u16,
+    index: u16,
+}
+
+enum StackMapFrame {
+    SameFrame {
+        frame_type: u8,
+    },
+    SameLocals1StackItemFrame {
+        frame_type: u8,
+        stack: VerificationTypeInfo,
+    },
+    SameLocals1StackItemFrameExtended {
+        offset_delta: u16,
+        stack: VerificationTypeInfo,
+    },
+    ChopFrame {
+        frame_type: u8,
+        offset_delta: u16,
+    },
+    SameFrameExtended {
+        offset_delta: u16,
+    },
+    AppendFrame {
+        frame_type: u8,
+        offset_delta: u16,
+        locals: Vec<VerificationTypeInfo>,
+    },
+    FullFrame {
+        offset_delta: u16,
+        locals: Vec<VerificationTypeInfo>,
+        stack: Vec<VerificationTypeInfo>,
+    },
+}
+
+enum VerificationTypeInfo {
+    TopVariable,
+    IntegerVariable,
+    FloatVariable,
+    LongVariable,
+    DoubleVariable,
+    NullVariable,
+    UninitializedThisVariable,
+    ObjectVariable { constant_pool_index: u16 },
+    UninitializedVariable { offset: u16 },
+}
+
+struct BootstrapMethod {
+    bootstrap_method_ref: u16,
+    bootstrap_arguments: Vec<u16>,
+}
+
+// TODO: find a better name
+struct Class {
+    inner_class_info_index: u16,
+    outer_class_info_index: u16,
+    inner_name_index: u16,
+    inner_class_access_flags: u16,
+}
 
 pub fn parse_attributes(
     reader: &mut BinaryReader,
@@ -19,7 +122,190 @@ pub fn parse_attributes(
 fn parse_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
-    match attribute_name {
+    let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
+    match attribute_name.as_str() {
+        "Code" => {
+            let max_stack: u16 = reader.read_u16().unwrap();
+            let max_locals: u16 = reader.read_u16().unwrap();
+            let code_length: u32 = reader.read_u32().unwrap();
+            let code: Vec<u8> = reader.read_u8_vec(code_length.try_into().unwrap()).unwrap();
+            let exception_table_length: u16 = reader.read_u16().unwrap();
+            let mut exception_table: Vec<ExceptionTableEntry> =
+                Vec::with_capacity(exception_table_length.into());
+            for _ in 0..exception_table_length {
+                let start_pc: u16 = reader.read_u16().unwrap();
+                let end_pc: u16 = reader.read_u16().unwrap();
+                let handler_pc: u16 = reader.read_u16().unwrap();
+                let catch_type: u16 = reader.read_u16().unwrap();
+                exception_table.push(ExceptionTableEntry {
+                    start_pc,
+                    end_pc,
+                    handler_pc,
+                    catch_type,
+                });
+            }
+            let attribute_count: u16 = reader.read_u16().unwrap();
+            let attributes: Vec<AttributeInfo> =
+                parse_attributes(reader, cp, attribute_count.into());
+            AttributeInfo::Code {
+                attribute_name_index,
+                max_stack,
+                max_locals,
+                code,
+                exception_table,
+                attributes,
+            }
+        }
+        "LineNumberTable" => {
+            let line_number_table_length: u16 = reader.read_u16().unwrap();
+            let mut line_number_table: Vec<LineNumberTableEntry> =
+                Vec::with_capacity(line_number_table_length.into());
+            for _ in 0..line_number_table_length {
+                let start_pc: u16 = reader.read_u16().unwrap();
+                let line_number: u16 = reader.read_u16().unwrap();
+                line_number_table.push(LineNumberTableEntry {
+                    start_pc,
+                    line_number,
+                });
+            }
+            AttributeInfo::LineNumberTable { line_number_table }
+        }
+        "LocalVariableTable" => {
+            let local_variable_table_length: u16 = reader.read_u16().unwrap();
+            let mut local_variable_table: Vec<LocalVariableTableEntry> =
+                Vec::with_capacity(local_variable_table_length.into());
+            for _ in 0..local_variable_table_length {
+                let start_pc: u16 = reader.read_u16().unwrap();
+                let length: u16 = reader.read_u16().unwrap();
+                let name_index: u16 = reader.read_u16().unwrap();
+                let descriptor_index: u16 = reader.read_u16().unwrap();
+                let index: u16 = reader.read_u16().unwrap();
+                local_variable_table.push(LocalVariableTableEntry {
+                    start_pc,
+                    length,
+                    name_index,
+                    descriptor_index,
+                    index,
+                });
+            }
+            AttributeInfo::LocalVariableTable {
+                local_variable_table,
+            }
+        }
+        "StackMapTable" => {
+            let number_of_entries: u16 = reader.read_u16().unwrap();
+            let mut stack_map_table: Vec<StackMapFrame> =
+                Vec::with_capacity(number_of_entries.into());
+            for _ in 0..number_of_entries {
+                stack_map_table.push(parse_stack_map_entry(reader));
+            }
+            AttributeInfo::StackMapTable { stack_map_table }
+        }
+        "SourceFile" => AttributeInfo::SourceFile {
+            source_file_index: reader.read_u16().unwrap(),
+        },
+        "BootstrapMethods" => {
+            let num_bootstrap_methods: u16 = reader.read_u16().unwrap();
+            let mut methods: Vec<BootstrapMethod> =
+                Vec::with_capacity(num_bootstrap_methods.into());
+            for _ in 0..num_bootstrap_methods {
+                let bootstrap_method_ref: u16 = reader.read_u16().unwrap();
+                let num_bootstrap_arguments: u16 = reader.read_u16().unwrap();
+                let bootstrap_arguments: Vec<u16> =
+                    reader.read_u16_vec(num_bootstrap_arguments.into()).unwrap();
+                methods.push(BootstrapMethod {
+                    bootstrap_method_ref,
+                    bootstrap_arguments,
+                });
+            }
+            AttributeInfo::BootstrapMethods { methods }
+        }
+        "InnerClasses" => {
+            let number_of_classes: u16 = reader.read_u16().unwrap();
+            let mut classes: Vec<Class> = Vec::with_capacity(number_of_classes.into());
+            for _ in 0..number_of_classes {
+                classes.push(Class {
+                    inner_class_info_index: reader.read_u16().unwrap(),
+                    outer_class_info_index: reader.read_u16().unwrap(),
+                    inner_name_index: reader.read_u16().unwrap(),
+                    inner_class_access_flags: reader.read_u16().unwrap(),
+                });
+            }
+            AttributeInfo::InnerClasses { classes }
+        }
         _ => panic!("Unknown attribute name {}.", attribute_name),
+    }
+}
+
+fn parse_stack_map_entry(reader: &mut BinaryReader) -> StackMapFrame {
+    let frame_type: u8 = reader.read_u8().unwrap();
+    match frame_type {
+        0..=63 => StackMapFrame::SameFrame { frame_type },
+        64..=127 => StackMapFrame::SameLocals1StackItemFrame {
+            frame_type,
+            stack: parse_verification_type_info(reader),
+        },
+        128..=246 => panic!("Frame type {} is reserved.", frame_type),
+        247 => StackMapFrame::SameLocals1StackItemFrameExtended {
+            offset_delta: reader.read_u16().unwrap(),
+            stack: parse_verification_type_info(reader),
+        },
+        248..=250 => StackMapFrame::ChopFrame {
+            frame_type,
+            offset_delta: reader.read_u16().unwrap(),
+        },
+        251 => StackMapFrame::SameFrameExtended {
+            offset_delta: reader.read_u16().unwrap(),
+        },
+        252..=254 => StackMapFrame::AppendFrame {
+            frame_type,
+            offset_delta: reader.read_u16().unwrap(),
+            locals: parse_verification_type_info_vec(reader, (frame_type - 251).into()),
+        },
+        255 => {
+            let offset_delta: u16 = reader.read_u16().unwrap();
+            let number_of_locals: u16 = reader.read_u16().unwrap();
+            let locals: Vec<VerificationTypeInfo> =
+                parse_verification_type_info_vec(reader, number_of_locals.into());
+            let number_of_stack_items: u16 = reader.read_u16().unwrap();
+            let stack: Vec<VerificationTypeInfo> =
+                parse_verification_type_info_vec(reader, number_of_stack_items.into());
+            StackMapFrame::FullFrame {
+                offset_delta,
+                locals,
+                stack,
+            }
+        }
+    }
+}
+
+fn parse_verification_type_info_vec(
+    reader: &mut BinaryReader,
+    num: usize,
+) -> Vec<VerificationTypeInfo> {
+    let mut result: Vec<VerificationTypeInfo> = Vec::with_capacity(num);
+    for _ in 0..num {
+        result.push(parse_verification_type_info(reader));
+    }
+    result
+}
+
+fn parse_verification_type_info(reader: &mut BinaryReader) -> VerificationTypeInfo {
+    let tag: u8 = reader.read_u8().unwrap();
+    match tag {
+        0 => VerificationTypeInfo::TopVariable,
+        1 => VerificationTypeInfo::IntegerVariable,
+        2 => VerificationTypeInfo::FloatVariable,
+        3 => VerificationTypeInfo::DoubleVariable,
+        4 => VerificationTypeInfo::LongVariable,
+        5 => VerificationTypeInfo::NullVariable,
+        6 => VerificationTypeInfo::UninitializedThisVariable,
+        7 => VerificationTypeInfo::ObjectVariable {
+            constant_pool_index: reader.read_u16().unwrap(),
+        },
+        8 => VerificationTypeInfo::UninitializedVariable {
+            offset: reader.read_u16().unwrap(),
+        },
+        _ => panic!("Wrong verification type info tag {}", tag),
     }
 }
