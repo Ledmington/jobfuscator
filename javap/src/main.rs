@@ -4,6 +4,7 @@ use std::io::Result;
 use std::{env, path::MAIN_SEPARATOR};
 
 use classfile::attributes::AttributeInfo;
+use classfile::bytecode::BytecodeInstruction;
 use classfile::constant_pool::{ConstantPool, ConstantPoolInfo};
 use classfile::{ClassFile, parse_class_file};
 
@@ -399,7 +400,115 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                 for (i, instruction) in code.iter().enumerate() {
                     print!("       {}: ", i);
                     match instruction {
-                        _ => println!("ciao"),
+                        BytecodeInstruction::AConstNull {} => println!("aconst_null"),
+                        BytecodeInstruction::ANewArray {
+                            constant_pool_index,
+                        } => println!("anewarray #{}", constant_pool_index),
+                        BytecodeInstruction::New {
+                            constant_pool_index,
+                        } => println!("new #{}", constant_pool_index),
+                        BytecodeInstruction::AThrow {} => println!("athrow"),
+                        BytecodeInstruction::Dup {} => println!("dup"),
+                        BytecodeInstruction::IConst { constant } => println!("iconst {}", constant),
+                        BytecodeInstruction::AaLoad {} => println!("aaload"),
+                        BytecodeInstruction::AaStore {} => println!("aastore"),
+                        BytecodeInstruction::ALoad {
+                            local_variable_index,
+                        } => println!("aload {}", local_variable_index),
+                        BytecodeInstruction::AStore {
+                            local_variable_index,
+                        } => println!("astore {}", local_variable_index),
+                        BytecodeInstruction::ILoad {
+                            local_variable_index,
+                        } => println!("iload {}", local_variable_index),
+                        BytecodeInstruction::IStore {
+                            local_variable_index,
+                        } => println!("istore {}", local_variable_index),
+                        BytecodeInstruction::LStore {
+                            local_variable_index,
+                        } => println!("lstore {}", local_variable_index),
+                        BytecodeInstruction::LLoad {
+                            local_variable_index,
+                        } => println!("lload {}", local_variable_index),
+                        BytecodeInstruction::Ldc {
+                            constant_pool_index,
+                        } => println!("ldc #{}", constant_pool_index),
+                        BytecodeInstruction::Ldc2W {
+                            constant_pool_index,
+                        } => println!("ldc2_w #{}", constant_pool_index),
+                        BytecodeInstruction::GetStatic { field_ref_index } => {
+                            println!("getstatic #{}", field_ref_index)
+                        }
+
+                        // invocation instructions
+                        BytecodeInstruction::InvokeStatic { method_ref_index } => {
+                            println!("invokestatic #{}", method_ref_index)
+                        }
+                        BytecodeInstruction::InvokeSpecial { method_ref_index } => {
+                            println!("invokespecial #{}", method_ref_index)
+                        }
+                        BytecodeInstruction::InvokeVirtual { method_ref_index } => {
+                            println!("invokevirtual #{}", method_ref_index)
+                        }
+                        BytecodeInstruction::InvokeDynamic {
+                            constant_pool_index,
+                        } => {
+                            println!("invokedynamic #{}", constant_pool_index)
+                        }
+                        BytecodeInstruction::InvokeInterface {
+                            constant_pool_index,
+                            count,
+                        } => println!("invokeinterface #{}, {}", constant_pool_index, count),
+
+                        BytecodeInstruction::Return {} => println!("return"),
+                        BytecodeInstruction::ArrayLength {} => println!("arraylength"),
+
+                        BytecodeInstruction::BiPush { immediate } => {
+                            println!("bipush {}", immediate)
+                        }
+
+                        // Comparison instructions
+                        BytecodeInstruction::IfIcmpGe { offset } => {
+                            println!("if_icmpge {}", offset)
+                        }
+                        BytecodeInstruction::IfIcmpLt { offset } => {
+                            println!("if_icmplt {}", offset)
+                        }
+                        BytecodeInstruction::IfEq { offset } => println!("ifeq {}", offset),
+
+                        BytecodeInstruction::GoTo { offset } => println!("goto {}", offset),
+
+                        BytecodeInstruction::LookupSwitch { default, pairs } => {
+                            println!("lookupswitch {{ // {}", pairs.len());
+                            for pair in pairs.iter() {
+                                println!(" {} : {}", pair.match_value, pair.offset);
+                            }
+                            println!(" default : {}", default);
+                            println!("}}");
+                        }
+                        BytecodeInstruction::TableSwitch {
+                            default,
+                            low,
+                            offsets,
+                        } => {
+                            println!(
+                                "tableswitch {{ // {} to {}",
+                                low,
+                                low + (offsets.len() as i32)
+                            );
+                            for (i, offset) in offsets.iter().enumerate() {
+                                println!(" {} : {}", i, offset);
+                            }
+                            println!(" default : {}", default);
+                            println!("}}");
+                        }
+
+                        // arithmetic instructions
+                        BytecodeInstruction::LDiv {} => println!("ldiv"),
+                        BytecodeInstruction::IInc { index, constant } => {
+                            println!("iinc {}, {}", index, constant)
+                        }
+                        _ => panic!("unknown"),
                     }
                 }
                 print_attributes(cp, attributes);

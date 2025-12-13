@@ -13,8 +13,14 @@ pub enum BytecodeInstruction {
     IConst {
         constant: i32,
     },
+    LConst {
+        constant: i64,
+    },
     Ldc {
         constant_pool_index: u8,
+    },
+    LdcW {
+        constant_pool_index: u16,
     },
     Ldc2W {
         constant_pool_index: u16,
@@ -50,7 +56,12 @@ pub enum BytecodeInstruction {
         immediate: u8,
     },
     Return {},
+    LReturn {},
+    AReturn {},
     GetStatic {
+        field_ref_index: u16,
+    },
+    PutStatic {
         field_ref_index: u16,
     },
     InvokeSpecial {
@@ -106,6 +117,9 @@ pub enum BytecodeInstruction {
     IfLe {
         offset: i16,
     },
+    IfNonNull {
+        offset: i16,
+    },
     GoTo {
         offset: i16,
     },
@@ -127,11 +141,15 @@ pub enum BytecodeInstruction {
         constant: i8,
     },
     IAdd {},
+    ISub {},
+    I2L {},
+    LAdd {},
+    LMul {},
 }
 
 pub struct LookupSwitchPair {
-    match_value: i32,
-    offset: i32,
+    pub match_value: i32,
+    pub offset: i32,
 }
 
 pub fn parse_bytecode(reader: &mut BinaryReader) -> Vec<BytecodeInstruction> {
@@ -151,11 +169,16 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> Vec<BytecodeInstruction> {
             0x06 => BytecodeInstruction::IConst { constant: 3 },
             0x07 => BytecodeInstruction::IConst { constant: 4 },
             0x08 => BytecodeInstruction::IConst { constant: 5 },
+            0x09 => BytecodeInstruction::LConst { constant: 0 },
+            0x0a => BytecodeInstruction::LConst { constant: 1 },
             0x10 => BytecodeInstruction::BiPush {
                 immediate: reader.read_u8().unwrap(),
             },
             0x12 => BytecodeInstruction::Ldc {
                 constant_pool_index: reader.read_u8().unwrap(),
+            },
+            0x13 => BytecodeInstruction::LdcW {
+                constant_pool_index: reader.read_u16().unwrap(),
             },
             0x14 => BytecodeInstruction::Ldc2W {
                 constant_pool_index: reader.read_u16().unwrap(),
@@ -168,6 +191,30 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> Vec<BytecodeInstruction> {
             },
             0x19 => BytecodeInstruction::ALoad {
                 local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x1a => BytecodeInstruction::ILoad {
+                local_variable_index: 0,
+            },
+            0x1b => BytecodeInstruction::ILoad {
+                local_variable_index: 1,
+            },
+            0x1c => BytecodeInstruction::ILoad {
+                local_variable_index: 2,
+            },
+            0x1d => BytecodeInstruction::ILoad {
+                local_variable_index: 3,
+            },
+            0x1e => BytecodeInstruction::LLoad {
+                local_variable_index: 0,
+            },
+            0x1f => BytecodeInstruction::LLoad {
+                local_variable_index: 1,
+            },
+            0x20 => BytecodeInstruction::LLoad {
+                local_variable_index: 2,
+            },
+            0x21 => BytecodeInstruction::LLoad {
+                local_variable_index: 3,
             },
             0x2a => BytecodeInstruction::ALoad {
                 local_variable_index: 0,
@@ -191,6 +238,30 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> Vec<BytecodeInstruction> {
             0x3a => BytecodeInstruction::AStore {
                 local_variable_index: reader.read_u8().unwrap(),
             },
+            0x3b => BytecodeInstruction::IStore {
+                local_variable_index: 0,
+            },
+            0x3c => BytecodeInstruction::IStore {
+                local_variable_index: 1,
+            },
+            0x3d => BytecodeInstruction::IStore {
+                local_variable_index: 2,
+            },
+            0x3e => BytecodeInstruction::IStore {
+                local_variable_index: 3,
+            },
+            0x3f => BytecodeInstruction::LStore {
+                local_variable_index: 0,
+            },
+            0x40 => BytecodeInstruction::LStore {
+                local_variable_index: 1,
+            },
+            0x41 => BytecodeInstruction::LStore {
+                local_variable_index: 2,
+            },
+            0x42 => BytecodeInstruction::LStore {
+                local_variable_index: 3,
+            },
             0x4b => BytecodeInstruction::AStore {
                 local_variable_index: 0,
             },
@@ -206,11 +277,15 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> Vec<BytecodeInstruction> {
             0x53 => BytecodeInstruction::AaStore {},
             0x59 => BytecodeInstruction::Dup {},
             0x60 => BytecodeInstruction::IAdd {},
+            0x61 => BytecodeInstruction::LAdd {},
+            0x64 => BytecodeInstruction::ISub {},
+            0x69 => BytecodeInstruction::LMul {},
             0x6d => BytecodeInstruction::LDiv {},
             0x84 => BytecodeInstruction::IInc {
                 index: reader.read_u8().unwrap(),
                 constant: reader.read_i8().unwrap(),
             },
+            0x85 => BytecodeInstruction::I2L {},
             0x99 => BytecodeInstruction::IfEq {
                 offset: reader.read_i16().unwrap(),
             },
@@ -287,8 +362,13 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> Vec<BytecodeInstruction> {
                 }
                 BytecodeInstruction::LookupSwitch { default, pairs }
             }
+            0xad => BytecodeInstruction::LReturn {},
+            0xb0 => BytecodeInstruction::AReturn {},
             0xb1 => BytecodeInstruction::Return {},
             0xb2 => BytecodeInstruction::GetStatic {
+                field_ref_index: reader.read_u16().unwrap(),
+            },
+            0xb3 => BytecodeInstruction::PutStatic {
                 field_ref_index: reader.read_u16().unwrap(),
             },
             0xb6 => BytecodeInstruction::InvokeVirtual {
@@ -329,6 +409,9 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> Vec<BytecodeInstruction> {
             0xbf => BytecodeInstruction::AThrow {},
             0xc0 => BytecodeInstruction::CheckCast {
                 constant_pool_index: reader.read_u16().unwrap(),
+            },
+            0xc7 => BytecodeInstruction::IfNonNull {
+                offset: reader.read_i16().unwrap(),
             },
             _ => panic!("Unknown bytecode instruction 0x{:02x}", opcode),
         });
