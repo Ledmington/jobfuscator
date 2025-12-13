@@ -1,12 +1,13 @@
 use binary_reader::BinaryReader;
 
+use crate::bytecode::{BytecodeInstruction, parse_bytecode};
 use crate::constant_pool::ConstantPool;
 
 pub enum AttributeInfo {
     Code {
         max_stack: u16,
         max_locals: u16,
-        code: Vec<u8>,
+        code: Vec<BytecodeInstruction>,
         exception_table: Vec<ExceptionTableEntry>,
         attributes: Vec<AttributeInfo>,
     },
@@ -128,7 +129,11 @@ fn parse_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInf
             let max_stack: u16 = reader.read_u16().unwrap();
             let max_locals: u16 = reader.read_u16().unwrap();
             let code_length: u32 = reader.read_u32().unwrap();
-            let code: Vec<u8> = reader.read_u8_vec(code_length.try_into().unwrap()).unwrap();
+            let code_bytes: Vec<u8> = reader.read_u8_vec(code_length.try_into().unwrap()).unwrap();
+            let code: Vec<BytecodeInstruction> = parse_bytecode(&mut BinaryReader::new(
+                &code_bytes,
+                binary_reader::Endian::Big,
+            ));
             let exception_table_length: u16 = reader.read_u16().unwrap();
             let mut exception_table: Vec<ExceptionTableEntry> =
                 Vec::with_capacity(exception_table_length.into());

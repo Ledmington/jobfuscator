@@ -395,7 +395,10 @@ fn print_attributes(cp: &ConstantPool, attributes: &Vec<AttributeInfo>) {
                     max_stack, max_locals, 0
                 );
                 for i in 0..code.len() {
-                    println!("       {}: {}",i,code[i]);
+                    print!("       {}: ",i);
+                    match code[i] {
+                        _=>println!("ciao"),
+                    }
                 }
                 print_attributes(cp, attributes);
                 if !exception_table.is_empty() {

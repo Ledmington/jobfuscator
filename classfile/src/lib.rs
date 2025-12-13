@@ -4,6 +4,7 @@ pub mod constant_pool;
 pub mod fields;
 pub mod methods;
 pub mod reference_kind;
+pub mod bytecode;
 
 use std::env;
 use std::fs::File;
