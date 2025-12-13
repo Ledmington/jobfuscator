@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::io::Result;
 
 use binary_reader::BinaryReader;
@@ -250,7 +252,7 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> Vec<BytecodeInstruction> {
             },
             0xaa => {
                 // skip padding
-                while reader.position() % 4 != 0 {
+                while !reader.position().is_multiple_of(4) {
                     _ = reader.read_u8();
                 }
                 let default: i32 = reader.read_i32().unwrap();
@@ -267,7 +269,7 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> Vec<BytecodeInstruction> {
             }
             0xab => {
                 // skip padding
-                while reader.position() % 4 != 0 {
+                while !reader.position().is_multiple_of(4) {
                     _ = reader.read_u8();
                 }
                 let default: i32 = reader.read_i32().unwrap();

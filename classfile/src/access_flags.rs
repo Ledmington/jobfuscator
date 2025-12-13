@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 #[repr(u16)]
 #[derive(Copy, Clone)]
 pub enum AccessFlag {

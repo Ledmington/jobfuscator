@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::io::Result;
 use std::{env, path::MAIN_SEPARATOR};
 
@@ -395,18 +397,25 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                     max_stack, max_locals, 0
                 );
                 for (i, instruction) in code.iter().enumerate() {
-                    print!("       {}: ",i);
+                    print!("       {}: ", i);
                     match instruction {
-                        _=>println!("ciao"),
+                        _ => println!("ciao"),
                     }
                 }
                 print_attributes(cp, attributes);
                 if !exception_table.is_empty() {
-                println!("      Exception table:");
-                println!("         from    to  target type");
-                for exception in exception_table.iter() {
-                    println!("          {}  {}  {}   Class {}",exception.start_pc,exception.end_pc,exception.handler_pc,exception.catch_type);
-                }}
+                    println!("      Exception table:");
+                    println!("         from    to  target type");
+                    for exception in exception_table.iter() {
+                        println!(
+                            "          {}  {}  {}   Class {}",
+                            exception.start_pc,
+                            exception.end_pc,
+                            exception.handler_pc,
+                            exception.catch_type
+                        );
+                    }
+                }
             }
             AttributeInfo::LineNumberTable { line_number_table } => {
                 println!("      LineNumberTable:");
@@ -437,9 +446,7 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                 );
                 for frame in stack_map_table.iter() {
                     match frame {
-                        classfile::attributes::StackMapFrame::SameFrame { frame_type } => 
-                            println!("        frame_type = {} /* same */",frame_type)
-                        ,
+                        classfile::attributes::StackMapFrame::SameFrame { frame_type } => println!("        frame_type = {} /* same */",frame_type),
                         classfile::attributes::StackMapFrame::SameLocals1StackItemFrame { frame_type, stack } => {
                             println!("        frame_type = {} /* same_locals_1_stack_item */",frame_type);
                             println!("          stack = [ {:?} ]",stack);
