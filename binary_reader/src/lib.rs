@@ -37,11 +37,23 @@ impl<'a> BinaryReader<'a> {
         Ok(self.read_bytes(count)?.to_vec())
     }
 
+    pub fn read_i8(&mut self) -> Result<i8> {
+        Ok(self.read_bytes(1)?[0].try_into().unwrap())
+    }
+
     pub fn read_u16(&mut self) -> Result<u16> {
         let bytes: [u8; 2] = self.read_bytes(2).unwrap().try_into().unwrap();
         Ok(match self.endian {
             Endian::Little => u16::from_le_bytes(bytes),
             Endian::Big => u16::from_be_bytes(bytes),
+        })
+    }
+
+    pub fn read_i16(&mut self) -> Result<i16> {
+        let bytes: [u8; 2] = self.read_bytes(2).unwrap().try_into().unwrap();
+        Ok(match self.endian {
+            Endian::Little => i16::from_le_bytes(bytes),
+            Endian::Big => i16::from_be_bytes(bytes),
         })
     }
 
@@ -59,5 +71,33 @@ impl<'a> BinaryReader<'a> {
             Endian::Little => u32::from_le_bytes(bytes),
             Endian::Big => u32::from_be_bytes(bytes),
         })
+    }
+
+    pub fn read_i32(&mut self) -> Result<i32> {
+        let bytes: [u8; 4] = self.read_bytes(4).unwrap().try_into().unwrap();
+        Ok(match self.endian {
+            Endian::Little => i32::from_le_bytes(bytes),
+            Endian::Big => i32::from_be_bytes(bytes),
+        })
+    }
+
+    pub fn read_i32_vec(&mut self, count: usize) -> Result<Vec<i32>> {
+        let mut res: Vec<i32> = vec![0i32; count];
+        for x in res.iter_mut().take(count) {
+            *x = self.read_i32().unwrap();
+        }
+        Ok(res)
+    }
+
+    pub fn position(&self) -> usize {
+        self.pos
+    }
+
+    pub fn len(&self) -> usize {
+        self.buf.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }

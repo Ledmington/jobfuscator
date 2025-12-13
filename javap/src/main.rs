@@ -379,7 +379,7 @@ fn print_methods(cf: &ClassFile) {
     }
 }
 
-fn print_attributes(cp: &ConstantPool, attributes: &Vec<AttributeInfo>) {
+fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
     for attribute in attributes.iter() {
         match attribute {
             AttributeInfo::Code {
@@ -394,9 +394,9 @@ fn print_attributes(cp: &ConstantPool, attributes: &Vec<AttributeInfo>) {
                     "      stack={}, locals={}, args_size={}",
                     max_stack, max_locals, 0
                 );
-                for i in 0..code.len() {
+                for (i, instruction) in code.iter().enumerate() {
                     print!("       {}: ",i);
-                    match code[i] {
+                    match instruction {
                         _=>println!("ciao"),
                     }
                 }
