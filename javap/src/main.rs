@@ -382,6 +382,22 @@ fn print_methods(cf: &ClassFile) {
     }
 }
 
+fn add_offset<T>(position: u32, offset: T) -> u32
+where
+    T: Into<i64>,
+{
+    let offset = offset.into();
+    if offset >= 0 {
+        position
+            .checked_add(offset as u32)
+            .expect("Negative final position")
+    } else {
+        position
+            .checked_sub((-offset) as u32)
+            .expect("Negative final position")
+    }
+}
+
 fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
     for attribute in attributes.iter() {
         match attribute {
@@ -398,62 +414,112 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                     max_stack, max_locals, 0
                 );
                 for (position, instruction) in code.iter() {
-                    print!("       {}: ", position);
+                    print!("     {:>5}: ", position);
                     match instruction {
                         BytecodeInstruction::AConstNull {} => println!("aconst_null"),
                         BytecodeInstruction::ANewArray {
                             constant_pool_index,
-                        } => println!("anewarray #{}", constant_pool_index),
+                        } => println!("anewarray     #{}", constant_pool_index),
                         BytecodeInstruction::New {
                             constant_pool_index,
-                        } => println!("new #{}", constant_pool_index),
+                        } => println!("new           #{}", constant_pool_index),
                         BytecodeInstruction::AThrow {} => println!("athrow"),
                         BytecodeInstruction::Dup {} => println!("dup"),
-                        BytecodeInstruction::IConst { constant } => println!("iconst {}", constant),
-                        BytecodeInstruction::LConst { constant } => println!("lconst {}", constant),
+                        BytecodeInstruction::IConst { constant } => {
+                            if *constant == -1 {
+                                println!("iconst_m1")
+                            } else if *constant <= 5 {
+                                println!("iconst_{}", constant)
+                            } else {
+                                println!("iconst {}", constant)
+                            }
+                        }
+                        BytecodeInstruction::LConst { constant } => {
+                            if *constant <= 1 {
+                                println!("lconst_{}", constant)
+                            } else {
+                                println!("lconst {}", constant)
+                            }
+                        }
                         BytecodeInstruction::AaLoad {} => println!("aaload"),
                         BytecodeInstruction::AaStore {} => println!("aastore"),
                         BytecodeInstruction::ALoad {
                             local_variable_index,
-                        } => println!("aload {}", local_variable_index),
+                        } => {
+                            if *local_variable_index <= 3 {
+                                println!("aload_{}", local_variable_index)
+                            } else {
+                                println!("aload         {}", local_variable_index)
+                            }
+                        }
                         BytecodeInstruction::AStore {
                             local_variable_index,
-                        } => println!("astore {}", local_variable_index),
+                        } => {
+                            if *local_variable_index <= 3 {
+                                println!("astore_{}", local_variable_index)
+                            } else {
+                                println!("astore        {}", local_variable_index)
+                            }
+                        }
                         BytecodeInstruction::ILoad {
                             local_variable_index,
-                        } => println!("iload {}", local_variable_index),
+                        } => {
+                            if *local_variable_index <= 3 {
+                                println!("iload_{}", local_variable_index)
+                            } else {
+                                println!("iload         {}", local_variable_index)
+                            }
+                        }
                         BytecodeInstruction::IStore {
                             local_variable_index,
-                        } => println!("istore {}", local_variable_index),
+                        } => {
+                            if *local_variable_index <= 3 {
+                                println!("istore_{}", local_variable_index)
+                            } else {
+                                println!("istore        {}", local_variable_index)
+                            }
+                        }
                         BytecodeInstruction::LStore {
                             local_variable_index,
-                        } => println!("lstore {}", local_variable_index),
+                        } => {
+                            if *local_variable_index <= 3 {
+                                println!("lstore_{}", local_variable_index)
+                            } else {
+                                println!("lstore        {}", local_variable_index)
+                            }
+                        }
                         BytecodeInstruction::LLoad {
                             local_variable_index,
-                        } => println!("lload {}", local_variable_index),
+                        } => {
+                            if *local_variable_index <= 3 {
+                                println!("lload_{}", local_variable_index)
+                            } else {
+                                println!("lload         {}", local_variable_index)
+                            }
+                        }
                         BytecodeInstruction::Ldc {
                             constant_pool_index,
-                        } => println!("ldc #{}", constant_pool_index),
+                        } => println!("ldc           #{}", constant_pool_index),
                         BytecodeInstruction::LdcW {
                             constant_pool_index,
-                        } => println!("ldc_w #{}", constant_pool_index),
+                        } => println!("ldc_w         #{}", constant_pool_index),
                         BytecodeInstruction::Ldc2W {
                             constant_pool_index,
-                        } => println!("ldc2_w #{}", constant_pool_index),
+                        } => println!("ldc2_w        #{}", constant_pool_index),
                         BytecodeInstruction::GetStatic { field_ref_index } => {
-                            println!("getstatic #{}", field_ref_index)
+                            println!("getstatic     #{}", field_ref_index)
                         }
                         BytecodeInstruction::PutStatic { field_ref_index } => {
-                            println!("putstatic #{}", field_ref_index)
+                            println!("putstatic     #{}", field_ref_index)
                         }
                         BytecodeInstruction::CheckCast {
                             constant_pool_index,
-                        } => println!("checkcast #{}", constant_pool_index),
+                        } => println!("checkcast     #{}", constant_pool_index),
                         BytecodeInstruction::I2L {} => println!("i2l"),
 
                         // invocation instructions
                         BytecodeInstruction::InvokeStatic { method_ref_index } => {
-                            println!("invokestatic #{}", method_ref_index)
+                            println!("invokestatic  #{}", method_ref_index)
                         }
                         BytecodeInstruction::InvokeSpecial { method_ref_index } => {
                             println!("invokespecial #{}", method_ref_index)
@@ -464,12 +530,12 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                         BytecodeInstruction::InvokeDynamic {
                             constant_pool_index,
                         } => {
-                            println!("invokedynamic #{}", constant_pool_index)
+                            println!("invokedynamic #{},  0", constant_pool_index)
                         }
                         BytecodeInstruction::InvokeInterface {
                             constant_pool_index,
                             count,
-                        } => println!("invokeinterface #{}, {}", constant_pool_index, count),
+                        } => println!("invokeinterface #{},  {}", constant_pool_index, count),
 
                         BytecodeInstruction::LReturn {} => println!("lreturn"),
                         BytecodeInstruction::AReturn {} => println!("areturn"),
@@ -477,22 +543,26 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                         BytecodeInstruction::ArrayLength {} => println!("arraylength"),
 
                         BytecodeInstruction::BiPush { immediate } => {
-                            println!("bipush {}", immediate)
+                            println!("bipush        {}", immediate)
                         }
 
                         // Comparison instructions
                         BytecodeInstruction::IfIcmpGe { offset } => {
-                            println!("if_icmpge {}", offset)
+                            println!("if_icmpge     {}", add_offset(*position, *offset))
                         }
                         BytecodeInstruction::IfIcmpLt { offset } => {
-                            println!("if_icmplt {}", offset)
+                            println!("if_icmplt     {}", add_offset(*position, *offset))
                         }
-                        BytecodeInstruction::IfEq { offset } => println!("ifeq {}", offset),
+                        BytecodeInstruction::IfEq { offset } => {
+                            println!("ifeq          {}", add_offset(*position, *offset))
+                        }
                         BytecodeInstruction::IfNonNull { offset } => {
-                            println!("ifnonnull {}", offset)
+                            println!("ifnonnull     {}", add_offset(*position, *offset))
                         }
 
-                        BytecodeInstruction::GoTo { offset } => println!("goto {}", offset),
+                        BytecodeInstruction::GoTo { offset } => {
+                            println!("goto          {}", add_offset(*position, *offset))
+                        }
 
                         BytecodeInstruction::LookupSwitch { default, pairs } => {
                             println!("lookupswitch  {{ // {}", pairs.len());
@@ -500,10 +570,13 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                                 println!(
                                     "            {:>11}: {}",
                                     pair.match_value,
-                                    position + (pair.offset as u32)
+                                    add_offset(*position, pair.offset)
                                 );
                             }
-                            println!("                default: {}", position + (*default as u32));
+                            println!(
+                                "                default: {}",
+                                add_offset(*position, *default)
+                            );
                             println!("}}");
                         }
                         BytecodeInstruction::TableSwitch {
@@ -517,9 +590,16 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                                 low + (offsets.len() as i32) - 1
                             );
                             for (i, offset) in offsets.iter().enumerate() {
-                                println!("            {:>11}: {}", i, position + (*offset as u32));
+                                println!(
+                                    "            {:>11}: {}",
+                                    i,
+                                    add_offset(*position, *offset)
+                                );
                             }
-                            println!("                default: {}", position + (*default as u32));
+                            println!(
+                                "                default: {}",
+                                add_offset(*position, *default)
+                            );
                             println!("}}");
                         }
 
@@ -528,7 +608,7 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                         BytecodeInstruction::LMul {} => println!("lmul"),
                         BytecodeInstruction::LDiv {} => println!("ldiv"),
                         BytecodeInstruction::IInc { index, constant } => {
-                            println!("iinc {}, {}", index, constant)
+                            println!("iinc          {}, {}", index, constant)
                         }
                         BytecodeInstruction::IAdd {} => println!("iadd"),
                         BytecodeInstruction::ISub {} => println!("isub"),
