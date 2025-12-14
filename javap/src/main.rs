@@ -94,7 +94,7 @@ fn print_header(cf: &ClassFile) {
         width = CP_COMMENT_START_INDEX
     );
     println!(
-        " interfaces: {}, fields: {}, methods: {}, attributes: {}",
+        "  interfaces: {}, fields: {}, methods: {}, attributes: {}",
         cf.interfaces.len(),
         cf.fields.len(),
         cf.methods.len(),
@@ -105,14 +105,19 @@ fn print_header(cf: &ClassFile) {
 fn print_constant_pool(cf: &ClassFile) {
     println!("Constant pool:");
     for i in 0..cf.constant_pool.len() {
-        if i > 0
-            && (matches!(cf.constant_pool[i - 1], ConstantPoolInfo::Long { .. })
-                || matches!(cf.constant_pool[i - 1], ConstantPoolInfo::Double { .. }))
+        if i > 1
+            && (matches!(
+                cf.constant_pool[(i - 1).try_into().unwrap()],
+                ConstantPoolInfo::Long { .. }
+            ) || matches!(
+                cf.constant_pool[(i - 1).try_into().unwrap()],
+                ConstantPoolInfo::Double { .. }
+            ))
         {
             continue;
         }
 
-        match &cf.constant_pool[i] {
+        match &cf.constant_pool[i.try_into().unwrap()] {
             ConstantPoolInfo::Utf8 { bytes } => {
                 println!(
                     "{:<width$}{}",
@@ -176,7 +181,7 @@ fn print_constant_pool(cf: &ClassFile) {
                 class_index,
                 name_and_type_index,
             } => println!(
-                "{:<width$}// {}.{}",
+                "{:<width$}// {}",
                 format!(
                     "{:<width$}#{}.#{}",
                     format!(
@@ -188,8 +193,8 @@ fn print_constant_pool(cf: &ClassFile) {
                     name_and_type_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.constant_pool.get_class_name(*class_index),
-                cf.constant_pool.get_name_and_type(*name_and_type_index),
+                cf.constant_pool
+                    .get_field_ref_string(*class_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodRef {
@@ -499,7 +504,15 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                         }
                         BytecodeInstruction::Ldc {
                             constant_pool_index,
-                        } => println!("ldc           #{}", constant_pool_index),
+                        } => {
+                            print!("ldc           #{}                 // ", constant_pool_index);
+                            match cp[(*constant_pool_index).into()] {
+                                ConstantPoolInfo::String { string_index } => {
+                                    println!("String {}", cp.get_utf8_content(string_index))
+                                }
+                                _ => println!("unknown"),
+                            }
+                        }
                         BytecodeInstruction::LdcW {
                             constant_pool_index,
                         } => println!("ldc_w         #{}", constant_pool_index),
@@ -507,7 +520,11 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                             constant_pool_index,
                         } => println!("ldc2_w        #{}", constant_pool_index),
                         BytecodeInstruction::GetStatic { field_ref_index } => {
-                            println!("getstatic     #{}", field_ref_index)
+                            println!(
+                                "getstatic     #{}                  // Field {}",
+                                field_ref_index,
+                                cp.get_field_ref(*field_ref_index)
+                            )
                         }
                         BytecodeInstruction::PutStatic { field_ref_index } => {
                             println!("putstatic     #{}", field_ref_index)
@@ -519,10 +536,18 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
 
                         // invocation instructions
                         BytecodeInstruction::InvokeStatic { method_ref_index } => {
-                            println!("invokestatic  #{}", method_ref_index)
+                            println!(
+                                "invokestatic  #{}                 // Method {}",
+                                method_ref_index,
+                                cp.get_method_ref(*method_ref_index)
+                            )
                         }
                         BytecodeInstruction::InvokeSpecial { method_ref_index } => {
-                            println!("invokespecial #{}", method_ref_index)
+                            println!(
+                                "invokespecial #{}                  // Method {}",
+                                method_ref_index,
+                                cp.get_method_ref(*method_ref_index)
+                            )
                         }
                         BytecodeInstruction::InvokeVirtual { method_ref_index } => {
                             println!("invokevirtual #{}", method_ref_index)

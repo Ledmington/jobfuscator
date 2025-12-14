@@ -12,7 +12,7 @@ pub struct ConstantPool {
 
 impl ConstantPool {
     pub fn get_class_name(&self, cp_index: u16) -> String {
-        let class_entry: &ConstantPoolInfo = &self.entries[(cp_index - 1) as usize];
+        let class_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match class_entry {
             ConstantPoolInfo::Class { name_index } => self.get_utf8_content(*name_index),
             _ => panic!(
@@ -23,7 +23,7 @@ impl ConstantPool {
     }
 
     pub fn get_method_ref(&self, cp_index: u16) -> String {
-        let method_ref_entry: &ConstantPoolInfo = &self.entries[(cp_index - 1) as usize];
+        let method_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match method_ref_entry {
             ConstantPoolInfo::MethodRef {
                 class_index,
@@ -40,8 +40,26 @@ impl ConstantPool {
         self.get_class_name(class_index) + "." + &self.get_name_and_type(name_and_type_index)
     }
 
+    pub fn get_field_ref(&self, cp_index: u16) -> String {
+        let field_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        match field_ref_entry {
+            ConstantPoolInfo::FieldRef {
+                class_index,
+                name_and_type_index,
+            } => self.get_field_ref_string(*class_index, *name_and_type_index),
+            _ => panic!(
+                "Expected entry #{} to be of Fieldref type but it wasn't.",
+                cp_index
+            ),
+        }
+    }
+
+    pub fn get_field_ref_string(&self, class_index: u16, name_and_type_index: u16) -> String {
+        self.get_class_name(class_index) + "." + &self.get_name_and_type(name_and_type_index)
+    }
+
     pub fn get_name_and_type(&self, cp_index: u16) -> String {
-        let name_and_type_entry: &ConstantPoolInfo = &self.entries[(cp_index - 1) as usize];
+        let name_and_type_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match name_and_type_entry {
             ConstantPoolInfo::NameAndType {
                 name_index,
@@ -64,7 +82,7 @@ impl ConstantPool {
     }
 
     pub fn get_utf8_content(&self, cp_index: u16) -> String {
-        let name_entry: &ConstantPoolInfo = &self.entries[(cp_index - 1) as usize];
+        let name_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match name_entry {
             ConstantPoolInfo::Utf8 { bytes } => {
                 let content = convert_utf8(bytes);
@@ -90,11 +108,11 @@ impl ConstantPool {
     }
 }
 
-impl Index<usize> for ConstantPool {
+impl Index<u16> for ConstantPool {
     type Output = ConstantPoolInfo;
 
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.entries[index]
+    fn index(&self, index: u16) -> &Self::Output {
+        &self.entries[index as usize]
     }
 }
 
