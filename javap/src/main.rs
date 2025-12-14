@@ -397,8 +397,8 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                     "      stack={}, locals={}, args_size={}",
                     max_stack, max_locals, 0
                 );
-                for (i, instruction) in code.iter().enumerate() {
-                    print!("       {}: ", i);
+                for (position, instruction) in code.iter() {
+                    print!("       {}: ", position);
                     match instruction {
                         BytecodeInstruction::AConstNull {} => println!("aconst_null"),
                         BytecodeInstruction::ANewArray {
@@ -410,6 +410,7 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                         BytecodeInstruction::AThrow {} => println!("athrow"),
                         BytecodeInstruction::Dup {} => println!("dup"),
                         BytecodeInstruction::IConst { constant } => println!("iconst {}", constant),
+                        BytecodeInstruction::LConst { constant } => println!("lconst {}", constant),
                         BytecodeInstruction::AaLoad {} => println!("aaload"),
                         BytecodeInstruction::AaStore {} => println!("aastore"),
                         BytecodeInstruction::ALoad {
@@ -433,12 +434,22 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                         BytecodeInstruction::Ldc {
                             constant_pool_index,
                         } => println!("ldc #{}", constant_pool_index),
+                        BytecodeInstruction::LdcW {
+                            constant_pool_index,
+                        } => println!("ldc_w #{}", constant_pool_index),
                         BytecodeInstruction::Ldc2W {
                             constant_pool_index,
                         } => println!("ldc2_w #{}", constant_pool_index),
                         BytecodeInstruction::GetStatic { field_ref_index } => {
                             println!("getstatic #{}", field_ref_index)
                         }
+                        BytecodeInstruction::PutStatic { field_ref_index } => {
+                            println!("putstatic #{}", field_ref_index)
+                        }
+                        BytecodeInstruction::CheckCast {
+                            constant_pool_index,
+                        } => println!("checkcast #{}", constant_pool_index),
+                        BytecodeInstruction::I2L {} => println!("i2l"),
 
                         // invocation instructions
                         BytecodeInstruction::InvokeStatic { method_ref_index } => {
@@ -460,6 +471,8 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                             count,
                         } => println!("invokeinterface #{}, {}", constant_pool_index, count),
 
+                        BytecodeInstruction::LReturn {} => println!("lreturn"),
+                        BytecodeInstruction::AReturn {} => println!("areturn"),
                         BytecodeInstruction::Return {} => println!("return"),
                         BytecodeInstruction::ArrayLength {} => println!("arraylength"),
 
@@ -475,15 +488,22 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                             println!("if_icmplt {}", offset)
                         }
                         BytecodeInstruction::IfEq { offset } => println!("ifeq {}", offset),
+                        BytecodeInstruction::IfNonNull { offset } => {
+                            println!("ifnonnull {}", offset)
+                        }
 
                         BytecodeInstruction::GoTo { offset } => println!("goto {}", offset),
 
                         BytecodeInstruction::LookupSwitch { default, pairs } => {
-                            println!("lookupswitch {{ // {}", pairs.len());
+                            println!("lookupswitch  {{ // {}", pairs.len());
                             for pair in pairs.iter() {
-                                println!(" {} : {}", pair.match_value, pair.offset);
+                                println!(
+                                    "            {:>11}: {}",
+                                    pair.match_value,
+                                    position + (pair.offset as u32)
+                                );
                             }
-                            println!(" default : {}", default);
+                            println!("                default: {}", position + (*default as u32));
                             println!("}}");
                         }
                         BytecodeInstruction::TableSwitch {
@@ -492,22 +512,26 @@ fn print_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                             offsets,
                         } => {
                             println!(
-                                "tableswitch {{ // {} to {}",
+                                "tableswitch   {{ // {} to {}",
                                 low,
-                                low + (offsets.len() as i32)
+                                low + (offsets.len() as i32) - 1
                             );
                             for (i, offset) in offsets.iter().enumerate() {
-                                println!(" {} : {}", i, offset);
+                                println!("            {:>11}: {}", i, position + (*offset as u32));
                             }
-                            println!(" default : {}", default);
+                            println!("                default: {}", position + (*default as u32));
                             println!("}}");
                         }
 
                         // arithmetic instructions
+                        BytecodeInstruction::LAdd {} => println!("ladd"),
+                        BytecodeInstruction::LMul {} => println!("lmul"),
                         BytecodeInstruction::LDiv {} => println!("ldiv"),
                         BytecodeInstruction::IInc { index, constant } => {
                             println!("iinc {}, {}", index, constant)
                         }
+                        BytecodeInstruction::IAdd {} => println!("iadd"),
+                        BytecodeInstruction::ISub {} => println!("isub"),
                         _ => panic!("unknown"),
                     }
                 }
