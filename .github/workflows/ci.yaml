@@ -7,6 +7,20 @@ on:
   pull_request:
 
 jobs:
+  format_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
   debug_profile:
     runs-on: ubuntu-latest
     steps:
@@ -16,6 +30,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          components: clippy
 
       - name: Build
         run: cargo build
@@ -38,6 +53,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          components: clippy
 
       - name: Build
         run: cargo build --release
