@@ -6,6 +6,8 @@ use std::io::Result;
 use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
 use classfile::bytecode::BytecodeInstruction;
 use classfile::constant_pool::{ConstantPool, ConstantPoolInfo};
+use classfile::fields::FieldInfo;
+use classfile::methods::MethodInfo;
 use classfile::{ClassFile, access_flags, parse_class_file, reference_kind};
 
 /**
@@ -35,10 +37,10 @@ const BYTECODE_INDEX_LENGTH: usize = 5;
 
 fn print_class_file(cf: &ClassFile) {
     print_header(cf);
-    print_constant_pool(cf);
+    print_constant_pool(&cf.constant_pool);
     println!("{{");
-    print_fields(cf);
-    print_methods(cf);
+    print_fields(&cf.constant_pool, &cf.fields);
+    print_methods(&cf.constant_pool, cf.this_class, &cf.methods);
     println!("}}");
     print_attributes(&cf.constant_pool, cf.this_class, &cf.attributes);
 }
@@ -107,22 +109,22 @@ fn print_header(cf: &ClassFile) {
     );
 }
 
-fn print_constant_pool(cf: &ClassFile) {
+fn print_constant_pool(cp: &ConstantPool) {
     println!("Constant pool:");
-    for i in 0..cf.constant_pool.len() {
+    for i in 0..cp.len() {
         if i > 1
             && (matches!(
-                cf.constant_pool[(i - 1).try_into().unwrap()],
+                cp[(i - 1).try_into().unwrap()],
                 ConstantPoolInfo::Long { .. }
             ) || matches!(
-                cf.constant_pool[(i - 1).try_into().unwrap()],
+                cp[(i - 1).try_into().unwrap()],
                 ConstantPoolInfo::Double { .. }
             ))
         {
             continue;
         }
 
-        match &cf.constant_pool[i.try_into().unwrap()] {
+        match &cp[i.try_into().unwrap()] {
             ConstantPoolInfo::Utf8 { bytes } => {
                 println!(
                     "{:<width$}{}",
@@ -164,7 +166,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     string_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.constant_pool.get_utf8_content(*string_index),
+                cp.get_utf8_content(*string_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::Class { name_index } => println!(
@@ -179,7 +181,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     name_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.constant_pool.get_wrapped_utf8_content(*name_index),
+                cp.get_wrapped_utf8_content(*name_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::FieldRef {
@@ -198,8 +200,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     name_and_type_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.constant_pool
-                    .get_field_ref_string(*class_index, *name_and_type_index),
+                cp.get_field_ref_string(*class_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodRef {
@@ -218,8 +219,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     name_and_type_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.constant_pool
-                    .get_method_ref_string(*class_index, *name_and_type_index),
+                cp.get_method_ref_string(*class_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::InterfaceMethodRef {
@@ -238,8 +238,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     name_and_type_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.constant_pool
-                    .get_method_ref_string(*class_index, *name_and_type_index),
+                cp.get_method_ref_string(*class_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::NameAndType {
@@ -258,8 +257,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     descriptor_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.constant_pool
-                    .get_name_and_type_string(*name_index, *descriptor_index),
+                cp.get_name_and_type_string(*name_index, *descriptor_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodType { descriptor_index } => println!(
@@ -274,7 +272,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     descriptor_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.constant_pool.get_utf8_content(*descriptor_index),
+                cp.get_utf8_content(*descriptor_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodHandle {
@@ -294,7 +292,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     width = CP_INFO_START_INDEX
                 ),
                 reference_kind::java_repr(*reference_kind),
-                cf.constant_pool.get_method_ref(*reference_index),
+                cp.get_method_ref(*reference_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::InvokeDynamic {
@@ -313,8 +311,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     name_and_type_index,
                     width = CP_INFO_START_INDEX
                 ),
-                cf.constant_pool
-                    .get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index),
+                cp.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::Null {} => unreachable!(),
@@ -322,14 +319,14 @@ fn print_constant_pool(cf: &ClassFile) {
     }
 }
 
-fn print_fields(cf: &ClassFile) {
-    for field in cf.fields.iter() {
-        let descriptor: String = cf.constant_pool.get_utf8_content(field.descriptor_index);
+fn print_fields(cp: &ConstantPool, fields: &Vec<FieldInfo>) {
+    for field in fields.iter() {
+        let descriptor: String = cp.get_utf8_content(field.descriptor_index);
         println!(
             "  {} {} {};",
             access_flags::modifier_repr_vec(&field.access_flags),
             classfile::convert_descriptor(descriptor.clone()),
-            cf.constant_pool.get_utf8_content(field.name_index)
+            cp.get_utf8_content(field.name_index)
         );
         println!("    descriptor: {}", descriptor);
         println!(
@@ -341,16 +338,17 @@ fn print_fields(cf: &ClassFile) {
     }
 }
 
-fn print_methods(cf: &ClassFile) {
-    for i in 0..cf.methods.len() {
-        let method = &cf.methods[i];
-        let descriptor: String = cf.constant_pool.get_utf8_content(method.descriptor_index);
+fn print_methods(cp: &ConstantPool, this_class: u16, methods: &Vec<MethodInfo>) {
+    for i in 0..methods.len() {
+        let method = &methods[i];
+        let descriptor: String = cp.get_utf8_content(method.descriptor_index);
         if i > 0 {
             println!();
         }
         println!(
-            "  {} {}",
+            "  {} {}{}",
             access_flags::modifier_repr_vec(&method.access_flags),
+            cp.get_utf8_content(method.name_index),
             classfile::convert_descriptor(descriptor.clone())
         );
         println!("    descriptor: {}", descriptor);
@@ -360,7 +358,7 @@ fn print_methods(cf: &ClassFile) {
             access_flags::java_repr_vec(&method.access_flags)
         );
 
-        print_attributes(&cf.constant_pool, cf.this_class, &method.attributes);
+        print_attributes(cp, this_class, &method.attributes);
     }
 }
 
