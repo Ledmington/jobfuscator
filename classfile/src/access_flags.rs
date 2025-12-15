@@ -50,6 +50,14 @@ pub fn java_repr(flag: AccessFlag) -> String {
     .to_string()
 }
 
+pub fn java_repr_vec(flags: &[AccessFlag]) -> String {
+    flags
+        .iter()
+        .map(|f| java_repr(*f))
+        .collect::<Vec<String>>()
+        .join(", ")
+}
+
 // TODO: Convert into a trait?
 pub fn modifier_repr(flag: AccessFlag) -> String {
     match flag {
@@ -61,12 +69,32 @@ pub fn modifier_repr(flag: AccessFlag) -> String {
         AccessFlag::Super => "class",
         AccessFlag::Interface => "interface",
         AccessFlag::Abstract => "abstract",
-        AccessFlag::Enum => "enum",
+        AccessFlag::Enum => "",
         AccessFlag::Synthetic => "",
         AccessFlag::Annotation => todo!(),
         AccessFlag::Module => todo!(),
     }
     .to_string()
+}
+
+pub fn modifier_repr_vec(flags: &[AccessFlag]) -> String {
+    let mut result: String = String::new();
+    for f in flags {
+        let fs: String = modifier_repr(*f);
+        if fs.is_empty() {
+            continue;
+        }
+        result = result + " " + &fs;
+    }
+    result
+}
+
+pub fn to_u16(flags: &[AccessFlag]) -> u16 {
+    flags
+        .iter()
+        .map(|f| *f as u16)
+        .reduce(|a, b| a | b)
+        .unwrap()
 }
 
 pub fn parse_access_flags(flags: u16) -> Vec<AccessFlag> {

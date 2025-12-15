@@ -3,10 +3,10 @@
 use std::io::Result;
 use std::{env, path::MAIN_SEPARATOR};
 
-use classfile::attributes::{AttributeInfo, VerificationTypeInfo};
+use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
 use classfile::bytecode::BytecodeInstruction;
 use classfile::constant_pool::{ConstantPool, ConstantPoolInfo};
-use classfile::{ClassFile, parse_class_file};
+use classfile::{ClassFile, access_flags, parse_class_file, reference_kind};
 
 /**
  * The index of the column (on the terminal) where the index of each constant pool entry ends.
@@ -40,6 +40,7 @@ fn print_class_file(cf: &ClassFile) {
     print_fields(cf);
     print_methods(cf);
     println!("}}");
+    print_attributes(&cf.constant_pool, cf.this_class, &cf.attributes);
 }
 
 fn print_header(cf: &ClassFile) {
@@ -55,6 +56,7 @@ fn print_header(cf: &ClassFile) {
     );
     println!(
         "  Compiled from \"{}\"",
+        // FIXME: take this info from the "SourceFile" attribute
         cf.absolute_file_path
             .split(MAIN_SEPARATOR)
             .next_back()
@@ -67,11 +69,7 @@ fn print_header(cf: &ClassFile) {
     );
     println!(
         "{} {}",
-        cf.access_flags
-            .iter()
-            .map(|f| classfile::access_flags::modifier_repr(*f))
-            .collect::<Vec<String>>()
-            .join(" "),
+        access_flags::modifier_repr_vec(&cf.access_flags),
         cf.constant_pool
             .get_class_name(cf.this_class)
             .replace('/', ".")
@@ -80,16 +78,8 @@ fn print_header(cf: &ClassFile) {
     println!("  major version: {}", cf.major_version);
     println!(
         "  flags: (0x{:04x}) {}",
-        cf.access_flags
-            .iter()
-            .map(|f| *f as u16)
-            .reduce(|a, b| a | b)
-            .unwrap(),
-        cf.access_flags
-            .iter()
-            .map(|f| classfile::access_flags::java_repr(*f))
-            .collect::<Vec<String>>()
-            .join(", ")
+        access_flags::to_u16(&cf.access_flags),
+        access_flags::java_repr_vec(&cf.access_flags)
     );
     println!(
         "{:<width$}// {}",
@@ -298,7 +288,7 @@ fn print_constant_pool(cf: &ClassFile) {
                     reference_index,
                     width = CP_INFO_START_INDEX
                 ),
-                classfile::reference_kind::java_repr(*reference_kind),
+                reference_kind::java_repr(*reference_kind),
                 cf.constant_pool.get_method_ref(*reference_index),
                 width = CP_COMMENT_START_INDEX
             ),
@@ -332,68 +322,40 @@ fn print_fields(cf: &ClassFile) {
         let descriptor: String = cf.constant_pool.get_utf8_content(field.descriptor_index);
         println!(
             "  {} {} {};",
-            field
-                .access_flags
-                .iter()
-                .map(|f| classfile::access_flags::modifier_repr(*f))
-                .collect::<Vec<String>>()
-                .join(" "),
+            access_flags::modifier_repr_vec(&field.access_flags),
             classfile::convert_descriptor(descriptor.clone()),
             cf.constant_pool.get_utf8_content(field.name_index)
         );
         println!("    descriptor: {}", descriptor);
         println!(
             "    flags: (0x{:04x}) {}",
-            field
-                .access_flags
-                .iter()
-                .map(|f| *f as u16)
-                .reduce(|a, b| a | b)
-                .unwrap(),
-            field
-                .access_flags
-                .iter()
-                .map(|f| classfile::access_flags::java_repr(*f))
-                .collect::<Vec<String>>()
-                .join(", ")
+            access_flags::to_u16(&field.access_flags),
+            access_flags::java_repr_vec(&field.access_flags)
         );
         println!();
     }
 }
 
 fn print_methods(cf: &ClassFile) {
-    for method in cf.methods.iter() {
+    for i in 0..cf.methods.len() {
+        let method = &cf.methods[i];
         let descriptor: String = cf.constant_pool.get_utf8_content(method.descriptor_index);
+        if i > 0 {
+            println!();
+        }
         println!(
             "  {} {}",
-            method
-                .access_flags
-                .iter()
-                .map(|f| classfile::access_flags::modifier_repr(*f))
-                .collect::<Vec<String>>()
-                .join(" "),
+            access_flags::modifier_repr_vec(&method.access_flags),
             classfile::convert_descriptor(descriptor.clone())
         );
         println!("    descriptor: {}", descriptor);
         println!(
             "    flags: (0x{:04x}) {}",
-            method
-                .access_flags
-                .iter()
-                .map(|f| *f as u16)
-                .reduce(|a, b| a | b)
-                .unwrap(),
-            method
-                .access_flags
-                .iter()
-                .map(|f| classfile::access_flags::java_repr(*f))
-                .collect::<Vec<String>>()
-                .join(", ")
+            access_flags::to_u16(&method.access_flags),
+            access_flags::java_repr_vec(&method.access_flags)
         );
 
         print_attributes(&cf.constant_pool, cf.this_class, &method.attributes);
-
-        println!();
     }
 }
 
@@ -743,9 +705,22 @@ fn get_comment(
                     _ => unreachable!(),
                 },
         ),
-        BytecodeInstruction::PutStatic { field_ref_index } => {
-            Some("Field ".to_owned() + &cp.get_field_ref(*field_ref_index))
-        }
+        BytecodeInstruction::PutStatic { field_ref_index } => Some(
+            "Field ".to_owned()
+                + &match cp[field_ref_index - 1] {
+                    ConstantPoolInfo::FieldRef {
+                        class_index,
+                        name_and_type_index,
+                    } => {
+                        if class_index == this_class {
+                            cp.get_name_and_type(name_and_type_index)
+                        } else {
+                            cp.get_field_ref(*field_ref_index)
+                        }
+                    }
+                    _ => unreachable!(),
+                },
+        ),
         BytecodeInstruction::InvokeSpecial { method_ref_index } => {
             Some("Method ".to_owned() + &cp.get_method_ref(*method_ref_index))
         }
@@ -838,7 +813,7 @@ fn get_verification_type_info_string(cp: &ConstantPool, vti: &VerificationTypeIn
         VerificationTypeInfo::TopVariable => todo!(),
         VerificationTypeInfo::IntegerVariable => "int".to_owned(),
         VerificationTypeInfo::FloatVariable => todo!(),
-        VerificationTypeInfo::LongVariable => todo!(),
+        VerificationTypeInfo::LongVariable => "long".to_owned(),
         VerificationTypeInfo::DoubleVariable => todo!(),
         VerificationTypeInfo::NullVariable => todo!(),
         VerificationTypeInfo::UninitializedThisVariable => todo!(),
@@ -934,44 +909,169 @@ fn print_attributes(cp: &ConstantPool, this_class: u16, attributes: &[AttributeI
                 );
                 for frame in stack_map_table.iter() {
                     match frame {
-                        classfile::attributes::StackMapFrame::SameFrame { frame_type } => println!("        frame_type = {} /* same */",frame_type),
-                        classfile::attributes::StackMapFrame::SameLocals1StackItemFrame { frame_type, stack } => {
-                            println!("        frame_type = {} /* same_locals_1_stack_item */",frame_type);
-                            println!("          stack = [ {} ]",get_verification_type_info_string(cp,stack));
-                        },
-                        classfile::attributes::StackMapFrame::SameLocals1StackItemFrameExtended { offset_delta, stack } => {
-                            println!("        frame_type = 247 /* same_locals_1_stack_item_frame_extended */");
-                            println!("          offset_delta = {}",offset_delta);
-                            println!("          stack = [ {} ]", get_verification_type_info_string(cp,stack));
-                        },
-                        classfile::attributes::StackMapFrame::ChopFrame { frame_type, offset_delta } => {
-                            println!("        frame_type = {} /* chop */",frame_type);
-                            println!("          offset_delta = {}",offset_delta);
-                        },
-                        classfile::attributes::StackMapFrame::SameFrameExtended { offset_delta } => {
+                        StackMapFrame::SameFrame { frame_type } => {
+                            println!("        frame_type = {} /* same */", frame_type)
+                        }
+                        StackMapFrame::SameLocals1StackItemFrame { frame_type, stack } => {
+                            println!(
+                                "        frame_type = {} /* same_locals_1_stack_item */",
+                                frame_type
+                            );
+                            println!(
+                                "          stack = [ {} ]",
+                                get_verification_type_info_string(cp, stack)
+                            );
+                        }
+                        StackMapFrame::SameLocals1StackItemFrameExtended {
+                            offset_delta,
+                            stack,
+                        } => {
+                            println!(
+                                "        frame_type = 247 /* same_locals_1_stack_item_frame_extended */"
+                            );
+                            println!("          offset_delta = {}", offset_delta);
+                            println!(
+                                "          stack = [ {} ]",
+                                get_verification_type_info_string(cp, stack)
+                            );
+                        }
+                        StackMapFrame::ChopFrame {
+                            frame_type,
+                            offset_delta,
+                        } => {
+                            println!("        frame_type = {} /* chop */", frame_type);
+                            println!("          offset_delta = {}", offset_delta);
+                        }
+                        StackMapFrame::SameFrameExtended { offset_delta } => {
                             println!("        frame_type = 251 /* same_frame_extended */");
-                            println!("          offset_delta = {}",offset_delta);
-                        },
-                        classfile::attributes::StackMapFrame::AppendFrame { frame_type, offset_delta, locals } => {
-                            println!("        frame_type = {} /* append */",frame_type);
-                            println!("          offset_delta = {}",offset_delta);
-                            println!("          locals = {}",
-                            if locals.is_empty() {"[]".to_owned()} else {"[ ".to_owned() + 
-                            &locals.iter().map(|x| get_verification_type_info_string(cp,x)).collect::<Vec<String>>().join(", ")+" ]"});
-                        },
-                        classfile::attributes::StackMapFrame::FullFrame { offset_delta, locals, stack } => {
+                            println!("          offset_delta = {}", offset_delta);
+                        }
+                        StackMapFrame::AppendFrame {
+                            frame_type,
+                            offset_delta,
+                            locals,
+                        } => {
+                            println!("        frame_type = {} /* append */", frame_type);
+                            println!("          offset_delta = {}", offset_delta);
+                            println!(
+                                "          locals = {}",
+                                if locals.is_empty() {
+                                    "[]".to_owned()
+                                } else {
+                                    "[ ".to_owned()
+                                        + &locals
+                                            .iter()
+                                            .map(|x| get_verification_type_info_string(cp, x))
+                                            .collect::<Vec<String>>()
+                                            .join(", ")
+                                        + " ]"
+                                }
+                            );
+                        }
+                        StackMapFrame::FullFrame {
+                            offset_delta,
+                            locals,
+                            stack,
+                        } => {
                             println!("        frame_type = 255 /* full_frame */");
-                            println!("          offset_delta = {}",offset_delta);
-                            println!("          locals = {}",if locals.is_empty() {"[]".to_owned()} else {"[ ".to_owned() + 
-                            &locals.iter().map(|x| get_verification_type_info_string(cp,x)).collect::<Vec<String>>().join(", ")+" ]"});
-                            println!("          stack = {}",
-                        if stack.is_empty(){"[]".to_owned()} else {"[ ".to_owned() + &stack.iter().map(|x| get_verification_type_info_string(cp,x)).collect::<Vec<String>>().join(", ")+" ]"}
-                        );
-                        },
+                            println!("          offset_delta = {}", offset_delta);
+                            println!(
+                                "          locals = {}",
+                                if locals.is_empty() {
+                                    "[]".to_owned()
+                                } else {
+                                    "[ ".to_owned()
+                                        + &locals
+                                            .iter()
+                                            .map(|x| get_verification_type_info_string(cp, x))
+                                            .collect::<Vec<String>>()
+                                            .join(", ")
+                                        + " ]"
+                                }
+                            );
+                            println!(
+                                "          stack = {}",
+                                if stack.is_empty() {
+                                    "[]".to_owned()
+                                } else {
+                                    "[ ".to_owned()
+                                        + &stack
+                                            .iter()
+                                            .map(|x| get_verification_type_info_string(cp, x))
+                                            .collect::<Vec<String>>()
+                                            .join(", ")
+                                        + " ]"
+                                }
+                            );
+                        }
                     }
                 }
             }
-            _ => todo!(),
+            AttributeInfo::SourceFile { source_file_index } => {
+                println!(
+                    "SourceFile: \"{}\"",
+                    cp.get_utf8_content(*source_file_index)
+                )
+            }
+            AttributeInfo::BootstrapMethods { methods } => {
+                println!("BootstrapMethods:");
+                for (i, method) in methods.iter().enumerate() {
+                    print!("  {}: #{} ", i, method.bootstrap_method_ref);
+
+                    // TODO: can we merge this match-case with the one below?
+                    match cp[method.bootstrap_method_ref - 1] {
+                        ConstantPoolInfo::MethodHandle {
+                            reference_kind,
+                            reference_index,
+                        } => println!(
+                            "{} {}",
+                            reference_kind::java_repr(reference_kind),
+                            cp.get_method_ref(reference_index)
+                        ),
+                        _ => unreachable!(),
+                    }
+                    println!("    Method arguments:");
+                    for arg in method.bootstrap_arguments.iter() {
+                        print!("      #{} ", arg);
+                        match cp[arg - 1] {
+                            ConstantPoolInfo::String { string_index } => {
+                                println!("{}", cp.get_utf8_content(string_index))
+                            }
+                            ConstantPoolInfo::MethodType { descriptor_index } => {
+                                println!("{}", cp.get_utf8_content(descriptor_index))
+                            }
+                            ConstantPoolInfo::MethodHandle {
+                                reference_kind,
+                                reference_index,
+                            } => println!(
+                                "{} {}",
+                                reference_kind::java_repr(reference_kind),
+                                cp.get_method_ref(reference_index)
+                            ),
+                            _ => unreachable!(),
+                        }
+                    }
+                }
+            }
+            AttributeInfo::InnerClasses { classes } => {
+                println!("InnerClasses:");
+                for class in classes.iter() {
+                    println!(
+                        "{:<width$} // {}=class {} of class {}",
+                        format!(
+                            "  {} #{}= #{} of #{};",
+                            access_flags::modifier_repr_vec(&class.inner_class_access_flags),
+                            class.inner_name_index,
+                            class.inner_class_info_index,
+                            class.outer_class_info_index
+                        ),
+                        cp.get_utf8_content(class.inner_name_index),
+                        cp.get_class_name(class.inner_class_info_index),
+                        cp.get_class_name(class.outer_class_info_index),
+                        width = CP_COMMENT_START_INDEX
+                    );
+                }
+            }
         }
     }
 }

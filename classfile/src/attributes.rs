@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use binary_reader::BinaryReader;
 
+use crate::access_flags::{self, AccessFlag};
 use crate::bytecode::{BytecodeInstruction, parse_bytecode};
 use crate::constant_pool::ConstantPool;
 
@@ -109,7 +110,7 @@ pub struct Class {
     pub inner_class_info_index: u16,
     pub outer_class_info_index: u16,
     pub inner_name_index: u16,
-    pub inner_class_access_flags: u16,
+    pub inner_class_access_flags: Vec<AccessFlag>,
 }
 
 pub fn parse_attributes(
@@ -236,7 +237,9 @@ fn parse_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInf
                     inner_class_info_index: reader.read_u16().unwrap(),
                     outer_class_info_index: reader.read_u16().unwrap(),
                     inner_name_index: reader.read_u16().unwrap(),
-                    inner_class_access_flags: reader.read_u16().unwrap(),
+                    inner_class_access_flags: access_flags::parse_access_flags(
+                        reader.read_u16().unwrap(),
+                    ),
                 });
             }
             AttributeInfo::InnerClasses { classes }
