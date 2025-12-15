@@ -12,6 +12,7 @@ use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read, Result};
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use binary_reader::{BinaryReader, Endian};
 use sha2::{Digest, Sha256};
@@ -28,6 +29,8 @@ use crate::methods::{MethodInfo, parse_methods};
  */
 pub struct ClassFile {
     pub absolute_file_path: String,
+    pub modified_time: SystemTime,
+    pub file_size: usize,
     pub sha256_digest: Vec<u8>,
     pub minor_version: u16,
     pub major_version: u16,
@@ -51,12 +54,15 @@ fn absolute_no_symlinks(p: &Path) -> Result<PathBuf> {
 
 pub fn parse_class_file(filename: String) -> ClassFile {
     let abs_file_path = absolute_no_symlinks(Path::new(&filename)).unwrap();
+    let absolute_file_path = abs_file_path.to_str().unwrap().to_owned();
     let file = File::open(&abs_file_path).expect("File does not exist");
+    let modified_time: SystemTime = file.metadata().unwrap().modified().unwrap();
     let mut file_reader = BufReader::new(file);
     let mut file_bytes: Vec<u8> = Vec::with_capacity(file_reader.capacity());
     file_reader
         .read_to_end(&mut file_bytes)
         .expect("Could not read whole file");
+    let file_size: usize = file_bytes.len();
 
     let digest = Sha256::digest(&file_bytes);
 
@@ -96,7 +102,9 @@ pub fn parse_class_file(filename: String) -> ClassFile {
         parse_attributes(&mut reader, &constant_pool, attributes_count.into());
 
     ClassFile {
-        absolute_file_path: abs_file_path.to_str().unwrap().to_string(),
+        absolute_file_path,
+        modified_time,
+        file_size,
         sha256_digest: digest.to_vec(),
         minor_version,
         major_version,

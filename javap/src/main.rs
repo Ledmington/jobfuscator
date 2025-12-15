@@ -9,6 +9,7 @@ use classfile::constant_pool::{ConstantPool, ConstantPoolInfo};
 use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
 use classfile::{ClassFile, access_flags, parse_class_file, reference_kind};
+use time::OffsetDateTime;
 
 /**
  * The index of the column (on the terminal) where the index of each constant pool entry ends.
@@ -47,7 +48,20 @@ fn print_class_file(cf: &ClassFile) {
 
 fn print_header(cf: &ClassFile) {
     println!("Classfile {}", cf.absolute_file_path);
-    println!("  Last modified Dec 5, 2025; size 12150 bytes");
+    println!(
+        "  Last modified {} {}, {}; size {} bytes",
+        OffsetDateTime::from(cf.modified_time)
+            .month()
+            .to_string()
+            .chars()
+            .take(3)
+            .map(|c| c.to_string())
+            .collect::<Vec<String>>()
+            .join(""),
+        OffsetDateTime::from(cf.modified_time).day(),
+        OffsetDateTime::from(cf.modified_time).year(),
+        cf.file_size
+    );
     println!(
         "  SHA-256 checksum {}",
         cf.sha256_digest
@@ -59,12 +73,7 @@ fn print_header(cf: &ClassFile) {
     let source_file: String = cf
         .attributes
         .iter()
-        .filter(|attr| match attr {
-            AttributeInfo::SourceFile {
-                source_file_index: _,
-            } => true,
-            _ => false,
-        })
+        .filter(|attr| matches!(attr, AttributeInfo::SourceFile { .. }))
         .map(|attr| match attr {
             AttributeInfo::SourceFile { source_file_index } => {
                 cf.constant_pool.get_utf8_content(*source_file_index)
@@ -319,7 +328,7 @@ fn print_constant_pool(cp: &ConstantPool) {
     }
 }
 
-fn print_fields(cp: &ConstantPool, fields: &Vec<FieldInfo>) {
+fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
     for field in fields.iter() {
         let descriptor: String = cp.get_utf8_content(field.descriptor_index);
         println!(
@@ -338,9 +347,8 @@ fn print_fields(cp: &ConstantPool, fields: &Vec<FieldInfo>) {
     }
 }
 
-fn print_methods(cp: &ConstantPool, this_class: u16, methods: &Vec<MethodInfo>) {
-    for i in 0..methods.len() {
-        let method = &methods[i];
+fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
+    for (i, method) in methods.iter().enumerate() {
         let descriptor: String = cp.get_utf8_content(method.descriptor_index);
         if i > 0 {
             println!();
