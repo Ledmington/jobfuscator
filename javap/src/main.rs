@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
+use std::env;
 use std::io::Result;
-use std::{env, path::MAIN_SEPARATOR};
 
 use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
 use classfile::bytecode::BytecodeInstruction;
@@ -54,19 +54,24 @@ fn print_header(cf: &ClassFile) {
             .collect::<Vec<String>>()
             .concat()
     );
-    println!(
-        "  Compiled from \"{}\"",
-        // FIXME: take this info from the "SourceFile" attribute
-        cf.absolute_file_path
-            .split(MAIN_SEPARATOR)
-            .next_back()
-            .unwrap()
-            .split('.')
-            .next()
-            .unwrap()
-            .to_owned()
-            + ".java"
-    );
+    let source_file: String = cf
+        .attributes
+        .iter()
+        .filter(|attr| match attr {
+            AttributeInfo::SourceFile {
+                source_file_index: _,
+            } => true,
+            _ => false,
+        })
+        .map(|attr| match attr {
+            AttributeInfo::SourceFile { source_file_index } => {
+                cf.constant_pool.get_utf8_content(*source_file_index)
+            }
+            _ => unreachable!(),
+        })
+        .next()
+        .unwrap();
+    println!("  Compiled from \"{}\"", source_file);
     println!(
         "{} {}",
         access_flags::modifier_repr_vec(&cf.access_flags),
