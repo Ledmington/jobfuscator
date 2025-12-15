@@ -834,10 +834,10 @@ fn get_verification_type_info_string(cp: &ConstantPool, vti: &VerificationTypeIn
     match vti {
         VerificationTypeInfo::TopVariable => todo!(),
         VerificationTypeInfo::IntegerVariable => "int".to_owned(),
-        VerificationTypeInfo::FloatVariable => todo!(),
+        VerificationTypeInfo::FloatVariable => "float".to_owned(),
         VerificationTypeInfo::LongVariable => "long".to_owned(),
-        VerificationTypeInfo::DoubleVariable => todo!(),
-        VerificationTypeInfo::NullVariable => todo!(),
+        VerificationTypeInfo::DoubleVariable => "double".to_owned(),
+        VerificationTypeInfo::NullVariable => "null".to_owned(),
         VerificationTypeInfo::UninitializedThisVariable => todo!(),
         VerificationTypeInfo::ObjectVariable {
             constant_pool_index,
