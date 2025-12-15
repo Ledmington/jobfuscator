@@ -5,7 +5,9 @@ resolver = "3"
 [profile.dev]
 opt-level = 0
 debug-assertions = true
+incremental = true
 
 [profile.release]
 opt-level = 3
 debug-assertions = false
+incremental = false
