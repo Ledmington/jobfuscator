@@ -119,17 +119,17 @@ pub fn parse_class_file(filename: String) -> ClassFile {
     }
 }
 
-pub fn get_return_type(descriptor: &String) -> String {
-    convert_descriptor(&descriptor.split(')').last().unwrap().to_string())
+pub fn get_return_type(descriptor: &str) -> String {
+    convert_descriptor(&descriptor.split(')').next_back().unwrap().to_string())
 }
 
 pub fn convert_descriptor(descriptor: &String) -> String {
-    match descriptor.chars().nth(0).unwrap().to_string().as_str() {
+    match descriptor.chars().next().unwrap().to_string().as_str() {
         "V" => "void".to_owned(),
         "J" => "long".to_owned(),
         "L" => descriptor[1..(descriptor.len() - 1)].replace('/', "."),
         "(" => {
-            let args: String = descriptor[1..].split(")").nth(0).unwrap().to_string();
+            let args: String = descriptor[1..].split(")").next().unwrap().to_string();
             "(".to_owned() + &convert_descriptor(&args) + ")"
         }
         "[" => convert_descriptor(&descriptor[1..].to_string()) + "[]",
