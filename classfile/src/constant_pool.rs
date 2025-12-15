@@ -14,7 +14,7 @@ impl ConstantPool {
     pub fn get_class_name(&self, cp_index: u16) -> String {
         let class_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match class_entry {
-            ConstantPoolInfo::Class { name_index } => self.get_utf8_content(*name_index),
+            ConstantPoolInfo::Class { name_index } => self.get_wrapped_utf8_content(*name_index),
             _ => panic!(
                 "Expected entry #{} to be of Class type but it wasn't.",
                 cp_index
@@ -124,17 +124,20 @@ impl ConstantPool {
         }
     }
 
+    // FIXME: find a better name
+    pub fn get_wrapped_utf8_content(&self, cp_index: u16) -> String {
+        let content = self.get_utf8_content(cp_index);
+        if content.starts_with('[') {
+            "\"".to_owned() + &content + "\""
+        } else {
+            content
+        }
+    }
+
     pub fn get_utf8_content(&self, cp_index: u16) -> String {
         let name_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match name_entry {
-            ConstantPoolInfo::Utf8 { bytes } => {
-                let content = convert_utf8(bytes);
-                if content.starts_with('[') {
-                    "\"".to_owned() + &content + "\""
-                } else {
-                    content
-                }
-            }
+            ConstantPoolInfo::Utf8 { bytes } => convert_utf8(bytes),
             _ => panic!(
                 "Expected entry #{} to be of Utf8 type but it wasn't.",
                 cp_index
@@ -167,7 +170,6 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
         .replace("\u{0001}", "\\u0001")
 }
 
-#[derive(Clone)]
 pub enum ConstantPoolInfo {
     /**
      * The type of constant pool entry which can be found right after a Long or Double one.
