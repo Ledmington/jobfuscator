@@ -29,6 +29,10 @@ impl ConstantPool {
                 class_index,
                 name_and_type_index,
             } => self.get_method_ref_string(*class_index, *name_and_type_index),
+            ConstantPoolInfo::InterfaceMethodRef {
+                class_index,
+                name_and_type_index,
+            } => self.get_method_ref_string(*class_index, *name_and_type_index),
             _ => panic!(
                 "Expected entry #{} to be of Methodref type but it wasn't.",
                 cp_index
@@ -56,6 +60,45 @@ impl ConstantPool {
 
     pub fn get_field_ref_string(&self, class_index: u16, name_and_type_index: u16) -> String {
         self.get_class_name(class_index) + "." + &self.get_name_and_type(name_and_type_index)
+    }
+
+    pub fn get_field_ref_name_and_type(&self, cp_index: u16) -> String {
+        let field_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        match field_ref_entry {
+            ConstantPoolInfo::FieldRef {
+                class_index: _,
+                name_and_type_index,
+            } => self.get_name_and_type(*name_and_type_index),
+            _ => panic!(
+                "Expected entry #{} to be of Fieldref type but it wasn't.",
+                cp_index
+            ),
+        }
+    }
+
+    pub fn get_invoke_dynamic(&self, cp_index: u16) -> String {
+        let invoke_dynamic_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        match invoke_dynamic_entry {
+            ConstantPoolInfo::InvokeDynamic {
+                bootstrap_method_attr_index,
+                name_and_type_index,
+            } => self.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index),
+            _ => panic!(
+                "Expected entry #{} to be of InvokeDynamic type but it wasn't.",
+                cp_index
+            ),
+        }
+    }
+
+    pub fn get_invoke_dynamic_string(
+        &self,
+        bootstrap_method_attr_index: u16,
+        name_and_type_index: u16,
+    ) -> String {
+        "#".to_owned()
+            + &bootstrap_method_attr_index.to_string()
+            + ":"
+            + &self.get_name_and_type(name_and_type_index)
     }
 
     pub fn get_name_and_type(&self, cp_index: u16) -> String {
@@ -124,6 +167,7 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
         .replace("\u{0001}", "\\u0001")
 }
 
+#[derive(Clone)]
 pub enum ConstantPoolInfo {
     /**
      * The type of constant pool entry which can be found right after a Long or Double one.
