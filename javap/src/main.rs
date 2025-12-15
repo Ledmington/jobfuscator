@@ -334,7 +334,7 @@ fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
         println!(
             "  {} {} {};",
             access_flags::modifier_repr_vec(&field.access_flags),
-            classfile::convert_descriptor(descriptor.clone()),
+            classfile::convert_descriptor(&descriptor),
             cp.get_utf8_content(field.name_index)
         );
         println!("    descriptor: {}", descriptor);
@@ -350,15 +350,26 @@ fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
 fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
     for (i, method) in methods.iter().enumerate() {
         let descriptor: String = cp.get_utf8_content(method.descriptor_index);
+        let method_name = cp.get_utf8_content(method.name_index);
         if i > 0 {
             println!();
         }
-        println!(
-            "  {} {}{}",
-            access_flags::modifier_repr_vec(&method.access_flags),
-            cp.get_utf8_content(method.name_index),
-            classfile::convert_descriptor(descriptor.clone())
+        print!(
+            "  {} ",
+            access_flags::modifier_repr_vec(&method.access_flags)
         );
+        if method_name == "<clinit>" {
+            println!("{{}};");
+        } else if method_name == "<init>" {
+            println!("{}();", cp.get_class_name(this_class).replace("/", "."));
+        } else {
+            println!(
+                "{} {}{};",
+                classfile::get_return_type(&descriptor),
+                method_name,
+                classfile::convert_descriptor(&descriptor)
+            );
+        }
         println!("    descriptor: {}", descriptor);
         println!(
             "    flags: (0x{:04x}) {}",
@@ -1068,7 +1079,7 @@ fn print_attributes(cp: &ConstantPool, this_class: u16, attributes: &[AttributeI
                 println!("InnerClasses:");
                 for class in classes.iter() {
                     println!(
-                        "{:<width$} // {}=class {} of class {}",
+                        "{:<width$}// {}=class {} of class {}",
                         format!(
                             "  {} #{}= #{} of #{};",
                             access_flags::modifier_repr_vec(&class.inner_class_access_flags),

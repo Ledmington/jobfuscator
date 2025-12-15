@@ -84,7 +84,11 @@ pub fn modifier_repr_vec(flags: &[AccessFlag]) -> String {
         if fs.is_empty() {
             continue;
         }
-        result = result + " " + &fs;
+        if result.is_empty() {
+            result = fs;
+        } else {
+            result = result + " " + &fs;
+        }
     }
     result
 }
