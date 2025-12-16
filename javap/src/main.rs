@@ -5,7 +5,7 @@ use std::io::Result;
 
 use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
 use classfile::bytecode::BytecodeInstruction;
-use classfile::constant_pool::{ConstantPool, ConstantPoolInfo};
+use classfile::constant_pool::{self, ConstantPool, ConstantPoolInfo};
 use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
 use classfile::{ClassFile, access_flags, parse_class_file, reference_kind};
@@ -135,16 +135,25 @@ fn print_constant_pool(cp: &ConstantPool) {
 
         match &cp[i.try_into().unwrap()] {
             ConstantPoolInfo::Utf8 { bytes } => {
-                println!(
-                    "{:<width$}{}",
-                    format!(
+                let content = constant_pool::convert_utf8(bytes);
+                if content.trim().is_empty() {
+                    println!(
                         "{:>width$} = Utf8",
                         format!("#{}", i + 1),
                         width = CP_INDEX_WIDTH
-                    ),
-                    classfile::constant_pool::convert_utf8(bytes),
-                    width = CP_INFO_START_INDEX
-                )
+                    );
+                } else {
+                    println!(
+                        "{:<width$}{}",
+                        format!(
+                            "{:>width$} = Utf8",
+                            format!("#{}", i + 1),
+                            width = CP_INDEX_WIDTH
+                        ),
+                        content,
+                        width = CP_INFO_START_INDEX
+                    )
+                }
             }
             ConstantPoolInfo::Long {
                 high_bytes,
@@ -163,21 +172,28 @@ fn print_constant_pool(cp: &ConstantPool) {
                 high_bytes: _,
                 low_bytes: _,
             } => print!("Double"),
-            ConstantPoolInfo::String { string_index } => println!(
-                "{:<width$}// {}",
-                format!(
-                    "{:<width$}#{}",
+            ConstantPoolInfo::String { string_index } => {
+                print!(
+                    "{:<width$}",
                     format!(
-                        "{:>width$} = String",
-                        format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        "{:<width$}#{}",
+                        format!(
+                            "{:>width$} = String",
+                            format!("#{}", i + 1),
+                            width = CP_INDEX_WIDTH
+                        ),
+                        string_index,
+                        width = CP_INFO_START_INDEX
                     ),
-                    string_index,
-                    width = CP_INFO_START_INDEX
-                ),
-                cp.get_utf8_content(*string_index),
-                width = CP_COMMENT_START_INDEX
-            ),
+                    width = CP_COMMENT_START_INDEX
+                );
+                let string_content = cp.get_utf8_content(*string_index);
+                if string_content.trim().is_empty() {
+                    println!("//");
+                } else {
+                    println!("// {}", string_content);
+                }
+            }
             ConstantPoolInfo::Class { name_index } => println!(
                 "{:<width$}// {}",
                 format!(
@@ -588,13 +604,13 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                     .iter()
                     .enumerate()
                     .map(|(i, offset)| {
-                        format!("            {:>11}: {}", i, add_offset(*position, *offset))
+                        format!("             {:>11}: {}", i, add_offset(*position, *offset))
                     })
                     .collect::<Vec<String>>()
                     .join("\n")
-                + "\n                default: "
+                + "\n                 default: "
                 + &add_offset(*position, *default).to_string()
-                + "\n}"
+                + "\n            }"
         }
         BytecodeInstruction::LookupSwitch { default, pairs } => {
             "lookupswitch  { // ".to_owned()
@@ -604,16 +620,16 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                     .iter()
                     .map(|p| {
                         format!(
-                            "            {:>11}: {}",
+                            "             {:>11}: {}",
                             p.match_value,
                             add_offset(*position, p.offset)
                         )
                     })
                     .collect::<Vec<String>>()
                     .join("\n")
-                + "\n                default: "
+                + "\n                 default: "
                 + &add_offset(*position, *default).to_string()
-                + "\n}"
+                + "\n            }"
         }
 
         // Arithmetic instructions
@@ -632,7 +648,12 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
 fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
     match cp[constant_pool_index - 1] {
         ConstantPoolInfo::String { string_index } => {
-            "String ".to_owned() + &cp.get_utf8_content(string_index)
+            let string_content = cp.get_utf8_content(string_index);
+            if string_content.trim().is_empty() {
+                "String".to_owned()
+            } else {
+                "String ".to_owned() + &cp.get_utf8_content(string_index)
+            }
         }
         ConstantPoolInfo::Long {
             high_bytes,
