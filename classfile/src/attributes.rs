@@ -37,6 +37,15 @@ pub enum AttributeInfo {
     MethodParameters {
         parameters: Vec<MethodParameter>,
     },
+    Record {
+        components: Vec<RecordComponentInfo>,
+    },
+}
+
+pub struct RecordComponentInfo {
+    name_index: u16,
+    descriptor_index: u16,
+    attributes: Vec<AttributeInfo>,
 }
 
 pub struct MethodParameter {
@@ -171,6 +180,24 @@ fn parse_class_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attrib
                 });
             }
             AttributeInfo::InnerClasses { classes }
+        }
+        "Record" => {
+            let components_count: u16 = reader.read_u16().unwrap();
+            let mut components: Vec<RecordComponentInfo> =
+                Vec::with_capacity(components_count.into());
+            for _ in 0..components_count {
+                let name_index: u16 = reader.read_u16().unwrap();
+                let descriptor_index: u16 = reader.read_u16().unwrap();
+                let attributes_count: u16 = reader.read_u16().unwrap();
+                let attributes: Vec<AttributeInfo> =
+                    parse_class_attributes(reader, cp, attributes_count.into());
+                components.push(RecordComponentInfo {
+                    name_index,
+                    descriptor_index,
+                    attributes,
+                });
+            }
+            AttributeInfo::Record { components }
         }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a class attribute.",
