@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use binary_reader::BinaryReader;
 
-use crate::access_flags::{self, AccessFlag};
+use crate::access_flags::{self, AccessFlag, parse_access_flags};
 use crate::bytecode::{BytecodeInstruction, parse_bytecode};
 use crate::constant_pool::ConstantPool;
 
@@ -34,6 +34,14 @@ pub enum AttributeInfo {
     InnerClasses {
         classes: Vec<Class>,
     },
+    MethodParameters {
+        parameters: Vec<MethodParameter>,
+    },
+}
+
+pub struct MethodParameter {
+    name_index: u16,
+    access_flags: Vec<AccessFlag>,
 }
 
 pub struct ExceptionTableEntry {
@@ -238,6 +246,20 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
                 exception_table,
                 attributes,
             }
+        }
+        "MethodParameters" => {
+            let parameters_count: u8 = reader.read_u8().unwrap();
+            let mut parameters: Vec<MethodParameter> = Vec::with_capacity(parameters_count.into());
+            for _ in 0..parameters_count {
+                let name_index: u16 = reader.read_u16().unwrap();
+                let raw_access_flags: u16 = reader.read_u16().unwrap();
+                let access_flags: Vec<AccessFlag> = parse_access_flags(raw_access_flags);
+                parameters.push(MethodParameter {
+                    name_index,
+                    access_flags,
+                });
+            }
+            AttributeInfo::MethodParameters { parameters }
         }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a method attribute.",

@@ -11,7 +11,7 @@ use crate::{
 pub struct MethodInfo {
     pub access_flags: Vec<AccessFlag>,
     pub name_index: u16,
-    pub descriptor_index: u16,
+    pub descriptor_index: u16, // TODO: maybe refactor into list of parsed arguments?
     pub attributes: Vec<AttributeInfo>,
 }
 
