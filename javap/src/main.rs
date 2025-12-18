@@ -83,13 +83,21 @@ fn print_header(cf: &ClassFile) {
         .next()
         .unwrap();
     println!("  Compiled from \"{}\"", source_file);
-    println!(
+
+    print!(
         "{} {}",
         access_flags::modifier_repr_vec(&cf.access_flags),
         cf.constant_pool
             .get_class_name(cf.this_class)
             .replace('/', ".")
     );
+    let super_class_name = cf.constant_pool.get_class_name(cf.super_class);
+    if super_class_name != "java/lang/Object" {
+        println!(" extends {}", super_class_name.replace('/', "."));
+    } else {
+        println!();
+    }
+
     println!("  minor version: {}", cf.minor_version);
     println!("  major version: {}", cf.major_version);
     println!(
