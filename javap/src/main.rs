@@ -12,11 +12,6 @@ use classfile::{ClassFile, access_flags, parse_class_file, reference_kind};
 use time::OffsetDateTime;
 
 /**
- * The index of the column (on the terminal) where the index of each constant pool entry ends.
- */
-const CP_INDEX_WIDTH: usize = 6;
-
-/**
  * The index of the column (on the terminal) where the information of each entry is displayed.
  */
 const CP_INFO_START_INDEX: usize = 28;
@@ -127,6 +122,17 @@ fn print_header(cf: &ClassFile) {
 }
 
 fn print_constant_pool(cp: &ConstantPool) {
+    // The index of the column (on the terminal) where the index of each constant pool entry ends.
+    let constant_pool_index_width: usize = 3 + if cp.len() < 10 {
+        1
+    } else if cp.len() < 100 {
+        2
+    } else if cp.len() < 1000 {
+        3
+    } else {
+        4
+    };
+
     println!("Constant pool:");
     for i in 0..cp.len() {
         if i > 1
@@ -148,7 +154,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     println!(
                         "{:>width$} = Utf8",
                         format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        width = constant_pool_index_width
                     );
                 } else {
                     println!(
@@ -156,7 +162,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                         format!(
                             "{:>width$} = Utf8",
                             format!("#{}", i + 1),
-                            width = CP_INDEX_WIDTH
+                            width = constant_pool_index_width
                         ),
                         content,
                         width = CP_INFO_START_INDEX
@@ -171,7 +177,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                 format!(
                     "{:>width$} = Long",
                     format!("#{}", i + 1),
-                    width = CP_INDEX_WIDTH
+                    width = constant_pool_index_width
                 ),
                 ((*high_bytes as u64) << 32) | (*low_bytes as u64),
                 width = CP_INFO_START_INDEX
@@ -188,7 +194,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                         format!(
                             "{:>width$} = String",
                             format!("#{}", i + 1),
-                            width = CP_INDEX_WIDTH
+                            width = constant_pool_index_width
                         ),
                         string_index,
                         width = CP_INFO_START_INDEX
@@ -209,7 +215,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     format!(
                         "{:>width$} = Class",
                         format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        width = constant_pool_index_width
                     ),
                     name_index,
                     width = CP_INFO_START_INDEX
@@ -227,7 +233,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     format!(
                         "{:>width$} = Fieldref",
                         format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        width = constant_pool_index_width
                     ),
                     class_index,
                     name_and_type_index,
@@ -246,7 +252,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     format!(
                         "{:>width$} = Methodref",
                         format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        width = constant_pool_index_width
                     ),
                     class_index,
                     name_and_type_index,
@@ -265,7 +271,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     format!(
                         "{:>width$} = InterfaceMethodref",
                         format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        width = constant_pool_index_width
                     ),
                     class_index,
                     name_and_type_index,
@@ -284,7 +290,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     format!(
                         "{:>width$} = NameAndType",
                         format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        width = constant_pool_index_width
                     ),
                     name_index,
                     descriptor_index,
@@ -300,7 +306,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     format!(
                         "{:>width$} = MethodType",
                         format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        width = constant_pool_index_width
                     ),
                     descriptor_index,
                     width = CP_INFO_START_INDEX
@@ -318,7 +324,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     format!(
                         "{:>width$} = MethodHandle",
                         format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        width = constant_pool_index_width
                     ),
                     *reference_kind as u8,
                     reference_index,
@@ -338,7 +344,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     format!(
                         "{:>width$} = InvokeDynamic",
                         format!("#{}", i + 1),
-                        width = CP_INDEX_WIDTH
+                        width = constant_pool_index_width
                     ),
                     bootstrap_method_attr_index,
                     name_and_type_index,
