@@ -518,6 +518,9 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::PutStatic { field_ref_index } => {
             "putstatic     #".to_owned() + &field_ref_index.to_string()
         }
+        BytecodeInstruction::PutField { field_ref_index } => {
+            "putfield      #".to_owned() + &field_ref_index.to_string()
+        }
         BytecodeInstruction::CheckCast {
             constant_pool_index,
         } => "checkcast     #".to_owned() + &constant_pool_index.to_string(),
@@ -749,6 +752,22 @@ fn get_comment(
                 },
         ),
         BytecodeInstruction::PutStatic { field_ref_index } => Some(
+            "Field ".to_owned()
+                + &match cp[field_ref_index - 1] {
+                    ConstantPoolInfo::FieldRef {
+                        class_index,
+                        name_and_type_index,
+                    } => {
+                        if class_index == this_class {
+                            cp.get_name_and_type(name_and_type_index)
+                        } else {
+                            cp.get_field_ref(*field_ref_index)
+                        }
+                    }
+                    _ => unreachable!(),
+                },
+        ),
+        BytecodeInstruction::PutField { field_ref_index } => Some(
             "Field ".to_owned()
                 + &match cp[field_ref_index - 1] {
                     ConstantPoolInfo::FieldRef {

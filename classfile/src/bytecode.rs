@@ -64,6 +64,9 @@ pub enum BytecodeInstruction {
     PutStatic {
         field_ref_index: u16,
     },
+    PutField {
+        field_ref_index: u16,
+    },
     InvokeSpecial {
         method_ref_index: u16,
     },
@@ -372,6 +375,9 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                     field_ref_index: reader.read_u16().unwrap(),
                 },
                 0xb3 => BytecodeInstruction::PutStatic {
+                    field_ref_index: reader.read_u16().unwrap(),
+                },
+                0xb5 => BytecodeInstruction::PutField {
                     field_ref_index: reader.read_u16().unwrap(),
                 },
                 0xb6 => BytecodeInstruction::InvokeVirtual {
