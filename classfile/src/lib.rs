@@ -19,7 +19,7 @@ use sha2::{Digest, Sha256};
 
 use crate::access_flags::AccessFlag;
 use crate::access_flags::parse_access_flags;
-use crate::attributes::{AttributeInfo, parse_attributes};
+use crate::attributes::{AttributeInfo, parse_class_attributes};
 use crate::constant_pool::{ConstantPool, parse_constant_pool};
 use crate::fields::{FieldInfo, parse_fields};
 use crate::methods::{MethodInfo, parse_methods};
@@ -99,7 +99,7 @@ pub fn parse_class_file(filename: String) -> ClassFile {
 
     let attributes_count: u16 = reader.read_u16().unwrap();
     let attributes: Vec<AttributeInfo> =
-        parse_attributes(&mut reader, &constant_pool, attributes_count.into());
+        parse_class_attributes(&mut reader, &constant_pool, attributes_count.into());
 
     ClassFile {
         absolute_file_path,
@@ -120,19 +120,22 @@ pub fn parse_class_file(filename: String) -> ClassFile {
 }
 
 pub fn get_return_type(descriptor: &str) -> String {
-    convert_descriptor(&descriptor.split(')').next_back().unwrap().to_string())
+    convert_descriptor(descriptor.split(')').next_back().unwrap())
 }
 
-pub fn convert_descriptor(descriptor: &String) -> String {
+pub fn convert_descriptor(descriptor: &str) -> String {
+    if descriptor.is_empty() {
+        return descriptor.to_owned();
+    }
     match descriptor.chars().next().unwrap().to_string().as_str() {
         "V" => "void".to_owned(),
         "J" => "long".to_owned(),
         "L" => descriptor[1..(descriptor.len() - 1)].replace('/', "."),
         "(" => {
-            let args: String = descriptor[1..].split(")").next().unwrap().to_string();
-            "(".to_owned() + &convert_descriptor(&args) + ")"
+            let args = descriptor[1..].split(")").next().unwrap();
+            "(".to_owned() + &convert_descriptor(args) + ")"
         }
-        "[" => convert_descriptor(&descriptor[1..].to_string()) + "[]",
+        "[" => convert_descriptor(&descriptor[1..]) + "[]",
         _ => descriptor.to_string(),
     }
 }

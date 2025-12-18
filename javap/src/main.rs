@@ -43,7 +43,7 @@ fn print_class_file(cf: &ClassFile) {
     print_fields(&cf.constant_pool, &cf.fields);
     print_methods(&cf.constant_pool, cf.this_class, &cf.methods);
     println!("}}");
-    print_attributes(&cf.constant_pool, cf.this_class, &cf.attributes);
+    print_class_attributes(&cf.constant_pool, &cf.attributes);
 }
 
 fn print_header(cf: &ClassFile) {
@@ -366,7 +366,7 @@ fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
 fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
     for (i, method) in methods.iter().enumerate() {
         let descriptor: String = cp.get_utf8_content(method.descriptor_index);
-        let method_name = cp.get_utf8_content(method.name_index);
+        let method_name: String = cp.get_utf8_content(method.name_index);
         if i > 0 {
             println!();
         }
@@ -393,7 +393,7 @@ fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
             access_flags::java_repr_vec(&method.access_flags)
         );
 
-        print_attributes(cp, this_class, &method.attributes);
+        print_method_attributes(cp, this_class, method);
     }
 }
 
@@ -867,8 +867,39 @@ fn get_verification_type_info_string(cp: &ConstantPool, vti: &VerificationTypeIn
     }
 }
 
-fn print_attributes(cp: &ConstantPool, this_class: u16, attributes: &[AttributeInfo]) {
-    for attribute in attributes.iter() {
+// utility method to extract arguments from a descriptor string
+fn extract_between_parenthesis(s: &str) -> String {
+    let start = s.find('(').unwrap() + 1;
+    let end = s.rfind(')').unwrap();
+    s[start..end].to_owned()
+}
+
+fn get_number_of_arguments(cp: &ConstantPool, method: &MethodInfo) -> u8 {
+    let raw_descriptor: String = cp.get_utf8_content(method.descriptor_index);
+    let descriptor: String = classfile::convert_descriptor(&raw_descriptor);
+    let arguments: String = extract_between_parenthesis(&descriptor).trim().to_string();
+
+    let mut num_arguments: u8 = if arguments.is_empty() {
+        0
+    } else {
+        (1 + arguments.chars().filter(|ch| *ch == ',').count())
+            .try_into()
+            .unwrap()
+    };
+
+    if !method
+        .access_flags
+        .contains(&access_flags::AccessFlag::Static)
+    {
+        // if the method is not static, there is the implicit 'this' argument
+        num_arguments += 1;
+    }
+
+    num_arguments
+}
+
+fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodInfo) {
+    for attribute in method.attributes.iter() {
         match attribute {
             AttributeInfo::Code {
                 max_stack,
@@ -878,9 +909,10 @@ fn print_attributes(cp: &ConstantPool, this_class: u16, attributes: &[AttributeI
                 attributes,
             } => {
                 println!("    Code:");
+                let args_size = get_number_of_arguments(cp, method);
                 println!(
                     "      stack={}, locals={}, args_size={}",
-                    max_stack, max_locals, 0
+                    max_stack, max_locals, args_size
                 );
                 for (position, instruction) in code.iter() {
                     let opcode_and_arguments: String =
@@ -921,8 +953,16 @@ fn print_attributes(cp: &ConstantPool, this_class: u16, attributes: &[AttributeI
                         );
                     }
                 }
-                print_attributes(cp, this_class, attributes);
+                print_code_attributes(cp, attributes);
             }
+            _ => unreachable!(),
+        }
+    }
+}
+
+fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
+    for attribute in attributes.iter() {
+        match attribute {
             AttributeInfo::LineNumberTable { line_number_table } => {
                 println!("      LineNumberTable:");
                 for entry in line_number_table.iter() {
@@ -1050,11 +1090,38 @@ fn print_attributes(cp: &ConstantPool, this_class: u16, attributes: &[AttributeI
                     }
                 }
             }
+            _ => unreachable!(),
+        }
+    }
+}
+
+fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
+    for attribute in attributes.iter() {
+        match attribute {
             AttributeInfo::SourceFile { source_file_index } => {
                 println!(
                     "SourceFile: \"{}\"",
                     cp.get_utf8_content(*source_file_index)
                 )
+            }
+            AttributeInfo::InnerClasses { classes } => {
+                println!("InnerClasses:");
+                for class in classes.iter() {
+                    println!(
+                        "{:<width$}// {}=class {} of class {}",
+                        format!(
+                            "  {} #{}= #{} of #{};",
+                            access_flags::modifier_repr_vec(&class.inner_class_access_flags),
+                            class.inner_name_index,
+                            class.inner_class_info_index,
+                            class.outer_class_info_index
+                        ),
+                        cp.get_utf8_content(class.inner_name_index),
+                        cp.get_class_name(class.inner_class_info_index),
+                        cp.get_class_name(class.outer_class_info_index),
+                        width = CP_COMMENT_START_INDEX
+                    );
+                }
             }
             AttributeInfo::BootstrapMethods { methods } => {
                 println!("BootstrapMethods:");
@@ -1096,25 +1163,7 @@ fn print_attributes(cp: &ConstantPool, this_class: u16, attributes: &[AttributeI
                     }
                 }
             }
-            AttributeInfo::InnerClasses { classes } => {
-                println!("InnerClasses:");
-                for class in classes.iter() {
-                    println!(
-                        "{:<width$}// {}=class {} of class {}",
-                        format!(
-                            "  {} #{}= #{} of #{};",
-                            access_flags::modifier_repr_vec(&class.inner_class_access_flags),
-                            class.inner_name_index,
-                            class.inner_class_info_index,
-                            class.outer_class_info_index
-                        ),
-                        cp.get_utf8_content(class.inner_name_index),
-                        cp.get_class_name(class.inner_class_info_index),
-                        cp.get_class_name(class.outer_class_info_index),
-                        width = CP_COMMENT_START_INDEX
-                    );
-                }
-            }
+            _ => unreachable!(),
         }
     }
 }

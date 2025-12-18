@@ -4,7 +4,7 @@ use binary_reader::BinaryReader;
 
 use crate::{
     access_flags::{self, AccessFlag},
-    attributes::{AttributeInfo, parse_attributes},
+    attributes::{AttributeInfo, parse_method_attributes},
     constant_pool::ConstantPool,
 };
 
@@ -27,7 +27,8 @@ pub fn parse_methods(
         let name_index: u16 = reader.read_u16().unwrap();
         let descriptor_index: u16 = reader.read_u16().unwrap();
         let attribute_count: u16 = reader.read_u16().unwrap();
-        let attributes: Vec<AttributeInfo> = parse_attributes(reader, cp, attribute_count.into());
+        let attributes: Vec<AttributeInfo> =
+            parse_method_attributes(reader, cp, attribute_count.into());
         methods.push(MethodInfo {
             access_flags,
             name_index,

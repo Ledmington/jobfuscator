@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 #[repr(u16)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum AccessFlag {
     Public = 0x0001,
     Private = 0x0002,

@@ -113,19 +113,93 @@ pub struct Class {
     pub inner_class_access_flags: Vec<AccessFlag>,
 }
 
-pub fn parse_attributes(
+pub fn parse_class_attributes(
     reader: &mut BinaryReader,
     cp: &ConstantPool,
     num_attributes: usize,
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for _ in 0..num_attributes {
-        attributes.push(parse_attribute(reader, cp));
+        attributes.push(parse_class_attribute(reader, cp));
     }
     attributes
 }
 
-fn parse_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
+fn parse_class_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
+    let attribute_name_index: u16 = reader.read_u16().unwrap();
+    let attribute_name: String = cp.get_utf8_content(attribute_name_index);
+    let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
+    match attribute_name.as_str() {
+        "SourceFile" => AttributeInfo::SourceFile {
+            source_file_index: reader.read_u16().unwrap(),
+        },
+        "BootstrapMethods" => {
+            let num_bootstrap_methods: u16 = reader.read_u16().unwrap();
+            let mut methods: Vec<BootstrapMethod> =
+                Vec::with_capacity(num_bootstrap_methods.into());
+            for _ in 0..num_bootstrap_methods {
+                let bootstrap_method_ref: u16 = reader.read_u16().unwrap();
+                let num_bootstrap_arguments: u16 = reader.read_u16().unwrap();
+                let bootstrap_arguments: Vec<u16> =
+                    reader.read_u16_vec(num_bootstrap_arguments.into()).unwrap();
+                methods.push(BootstrapMethod {
+                    bootstrap_method_ref,
+                    bootstrap_arguments,
+                });
+            }
+            AttributeInfo::BootstrapMethods { methods }
+        }
+        "InnerClasses" => {
+            let number_of_classes: u16 = reader.read_u16().unwrap();
+            let mut classes: Vec<Class> = Vec::with_capacity(number_of_classes.into());
+            for _ in 0..number_of_classes {
+                classes.push(Class {
+                    inner_class_info_index: reader.read_u16().unwrap(),
+                    outer_class_info_index: reader.read_u16().unwrap(),
+                    inner_name_index: reader.read_u16().unwrap(),
+                    inner_class_access_flags: access_flags::parse_access_flags(
+                        reader.read_u16().unwrap(),
+                    ),
+                });
+            }
+            AttributeInfo::InnerClasses { classes }
+        }
+        _ => panic!(
+            "The name '{}' is either not of an attribute or not a class attribute.",
+            attribute_name
+        ),
+    }
+}
+
+pub fn parse_field_attributes(
+    reader: &mut BinaryReader,
+    cp: &ConstantPool,
+    num_attributes: usize,
+) -> Vec<AttributeInfo> {
+    let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
+    for _ in 0..num_attributes {
+        attributes.push(parse_field_attribute(cp, reader));
+    }
+    attributes
+}
+
+fn parse_field_attribute(_cp: &ConstantPool, _reader: &mut BinaryReader) -> AttributeInfo {
+    unreachable!()
+}
+
+pub fn parse_method_attributes(
+    reader: &mut BinaryReader,
+    cp: &ConstantPool,
+    num_attributes: usize,
+) -> Vec<AttributeInfo> {
+    let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
+    for _ in 0..num_attributes {
+        attributes.push(parse_method_attribute(cp, reader));
+    }
+    attributes
+}
+
+fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
@@ -156,7 +230,7 @@ fn parse_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInf
             }
             let attribute_count: u16 = reader.read_u16().unwrap();
             let attributes: Vec<AttributeInfo> =
-                parse_attributes(reader, cp, attribute_count.into());
+                parse_code_attributes(reader, cp, attribute_count.into());
             AttributeInfo::Code {
                 max_stack,
                 max_locals,
@@ -165,6 +239,30 @@ fn parse_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInf
                 attributes,
             }
         }
+        _ => panic!(
+            "The name '{}' is either not of an attribute or not a method attribute.",
+            attribute_name
+        ),
+    }
+}
+
+fn parse_code_attributes(
+    reader: &mut BinaryReader,
+    cp: &ConstantPool,
+    num_attributes: usize,
+) -> Vec<AttributeInfo> {
+    let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
+    for _ in 0..num_attributes {
+        attributes.push(parse_code_attribute(cp, reader));
+    }
+    attributes
+}
+
+fn parse_code_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> AttributeInfo {
+    let attribute_name_index: u16 = reader.read_u16().unwrap();
+    let attribute_name: String = cp.get_utf8_content(attribute_name_index);
+    let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
+    match attribute_name.as_str() {
         "LineNumberTable" => {
             let line_number_table_length: u16 = reader.read_u16().unwrap();
             let mut line_number_table: Vec<LineNumberTableEntry> =
@@ -210,41 +308,10 @@ fn parse_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInf
             }
             AttributeInfo::StackMapTable { stack_map_table }
         }
-        "SourceFile" => AttributeInfo::SourceFile {
-            source_file_index: reader.read_u16().unwrap(),
-        },
-        "BootstrapMethods" => {
-            let num_bootstrap_methods: u16 = reader.read_u16().unwrap();
-            let mut methods: Vec<BootstrapMethod> =
-                Vec::with_capacity(num_bootstrap_methods.into());
-            for _ in 0..num_bootstrap_methods {
-                let bootstrap_method_ref: u16 = reader.read_u16().unwrap();
-                let num_bootstrap_arguments: u16 = reader.read_u16().unwrap();
-                let bootstrap_arguments: Vec<u16> =
-                    reader.read_u16_vec(num_bootstrap_arguments.into()).unwrap();
-                methods.push(BootstrapMethod {
-                    bootstrap_method_ref,
-                    bootstrap_arguments,
-                });
-            }
-            AttributeInfo::BootstrapMethods { methods }
-        }
-        "InnerClasses" => {
-            let number_of_classes: u16 = reader.read_u16().unwrap();
-            let mut classes: Vec<Class> = Vec::with_capacity(number_of_classes.into());
-            for _ in 0..number_of_classes {
-                classes.push(Class {
-                    inner_class_info_index: reader.read_u16().unwrap(),
-                    outer_class_info_index: reader.read_u16().unwrap(),
-                    inner_name_index: reader.read_u16().unwrap(),
-                    inner_class_access_flags: access_flags::parse_access_flags(
-                        reader.read_u16().unwrap(),
-                    ),
-                });
-            }
-            AttributeInfo::InnerClasses { classes }
-        }
-        _ => panic!("Unknown attribute name {}.", attribute_name),
+        _ => panic!(
+            "The name '{}' is either not of an attribute or not a code attribute.",
+            attribute_name
+        ),
     }
 }
 
