@@ -509,6 +509,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
             "bipush        ".to_owned() + &immediate.to_string()
         }
         BytecodeInstruction::Return {} => "return".to_owned(),
+        BytecodeInstruction::IReturn {} => "ireturn".to_owned(),
         BytecodeInstruction::LReturn {} => "lreturn".to_owned(),
         BytecodeInstruction::AReturn {} => "areturn".to_owned(),
         BytecodeInstruction::ArrayLength {} => "arraylength".to_owned(),
@@ -517,6 +518,9 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         }
         BytecodeInstruction::PutStatic { field_ref_index } => {
             "putstatic     #".to_owned() + &field_ref_index.to_string()
+        }
+        BytecodeInstruction::GetField { field_ref_index } => {
+            "getfield      #".to_owned() + &field_ref_index.to_string()
         }
         BytecodeInstruction::PutField { field_ref_index } => {
             "putfield      #".to_owned() + &field_ref_index.to_string()
@@ -733,6 +737,7 @@ fn get_comment(
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
         BytecodeInstruction::BiPush { immediate: _ } => None,
         BytecodeInstruction::Return {} => None,
+        BytecodeInstruction::IReturn {} => None,
         BytecodeInstruction::LReturn {} => None,
         BytecodeInstruction::AReturn {} => None,
         BytecodeInstruction::GetStatic { field_ref_index } => Some(
@@ -752,6 +757,22 @@ fn get_comment(
                 },
         ),
         BytecodeInstruction::PutStatic { field_ref_index } => Some(
+            "Field ".to_owned()
+                + &match cp[field_ref_index - 1] {
+                    ConstantPoolInfo::FieldRef {
+                        class_index,
+                        name_and_type_index,
+                    } => {
+                        if class_index == this_class {
+                            cp.get_name_and_type(name_and_type_index)
+                        } else {
+                            cp.get_field_ref(*field_ref_index)
+                        }
+                    }
+                    _ => unreachable!(),
+                },
+        ),
+        BytecodeInstruction::GetField { field_ref_index } => Some(
             "Field ".to_owned()
                 + &match cp[field_ref_index - 1] {
                     ConstantPoolInfo::FieldRef {

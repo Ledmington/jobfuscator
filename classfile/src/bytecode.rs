@@ -56,12 +56,16 @@ pub enum BytecodeInstruction {
         immediate: u8,
     },
     Return {},
+    IReturn {},
     LReturn {},
     AReturn {},
     GetStatic {
         field_ref_index: u16,
     },
     PutStatic {
+        field_ref_index: u16,
+    },
+    GetField {
         field_ref_index: u16,
     },
     PutField {
@@ -368,6 +372,7 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                     }
                     BytecodeInstruction::LookupSwitch { default, pairs }
                 }
+                0xac => BytecodeInstruction::IReturn {},
                 0xad => BytecodeInstruction::LReturn {},
                 0xb0 => BytecodeInstruction::AReturn {},
                 0xb1 => BytecodeInstruction::Return {},
@@ -375,6 +380,9 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                     field_ref_index: reader.read_u16().unwrap(),
                 },
                 0xb3 => BytecodeInstruction::PutStatic {
+                    field_ref_index: reader.read_u16().unwrap(),
+                },
+                0xb4 => BytecodeInstruction::GetField {
                     field_ref_index: reader.read_u16().unwrap(),
                 },
                 0xb5 => BytecodeInstruction::PutField {
