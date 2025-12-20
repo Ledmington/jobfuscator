@@ -129,13 +129,15 @@ pub fn convert_descriptor(descriptor: &str) -> String {
     }
     match descriptor.chars().next().unwrap().to_string().as_str() {
         "V" => "void".to_owned(),
+        "I" => "int".to_owned(),
         "J" => "long".to_owned(),
+        "Z" => "boolean".to_owned(),
         "L" => descriptor[1..(descriptor.len() - 1)].replace('/', "."),
         "(" => {
             let args = descriptor[1..].split(")").next().unwrap();
             "(".to_owned() + &convert_descriptor(args) + ")"
         }
         "[" => convert_descriptor(&descriptor[1..]) + "[]",
-        _ => descriptor.to_string(),
+        _ => panic!("Cannot convert descriptor: '{}'.", descriptor),
     }
 }

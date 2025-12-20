@@ -25,6 +25,10 @@ impl ConstantPool {
     pub fn get_method_ref(&self, cp_index: u16) -> String {
         let method_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match method_ref_entry {
+            ConstantPoolInfo::FieldRef {
+                class_index,
+                name_and_type_index,
+            } => self.get_field_ref_string(*class_index, *name_and_type_index),
             ConstantPoolInfo::MethodRef {
                 class_index,
                 name_and_type_index,

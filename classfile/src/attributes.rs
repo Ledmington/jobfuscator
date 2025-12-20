@@ -43,14 +43,14 @@ pub enum AttributeInfo {
 }
 
 pub struct RecordComponentInfo {
-    name_index: u16,
-    descriptor_index: u16,
-    attributes: Vec<AttributeInfo>,
+    pub name_index: u16,
+    pub descriptor_index: u16,
+    pub attributes: Vec<AttributeInfo>,
 }
 
 pub struct MethodParameter {
-    name_index: u16,
-    access_flags: Vec<AccessFlag>,
+    pub name_index: u16,
+    pub access_flags: Vec<AccessFlag>,
 }
 
 pub struct ExceptionTableEntry {

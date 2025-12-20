@@ -12,11 +12,6 @@ use classfile::{ClassFile, access_flags, parse_class_file, reference_kind};
 use time::OffsetDateTime;
 
 /**
- * The index of the column (on the terminal) where the information of each entry is displayed.
- */
-const CP_INFO_START_INDEX: usize = 28;
-
-/**
  * The index of the column (on the terminal) where the comments (the '//') start for the constant pool.
  */
 const CP_COMMENT_START_INDEX: usize = 42;
@@ -121,17 +116,16 @@ fn print_header(cf: &ClassFile) {
     );
 }
 
+fn num_digits(n: usize) -> usize {
+    (n as f64).log10().floor() as usize + 1
+}
+
 fn print_constant_pool(cp: &ConstantPool) {
     // The index of the column (on the terminal) where the index of each constant pool entry ends.
-    let constant_pool_index_width: usize = 3 + if cp.len() < 10 {
-        1
-    } else if cp.len() < 100 {
-        2
-    } else if cp.len() < 1000 {
-        3
-    } else {
-        4
-    };
+    let constant_pool_index_width: usize = 3 + num_digits(cp.len());
+
+    // The index of the column (on the terminal) where the information of each entry is displayed.
+    let constant_pool_info_start_index: usize = 25 + num_digits(cp.len());
 
     println!("Constant pool:");
     for i in 0..cp.len() {
@@ -165,7 +159,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                             width = constant_pool_index_width
                         ),
                         content,
-                        width = CP_INFO_START_INDEX
+                        width = constant_pool_info_start_index
                     )
                 }
             }
@@ -180,7 +174,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     width = constant_pool_index_width
                 ),
                 ((*high_bytes as u64) << 32) | (*low_bytes as u64),
-                width = CP_INFO_START_INDEX
+                width = constant_pool_info_start_index
             ),
             ConstantPoolInfo::Double {
                 high_bytes: _,
@@ -197,7 +191,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                             width = constant_pool_index_width
                         ),
                         string_index,
-                        width = CP_INFO_START_INDEX
+                        width = constant_pool_info_start_index
                     ),
                     width = CP_COMMENT_START_INDEX
                 );
@@ -218,7 +212,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                         width = constant_pool_index_width
                     ),
                     name_index,
-                    width = CP_INFO_START_INDEX
+                    width = constant_pool_info_start_index
                 ),
                 cp.get_wrapped_utf8_content(*name_index),
                 width = CP_COMMENT_START_INDEX
@@ -237,7 +231,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     ),
                     class_index,
                     name_and_type_index,
-                    width = CP_INFO_START_INDEX
+                    width = constant_pool_info_start_index
                 ),
                 cp.get_field_ref_string(*class_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
@@ -256,7 +250,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     ),
                     class_index,
                     name_and_type_index,
-                    width = CP_INFO_START_INDEX
+                    width = constant_pool_info_start_index
                 ),
                 cp.get_method_ref_string(*class_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
@@ -275,7 +269,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     ),
                     class_index,
                     name_and_type_index,
-                    width = CP_INFO_START_INDEX
+                    width = constant_pool_info_start_index
                 ),
                 cp.get_method_ref_string(*class_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
@@ -294,7 +288,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     ),
                     name_index,
                     descriptor_index,
-                    width = CP_INFO_START_INDEX
+                    width = constant_pool_info_start_index
                 ),
                 cp.get_name_and_type_string(*name_index, *descriptor_index),
                 width = CP_COMMENT_START_INDEX
@@ -309,7 +303,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                         width = constant_pool_index_width
                     ),
                     descriptor_index,
-                    width = CP_INFO_START_INDEX
+                    width = constant_pool_info_start_index
                 ),
                 cp.get_utf8_content(*descriptor_index),
                 width = CP_COMMENT_START_INDEX
@@ -328,7 +322,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     ),
                     *reference_kind as u8,
                     reference_index,
-                    width = CP_INFO_START_INDEX
+                    width = constant_pool_info_start_index
                 ),
                 reference_kind::java_repr(*reference_kind),
                 cp.get_method_ref(*reference_index),
@@ -348,7 +342,7 @@ fn print_constant_pool(cp: &ConstantPool) {
                     ),
                     bootstrap_method_attr_index,
                     name_and_type_index,
-                    width = CP_INFO_START_INDEX
+                    width = constant_pool_info_start_index
                 ),
                 cp.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index),
                 width = CP_COMMENT_START_INDEX
@@ -1009,6 +1003,13 @@ fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodIn
                 }
                 print_code_attributes(cp, attributes);
             }
+            AttributeInfo::MethodParameters { parameters } => {
+                println!("    MethodParameters:");
+                println!("      Name                           Flags");
+                for param in parameters.iter() {
+                    println!("      {}", cp.get_utf8_content(param.name_index));
+                }
+            }
             _ => unreachable!(),
         }
     }
@@ -1201,6 +1202,9 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                             ConstantPoolInfo::String { string_index } => {
                                 println!("{}", cp.get_utf8_content(string_index))
                             }
+                            ConstantPoolInfo::Class { name_index } => {
+                                println!("{}", cp.get_utf8_content(name_index));
+                            }
                             ConstantPoolInfo::MethodType { descriptor_index } => {
                                 println!("{}", cp.get_utf8_content(descriptor_index))
                             }
@@ -1215,6 +1219,19 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                             _ => unreachable!(),
                         }
                     }
+                }
+            }
+            AttributeInfo::Record { components } => {
+                println!("Record:");
+                for component in components.iter() {
+                    let descriptor = cp.get_utf8_content(component.descriptor_index);
+                    println!(
+                        "  {} {};",
+                        classfile::convert_descriptor(&descriptor),
+                        cp.get_utf8_content(component.name_index)
+                    );
+                    println!("    descriptor: {}", descriptor);
+                    println!();
                 }
             }
             _ => unreachable!(),

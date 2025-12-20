@@ -34,7 +34,7 @@ impl From<u8> for ReferenceKind {
 // TODO: Convert into a trait?
 pub fn java_repr(ref_kind: ReferenceKind) -> String {
     match ref_kind {
-        ReferenceKind::GetField => "REF_GetField",
+        ReferenceKind::GetField => "REF_getField",
         ReferenceKind::GetStatic => "REF_GetStatic",
         ReferenceKind::PutField => "REF_PutField",
         ReferenceKind::PutStatic => "REF_PutStatic",
