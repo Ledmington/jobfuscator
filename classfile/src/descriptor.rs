@@ -2,11 +2,17 @@
 
 use std::fmt::{Display, Formatter, Result};
 
+#[derive(Debug, PartialEq)]
 pub enum Type {
     Void,
+    Boolean,
+    Char,
+    Byte,
+    Short,
     Int,
     Long,
-    Boolean,
+    Float,
+    Double,
     Array { inner: Box<Type> },
     Object { class_name: String },
 }
@@ -15,9 +21,14 @@ impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Type::Void => write!(f, "void"),
+            Type::Boolean => write!(f, "boolean"),
+            Type::Char => write!(f, "char"),
+            Type::Byte => write!(f, "byte"),
+            Type::Short => write!(f, "short"),
             Type::Int => write!(f, "int"),
             Type::Long => write!(f, "long"),
-            Type::Boolean => write!(f, "boolean"),
+            Type::Float => write!(f, "float"),
+            Type::Double => write!(f, "double"),
             Type::Array { inner } => write!(f, "{}[]", inner),
             Type::Object { class_name } => write!(f, "{}", class_name),
         }
@@ -65,9 +76,14 @@ fn parse_type(raw_descriptor: &str) -> Type {
 
     match raw_descriptor {
         "V" => Type::Void,
-        "I" => Type::Int,
-        "J" => Type::Long,
         "Z" => Type::Boolean,
+        "C" => Type::Char,
+        "B" => Type::Byte,
+        "S" => Type::Short,
+        "I" => Type::Int,
+        "F" => Type::Float,
+        "D" => Type::Double,
+        "J" => Type::Long,
         _ => {
             if let Some(stripped) = raw_descriptor.strip_prefix('[') {
                 return Type::Array {
@@ -80,7 +96,7 @@ fn parse_type(raw_descriptor: &str) -> Type {
                 assert!(raw_descriptor.len() > 2);
 
                 return Type::Object {
-                    class_name: raw_descriptor[1..(raw_descriptor.len())].replace('/', "."),
+                    class_name: raw_descriptor[1..(raw_descriptor.len() - 1)].replace('/', "."),
                 };
             }
 
@@ -141,5 +157,28 @@ pub fn parse_method_descriptor(raw_descriptor: &str) -> MethodDescriptor {
     MethodDescriptor {
         return_type,
         parameter_types,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test_case(Type::Void, "V")]
+    #[test_case(Type::Boolean, "Z")]
+    #[test_case(Type::Char, "C")]
+    #[test_case(Type::Byte, "B")]
+    #[test_case(Type::Short, "S")]
+    #[test_case(Type::Int, "I")]
+    #[test_case(Type::Long, "J")]
+    #[test_case(Type::Float, "F")]
+    #[test_case(Type::Double, "D")]
+    #[test_case(Type::Array{inner:Box::new(Type::Double)}, "[D")]
+    #[test_case(Type::Array{inner:Box::new(Type::Array{inner:Box::new(Type::Byte)})}, "[[B")]
+    #[test_case(Type::Array{inner:Box::new(Type::Array{inner:Box::new(Type::Array{inner:Box::new(Type::Long)})})}, "[[[J")]
+    #[test_case(Type::Object{class_name:"java.lang.Object".to_string()}, "Ljava/lang/Object;")]
+    fn descriptor_parsing(expected: Type, input: &str) {
+        assert_eq!(expected, parse_type(input));
     }
 }

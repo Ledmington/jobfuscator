@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 binary_reader = { path = "../binary_reader" }
 sha2 = "0.10.9"
+
+[dev-dependencies]
+test-case = "3.3.1"
