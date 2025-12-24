@@ -6,9 +6,10 @@ use std::io::Result;
 use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
 use classfile::bytecode::BytecodeInstruction;
 use classfile::constant_pool::{self, ConstantPool, ConstantPoolInfo};
+use classfile::descriptor::MethodDescriptor;
 use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
-use classfile::{ClassFile, access_flags, parse_class_file, reference_kind};
+use classfile::{ClassFile, access_flags, descriptor, parse_class_file, reference_kind};
 use time::OffsetDateTime;
 
 /**
@@ -358,7 +359,7 @@ fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
         println!(
             "  {} {} {};",
             access_flags::modifier_repr_vec(&field.access_flags),
-            classfile::convert_descriptor(&descriptor),
+            descriptor::parse_field_descriptor(&descriptor),
             cp.get_utf8_content(field.name_index)
         );
         println!("    descriptor: {}", descriptor);
@@ -387,11 +388,17 @@ fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
         } else if method_name == "<init>" {
             println!("{}();", cp.get_class_name(this_class).replace("/", "."));
         } else {
+            let descriptor: MethodDescriptor = descriptor::parse_method_descriptor(&descriptor);
             println!(
-                "{} {}{};",
-                classfile::get_return_type(&descriptor),
+                "{} {}({});",
+                descriptor.return_type,
                 method_name,
-                classfile::convert_descriptor(&descriptor)
+                descriptor
+                    .parameter_types
+                    .iter()
+                    .map(|t| format!("{}", t))
+                    .collect::<Vec<String>>()
+                    .join(", ")
             );
         }
         println!("    descriptor: {}", descriptor);
@@ -915,25 +922,13 @@ fn get_verification_type_info_string(cp: &ConstantPool, vti: &VerificationTypeIn
     }
 }
 
-// utility method to extract arguments from a descriptor string
-fn extract_between_parenthesis(s: &str) -> String {
-    let start = s.find('(').unwrap() + 1;
-    let end = s.rfind(')').unwrap();
-    s[start..end].to_owned()
-}
-
 fn get_number_of_arguments(cp: &ConstantPool, method: &MethodInfo) -> u8 {
-    let raw_descriptor: String = cp.get_utf8_content(method.descriptor_index);
-    let descriptor: String = classfile::convert_descriptor(&raw_descriptor);
-    let arguments: String = extract_between_parenthesis(&descriptor).trim().to_string();
-
-    let mut num_arguments: u8 = if arguments.is_empty() {
-        0
-    } else {
-        (1 + arguments.chars().filter(|ch| *ch == ',').count())
+    let mut num_arguments: u8 =
+        descriptor::parse_method_descriptor(&cp.get_utf8_content(method.descriptor_index))
+            .parameter_types
+            .len()
             .try_into()
-            .unwrap()
-    };
+            .unwrap();
 
     if !method
         .access_flags
@@ -1227,7 +1222,7 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                     let descriptor = cp.get_utf8_content(component.descriptor_index);
                     println!(
                         "  {} {};",
-                        classfile::convert_descriptor(&descriptor),
+                        descriptor::parse_field_descriptor(&descriptor),
                         cp.get_utf8_content(component.name_index)
                     );
                     println!("    descriptor: {}", descriptor);

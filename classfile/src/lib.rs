@@ -4,6 +4,7 @@ pub mod access_flags;
 pub mod attributes;
 pub mod bytecode;
 pub mod constant_pool;
+pub mod descriptor;
 pub mod fields;
 pub mod methods;
 pub mod reference_kind;
@@ -116,28 +117,5 @@ pub fn parse_class_file(filename: String) -> ClassFile {
         fields,
         methods,
         attributes,
-    }
-}
-
-pub fn get_return_type(descriptor: &str) -> String {
-    convert_descriptor(descriptor.split(')').next_back().unwrap())
-}
-
-pub fn convert_descriptor(descriptor: &str) -> String {
-    if descriptor.is_empty() {
-        return descriptor.to_owned();
-    }
-    match descriptor.chars().next().unwrap().to_string().as_str() {
-        "V" => "void".to_owned(),
-        "I" => "int".to_owned(),
-        "J" => "long".to_owned(),
-        "Z" => "boolean".to_owned(),
-        "L" => descriptor[1..(descriptor.len() - 1)].replace('/', "."),
-        "(" => {
-            let args = descriptor[1..].split(")").next().unwrap();
-            "(".to_owned() + &convert_descriptor(args) + ")"
-        }
-        "[" => convert_descriptor(&descriptor[1..]) + "[]",
-        _ => panic!("Cannot convert descriptor: '{}'.", descriptor),
     }
 }
