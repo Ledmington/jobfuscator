@@ -374,8 +374,10 @@ fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
 
 fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
     for (i, method) in methods.iter().enumerate() {
-        let descriptor: String = cp.get_utf8_content(method.descriptor_index);
         let method_name: String = cp.get_utf8_content(method.name_index);
+        let raw_descriptor: String = cp.get_utf8_content(method.descriptor_index);
+        let parsed_descriptor: MethodDescriptor =
+            descriptor::parse_method_descriptor(&raw_descriptor);
         if i > 0 {
             println!();
         }
@@ -386,14 +388,22 @@ fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
         if method_name == "<clinit>" {
             println!("{{}};");
         } else if method_name == "<init>" {
-            println!("{}();", cp.get_class_name(this_class).replace("/", "."));
+            println!(
+                "{}({});",
+                cp.get_class_name(this_class).replace("/", "."),
+                parsed_descriptor
+                    .parameter_types
+                    .iter()
+                    .map(|t| format!("{}", t))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            );
         } else {
-            let descriptor: MethodDescriptor = descriptor::parse_method_descriptor(&descriptor);
             println!(
                 "{} {}({});",
-                descriptor.return_type,
+                parsed_descriptor.return_type,
                 method_name,
-                descriptor
+                parsed_descriptor
                     .parameter_types
                     .iter()
                     .map(|t| format!("{}", t))
@@ -401,7 +411,7 @@ fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
                     .join(", ")
             );
         }
-        println!("    descriptor: {}", descriptor);
+        println!("    descriptor: {}", raw_descriptor);
         println!(
             "    flags: (0x{:04x}) {}",
             access_flags::to_u16(&method.access_flags),
