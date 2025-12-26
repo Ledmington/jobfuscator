@@ -88,6 +88,7 @@ pub enum BytecodeInstruction {
         count: u8,
     },
     ArrayLength {},
+    LCmp {},
     IfIcmpEq {
         offset: i16,
     },
@@ -296,6 +297,7 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                     constant: reader.read_i8().unwrap(),
                 },
                 0x85 => BytecodeInstruction::I2L {},
+                0x94 => BytecodeInstruction::LCmp {},
                 0x99 => BytecodeInstruction::IfEq {
                     offset: reader.read_i16().unwrap(),
                 },

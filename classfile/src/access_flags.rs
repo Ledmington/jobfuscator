@@ -70,7 +70,7 @@ pub fn modifier_repr(flag: AccessFlag) -> String {
         AccessFlag::Interface => "interface",
         AccessFlag::Abstract => "abstract",
         AccessFlag::Enum => "",
-        AccessFlag::Synthetic => "",
+        AccessFlag::Synthetic => "synthetic",
         AccessFlag::Annotation => todo!(),
         AccessFlag::Module => todo!(),
     }

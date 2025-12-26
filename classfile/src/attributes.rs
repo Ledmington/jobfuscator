@@ -40,6 +40,9 @@ pub enum AttributeInfo {
     Record {
         components: Vec<RecordComponentInfo>,
     },
+    Signature {
+        signature_index: u16,
+    },
 }
 
 pub struct RecordComponentInfo {
@@ -137,12 +140,12 @@ pub fn parse_class_attributes(
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for _ in 0..num_attributes {
-        attributes.push(parse_class_attribute(reader, cp));
+        attributes.push(parse_classfile_attribute(reader, cp));
     }
     attributes
 }
 
-fn parse_class_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
+fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
@@ -198,6 +201,10 @@ fn parse_class_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attrib
                 });
             }
             AttributeInfo::Record { components }
+        }
+        "Signature" => {
+            let signature_index: u16 = reader.read_u16().unwrap();
+            AttributeInfo::Signature { signature_index }
         }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a class attribute.",
@@ -287,6 +294,10 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
                 });
             }
             AttributeInfo::MethodParameters { parameters }
+        }
+        "Signature" => {
+            let signature_index: u16 = reader.read_u16().unwrap();
+            AttributeInfo::Signature { signature_index }
         }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a method attribute.",

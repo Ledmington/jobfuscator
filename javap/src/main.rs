@@ -538,6 +538,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::LReturn {} => "lreturn".to_owned(),
         BytecodeInstruction::AReturn {} => "areturn".to_owned(),
         BytecodeInstruction::ArrayLength {} => "arraylength".to_owned(),
+        BytecodeInstruction::LCmp {} => "lcmp".to_owned(),
         BytecodeInstruction::GetStatic { field_ref_index } => {
             "getstatic     #".to_owned() + &field_ref_index.to_string()
         }
@@ -695,6 +696,17 @@ fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
                 + &(((high_bytes as u64) << 32) | (low_bytes as u64)).to_string()
                 + "l"
         }
+        ConstantPoolInfo::Double {
+            high_bytes,
+            low_bytes,
+        } => {
+            "double ".to_owned()
+                + &(((high_bytes as u64) << 32) | (low_bytes as u64)).to_string()
+                + "l"
+        }
+        ConstantPoolInfo::Class { name_index } => {
+            "class ".to_owned() + &cp.get_utf8_content(name_index)
+        }
         _ => unreachable!(),
     }
 }
@@ -829,9 +841,22 @@ fn get_comment(
                     _ => unreachable!(),
                 },
         ),
-        BytecodeInstruction::InvokeSpecial { method_ref_index } => {
-            Some("Method ".to_owned() + &cp.get_method_ref(*method_ref_index))
-        }
+        BytecodeInstruction::InvokeSpecial { method_ref_index } => Some(
+            "Method ".to_owned()
+                + &match cp[method_ref_index - 1] {
+                    ConstantPoolInfo::MethodRef {
+                        class_index,
+                        name_and_type_index,
+                    } => {
+                        if class_index == this_class {
+                            cp.get_name_and_type(name_and_type_index)
+                        } else {
+                            cp.get_method_ref(*method_ref_index)
+                        }
+                    }
+                    _ => unreachable!(),
+                },
+        ),
         BytecodeInstruction::InvokeStatic { method_ref_index } => {
             let method_entry = &cp[method_ref_index - 1];
             Some(
@@ -877,6 +902,7 @@ fn get_comment(
                 + &cp.get_method_ref(*constant_pool_index),
         ),
         BytecodeInstruction::ArrayLength {} => None,
+        BytecodeInstruction::LCmp {} => None,
         BytecodeInstruction::IfIcmpEq { offset: _ } => None,
         BytecodeInstruction::IfIcmpNe { offset: _ } => None,
         BytecodeInstruction::IfIcmpLt { offset: _ } => None,
@@ -1012,8 +1038,25 @@ fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodIn
                 println!("    MethodParameters:");
                 println!("      Name                           Flags");
                 for param in parameters.iter() {
-                    println!("      {}", cp.get_utf8_content(param.name_index));
+                    let name = if param.name_index == 0 {
+                        "<no name>"
+                    } else {
+                        &cp.get_utf8_content(param.name_index)
+                    };
+                    println!(
+                        "      {}                      {}",
+                        name,
+                        access_flags::modifier_repr_vec(&param.access_flags)
+                    );
                 }
+            }
+            AttributeInfo::Signature { signature_index } => {
+                println!(
+                    "{:<width$}// {}",
+                    format!("    Signature: #{}", signature_index),
+                    cp.get_utf8_content(*signature_index),
+                    width = CP_COMMENT_START_INDEX
+                );
             }
             _ => unreachable!(),
         }
@@ -1238,6 +1281,14 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                     println!("    descriptor: {}", descriptor);
                     println!();
                 }
+            }
+            AttributeInfo::Signature { signature_index } => {
+                println!(
+                    "{:<width$}// {}",
+                    format!("Signature: #{}", signature_index),
+                    cp.get_utf8_content(*signature_index),
+                    width = CP_COMMENT_START_INDEX
+                );
             }
             _ => unreachable!(),
         }
