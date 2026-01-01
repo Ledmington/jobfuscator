@@ -3,6 +3,7 @@
 use std::env;
 use std::io::Result;
 
+use classfile::access_flags::MethodAccessFlag;
 use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
 use classfile::bytecode::BytecodeInstruction;
 use classfile::constant_pool::{self, ConstantPool, ConstantPoolInfo};
@@ -966,10 +967,7 @@ fn get_number_of_arguments(cp: &ConstantPool, method: &MethodInfo) -> u8 {
             .try_into()
             .unwrap();
 
-    if !method
-        .access_flags
-        .contains(&access_flags::AccessFlag::Static)
-    {
+    if !method.access_flags.contains(&MethodAccessFlag::Static) {
         // if the method is not static, there is the implicit 'this' argument
         num_arguments += 1;
     }

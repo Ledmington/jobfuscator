@@ -18,8 +18,7 @@ use std::time::SystemTime;
 use binary_reader::{BinaryReader, Endian};
 use sha2::{Digest, Sha256};
 
-use crate::access_flags::AccessFlag;
-use crate::access_flags::parse_access_flags;
+use crate::access_flags::{ClassAccessFlag, parse_class_access_flags};
 use crate::attributes::{AttributeInfo, parse_class_attributes};
 use crate::constant_pool::{ConstantPool, parse_constant_pool};
 use crate::fields::{FieldInfo, parse_fields};
@@ -36,7 +35,7 @@ pub struct ClassFile {
     pub minor_version: u16,
     pub major_version: u16,
     pub constant_pool: ConstantPool,
-    pub access_flags: Vec<AccessFlag>,
+    pub access_flags: Vec<ClassAccessFlag>,
     pub this_class: u16,
     pub super_class: u16,
     pub interfaces: Vec<u16>,
@@ -84,7 +83,7 @@ pub fn parse_class_file(filename: String) -> ClassFile {
     let cp_count: u16 = reader.read_u16().unwrap();
     let constant_pool: ConstantPool = parse_constant_pool(&mut reader, (cp_count - 1).into());
 
-    let access_flags: Vec<AccessFlag> = parse_access_flags(reader.read_u16().unwrap());
+    let access_flags: Vec<ClassAccessFlag> = parse_class_access_flags(reader.read_u16().unwrap());
 
     let this_class: u16 = reader.read_u16().unwrap();
     let super_class: u16 = reader.read_u16().unwrap();

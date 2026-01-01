@@ -4,7 +4,10 @@ use std::collections::BTreeMap;
 
 use binary_reader::BinaryReader;
 
-use crate::access_flags::{self, AccessFlag, parse_access_flags};
+use crate::access_flags::{
+    InnerClassAccessFlag, MethodParameterAccessFlag, parse_inner_class_access_flags,
+    parse_method_parameter_access_flags,
+};
 use crate::bytecode::{BytecodeInstruction, parse_bytecode};
 use crate::constant_pool::ConstantPool;
 
@@ -53,7 +56,7 @@ pub struct RecordComponentInfo {
 
 pub struct MethodParameter {
     pub name_index: u16,
-    pub access_flags: Vec<AccessFlag>,
+    pub access_flags: Vec<MethodParameterAccessFlag>,
 }
 
 pub struct ExceptionTableEntry {
@@ -130,7 +133,7 @@ pub struct Class {
     pub inner_class_info_index: u16,
     pub outer_class_info_index: u16,
     pub inner_name_index: u16,
-    pub inner_class_access_flags: Vec<AccessFlag>,
+    pub inner_class_access_flags: Vec<InnerClassAccessFlag>,
 }
 
 pub fn parse_class_attributes(
@@ -177,7 +180,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                     inner_class_info_index: reader.read_u16().unwrap(),
                     outer_class_info_index: reader.read_u16().unwrap(),
                     inner_name_index: reader.read_u16().unwrap(),
-                    inner_class_access_flags: access_flags::parse_access_flags(
+                    inner_class_access_flags: parse_inner_class_access_flags(
                         reader.read_u16().unwrap(),
                     ),
                 });
@@ -287,7 +290,8 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
             for _ in 0..parameters_count {
                 let name_index: u16 = reader.read_u16().unwrap();
                 let raw_access_flags: u16 = reader.read_u16().unwrap();
-                let access_flags: Vec<AccessFlag> = parse_access_flags(raw_access_flags);
+                let access_flags: Vec<MethodParameterAccessFlag> =
+                    parse_method_parameter_access_flags(raw_access_flags);
                 parameters.push(MethodParameter {
                     name_index,
                     access_flags,

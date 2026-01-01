@@ -3,13 +3,13 @@
 use binary_reader::BinaryReader;
 
 use crate::{
-    access_flags::{self, AccessFlag},
+    access_flags::{MethodAccessFlag, parse_method_access_flags},
     attributes::{AttributeInfo, parse_method_attributes},
     constant_pool::ConstantPool,
 };
 
 pub struct MethodInfo {
-    pub access_flags: Vec<AccessFlag>,
+    pub access_flags: Vec<MethodAccessFlag>,
     pub name_index: u16,
     pub descriptor_index: u16, // TODO: maybe refactor into list of parsed arguments?
     pub attributes: Vec<AttributeInfo>,
@@ -22,8 +22,8 @@ pub fn parse_methods(
 ) -> Vec<MethodInfo> {
     let mut methods: Vec<MethodInfo> = Vec::with_capacity(num_methods);
     for _ in 0..num_methods {
-        let access_flags: Vec<AccessFlag> =
-            access_flags::parse_access_flags(reader.read_u16().unwrap());
+        let access_flags: Vec<MethodAccessFlag> =
+            parse_method_access_flags(reader.read_u16().unwrap());
         let name_index: u16 = reader.read_u16().unwrap();
         let descriptor_index: u16 = reader.read_u16().unwrap();
         let attribute_count: u16 = reader.read_u16().unwrap();
