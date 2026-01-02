@@ -2,21 +2,30 @@
 
 set -euo pipefail
 
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 <class_file>"
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 <class_file> [<class_file> ...]"
     exit 1
 fi
-
-INPUT=$(realpath "$1")
 
 DIFF=$(realpath "$(which diff)")
 JAVAP=$(realpath "$(which javap)")
 JOBFUSCATOR=$(realpath ./target/debug/javap)
 
-EXPECTED_OUTPUT=$(mktemp)
-${JAVAP} -l -v -p "${INPUT}" > "${EXPECTED_OUTPUT}"
+GREEN='\033[0;32m'
+RESET='\033[0m'
 
-ACTUAL_OUTPUT=$(mktemp)
-${JOBFUSCATOR} "${INPUT}" > "${ACTUAL_OUTPUT}"
+for arg in "$@"; do
+    INPUT=$(realpath "$arg")
 
-${DIFF} "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}"
+    EXPECTED_OUTPUT=$(mktemp)
+    ACTUAL_OUTPUT=$(mktemp)
+
+    "${JAVAP}" -l -v -p "${INPUT}" > "${EXPECTED_OUTPUT}"
+    "${JOBFUSCATOR}" "${INPUT}" > "${ACTUAL_OUTPUT}"
+
+    "${DIFF}" "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}"
+
+    echo -e "${GREEN}OK${RESET} ${INPUT}"
+
+    rm -f "$EXPECTED_OUTPUT" "$ACTUAL_OUTPUT"
+done
