@@ -298,6 +298,10 @@ fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> 
             high_bytes: reader.read_u32().unwrap(),
             low_bytes: reader.read_u32().unwrap(),
         },
+        ConstantPoolTag::Double => ConstantPoolInfo::Double {
+            high_bytes: reader.read_u32().unwrap(),
+            low_bytes: reader.read_u32().unwrap(),
+        },
         ConstantPoolTag::String => ConstantPoolInfo::String {
             string_index: reader.read_u16().unwrap(),
         },

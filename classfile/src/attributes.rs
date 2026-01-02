@@ -223,13 +223,25 @@ pub fn parse_field_attributes(
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for _ in 0..num_attributes {
-        attributes.push(parse_field_attribute(cp, reader));
+        attributes.push(parse_field_attribute(reader, cp));
     }
     attributes
 }
 
-fn parse_field_attribute(_cp: &ConstantPool, _reader: &mut BinaryReader) -> AttributeInfo {
-    unreachable!()
+fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
+    let attribute_name_index: u16 = reader.read_u16().unwrap();
+    let attribute_name: String = cp.get_utf8_content(attribute_name_index);
+    let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
+    match attribute_name.as_str() {
+        "Signature" => {
+            let signature_index: u16 = reader.read_u16().unwrap();
+            AttributeInfo::Signature { signature_index }
+        }
+        _ => panic!(
+            "The name '{}' is either not of an attribute or not a field attribute.",
+            attribute_name
+        ),
+    }
 }
 
 pub fn parse_method_attributes(

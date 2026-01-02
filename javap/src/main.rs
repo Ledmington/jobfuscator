@@ -127,6 +127,7 @@ fn print_header(cf: &ClassFile) {
         access_flags::to_u16(&cf.access_flags),
         access_flags::java_repr_vec(&cf.access_flags)
     );
+
     let comment_index: usize = get_constant_pool_comment_start_index(&cf.constant_pool);
     println!(
         "{:<comment_index$}// {}",
@@ -1019,11 +1020,14 @@ fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodIn
                     } else {
                         &cp.get_utf8_content(param.name_index)
                     };
-                    println!(
-                        "      {}                      {}",
-                        name,
-                        access_flags::modifier_repr_vec(&param.access_flags)
-                    );
+                    print!("      {}", name);
+                    if !param.access_flags.is_empty() {
+                        print!(
+                            "                      {}",
+                            access_flags::modifier_repr_vec(&param.access_flags)
+                        );
+                    }
+                    println!();
                 }
             }
             AttributeInfo::Signature { signature_index } => {
