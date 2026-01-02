@@ -14,11 +14,6 @@ use classfile::{ClassFile, access_flags, descriptor, parse_class_file, reference
 use time::OffsetDateTime;
 
 /**
- * The index of the column (on the terminal) where the comments (the '//') start for the constant pool.
- */
-const CP_COMMENT_START_INDEX: usize = 42;
-
-/**
  * The index of the column (on the terminal) where the comments (the '//') start for the bytecode printing.
  */
 const BYTECODE_COMMENT_START_INDEX: usize = 46;
@@ -36,6 +31,27 @@ fn print_class_file(cf: &ClassFile) {
     print_methods(&cf.constant_pool, cf.this_class, &cf.methods);
     println!("}}");
     print_class_attributes(&cf.constant_pool, &cf.attributes);
+}
+
+/**
+ * Returns the index of the column (on the terminal) where the index of each constant pool entry ends.
+ */
+fn get_constant_pool_index_width(cp: &ConstantPool) -> usize {
+    3 + num_digits(cp.len())
+}
+
+/**
+ * Returns the index of the column (on the terminal) where the information of each entry is displayed.
+ */
+fn get_constant_pool_info_start_index(cp: &ConstantPool) -> usize {
+    25 + num_digits(cp.len())
+}
+
+/**
+ * Returns the index of the column (on the terminal) where the comments (the '//') start for the constant pool.
+ */
+fn get_constant_pool_comment_start_index(cp: &ConstantPool) -> usize {
+    39 + num_digits(cp.len())
 }
 
 fn print_header(cf: &ClassFile) {
@@ -97,17 +113,16 @@ fn print_header(cf: &ClassFile) {
         access_flags::to_u16(&cf.access_flags),
         access_flags::java_repr_vec(&cf.access_flags)
     );
+    let comment_index: usize = get_constant_pool_comment_start_index(&cf.constant_pool);
     println!(
-        "{:<width$}// {}",
+        "{:<comment_index$}// {}",
         format!("  this_class: #{}", cf.this_class),
         cf.constant_pool.get_class_name(cf.this_class),
-        width = CP_COMMENT_START_INDEX,
     );
     println!(
-        "{:<width$}// {}",
+        "{:<comment_index$}// {}",
         format!("  super_class: #{}", cf.super_class),
         cf.constant_pool.get_class_name(cf.super_class),
-        width = CP_COMMENT_START_INDEX
     );
     println!(
         "  interfaces: {}, fields: {}, methods: {}, attributes: {}",
@@ -123,14 +138,17 @@ fn num_digits(n: usize) -> usize {
 }
 
 fn print_constant_pool(cp: &ConstantPool) {
-    // The index of the column (on the terminal) where the index of each constant pool entry ends.
-    let constant_pool_index_width: usize = 3 + num_digits(cp.len());
-
-    // The index of the column (on the terminal) where the information of each entry is displayed.
-    let constant_pool_info_start_index: usize = 25 + num_digits(cp.len());
+    let index_width: usize = get_constant_pool_index_width(cp);
+    let info_start_index: usize = get_constant_pool_info_start_index(cp);
+    let comment_index: usize = get_constant_pool_comment_start_index(cp);
 
     println!("Constant pool:");
     for i in 0..cp.len() {
+        /*
+            We skip entries right after Long and Double. Why?
+            > In retrospect, making 8-byte constants take two constant pool entries was a poor choice.
+            Source: <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.4.5>
+        */
         if i > 1
             && (matches!(
                 cp[(i - 1).try_into().unwrap()],
@@ -147,21 +165,12 @@ fn print_constant_pool(cp: &ConstantPool) {
             ConstantPoolInfo::Utf8 { bytes } => {
                 let content = constant_pool::convert_utf8(bytes);
                 if content.trim().is_empty() {
-                    println!(
-                        "{:>width$} = Utf8",
-                        format!("#{}", i + 1),
-                        width = constant_pool_index_width
-                    );
+                    println!("{:>index_width$} = Utf8", format!("#{}", i + 1),);
                 } else {
                     println!(
-                        "{:<width$}{}",
-                        format!(
-                            "{:>width$} = Utf8",
-                            format!("#{}", i + 1),
-                            width = constant_pool_index_width
-                        ),
+                        "{:<info_start_index$}{}",
+                        format!("{:>index_width$} = Utf8", format!("#{}", i + 1),),
                         content,
-                        width = constant_pool_info_start_index
                     )
                 }
             }
@@ -169,14 +178,9 @@ fn print_constant_pool(cp: &ConstantPool) {
                 high_bytes,
                 low_bytes,
             } => println!(
-                "{:<width$}{}l",
-                format!(
-                    "{:>width$} = Long",
-                    format!("#{}", i + 1),
-                    width = constant_pool_index_width
-                ),
+                "{:<info_start_index$}{}l",
+                format!("{:>index_width$} = Long", format!("#{}", i + 1),),
                 ((*high_bytes as u64) << 32) | (*low_bytes as u64),
-                width = constant_pool_info_start_index
             ),
             ConstantPoolInfo::Double {
                 high_bytes: _,
@@ -184,18 +188,12 @@ fn print_constant_pool(cp: &ConstantPool) {
             } => print!("Double"),
             ConstantPoolInfo::String { string_index } => {
                 print!(
-                    "{:<width$}",
+                    "{:<comment_index$}",
                     format!(
-                        "{:<width$}#{}",
-                        format!(
-                            "{:>width$} = String",
-                            format!("#{}", i + 1),
-                            width = constant_pool_index_width
-                        ),
+                        "{:<info_start_index$}#{}",
+                        format!("{:>index_width$} = String", format!("#{}", i + 1),),
                         string_index,
-                        width = constant_pool_info_start_index
                     ),
-                    width = CP_COMMENT_START_INDEX
                 );
                 let string_content = cp.get_utf8_content(*string_index);
                 if string_content.trim().is_empty() {
@@ -205,149 +203,104 @@ fn print_constant_pool(cp: &ConstantPool) {
                 }
             }
             ConstantPoolInfo::Class { name_index } => println!(
-                "{:<width$}// {}",
+                "{:<comment_index$}// {}",
                 format!(
-                    "{:<width$}#{}",
-                    format!(
-                        "{:>width$} = Class",
-                        format!("#{}", i + 1),
-                        width = constant_pool_index_width
-                    ),
+                    "{:<info_start_index$}#{}",
+                    format!("{:>index_width$} = Class", format!("#{}", i + 1),),
                     name_index,
-                    width = constant_pool_info_start_index
                 ),
                 cp.get_wrapped_utf8_content(*name_index),
-                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::FieldRef {
                 class_index,
                 name_and_type_index,
             } => println!(
-                "{:<width$}// {}",
+                "{:<comment_index$}// {}",
                 format!(
-                    "{:<width$}#{}.#{}",
-                    format!(
-                        "{:>width$} = Fieldref",
-                        format!("#{}", i + 1),
-                        width = constant_pool_index_width
-                    ),
+                    "{:<info_start_index$}#{}.#{}",
+                    format!("{:>index_width$} = Fieldref", format!("#{}", i + 1),),
                     class_index,
                     name_and_type_index,
-                    width = constant_pool_info_start_index
                 ),
                 cp.get_field_ref_string(*class_index, *name_and_type_index),
-                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodRef {
                 class_index,
                 name_and_type_index,
             } => println!(
-                "{:<width$}// {}",
+                "{:<comment_index$}// {}",
                 format!(
-                    "{:<width$}#{}.#{}",
-                    format!(
-                        "{:>width$} = Methodref",
-                        format!("#{}", i + 1),
-                        width = constant_pool_index_width
-                    ),
+                    "{:<info_start_index$}#{}.#{}",
+                    format!("{:>index_width$} = Methodref", format!("#{}", i + 1),),
                     class_index,
                     name_and_type_index,
-                    width = constant_pool_info_start_index
                 ),
                 cp.get_method_ref_string(*class_index, *name_and_type_index),
-                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::InterfaceMethodRef {
                 class_index,
                 name_and_type_index,
             } => println!(
-                "{:<width$}// {}",
+                "{:<comment_index$}// {}",
                 format!(
-                    "{:<width$}#{}.#{}",
+                    "{:<info_start_index$}#{}.#{}",
                     format!(
-                        "{:>width$} = InterfaceMethodref",
+                        "{:>index_width$} = InterfaceMethodref",
                         format!("#{}", i + 1),
-                        width = constant_pool_index_width
                     ),
                     class_index,
                     name_and_type_index,
-                    width = constant_pool_info_start_index
                 ),
                 cp.get_method_ref_string(*class_index, *name_and_type_index),
-                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::NameAndType {
                 name_index,
                 descriptor_index,
             } => println!(
-                "{:<width$}// {}",
+                "{:<comment_index$}// {}",
                 format!(
-                    "{:<width$}#{}:#{}",
-                    format!(
-                        "{:>width$} = NameAndType",
-                        format!("#{}", i + 1),
-                        width = constant_pool_index_width
-                    ),
+                    "{:<info_start_index$}#{}:#{}",
+                    format!("{:>index_width$} = NameAndType", format!("#{}", i + 1),),
                     name_index,
                     descriptor_index,
-                    width = constant_pool_info_start_index
                 ),
                 cp.get_name_and_type_string(*name_index, *descriptor_index),
-                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodType { descriptor_index } => println!(
-                "{:<width$}//  {}",
+                "{:<comment_index$}//  {}",
                 format!(
-                    "{:<width$}#{}",
-                    format!(
-                        "{:>width$} = MethodType",
-                        format!("#{}", i + 1),
-                        width = constant_pool_index_width
-                    ),
+                    "{:<info_start_index$}#{}",
+                    format!("{:>index_width$} = MethodType", format!("#{}", i + 1),),
                     descriptor_index,
-                    width = constant_pool_info_start_index
                 ),
                 cp.get_utf8_content(*descriptor_index),
-                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::MethodHandle {
                 reference_kind,
                 reference_index,
             } => println!(
-                "{:<width$}// {} {}",
+                "{:<comment_index$}// {} {}",
                 format!(
-                    "{:<width$}{}:#{}",
-                    format!(
-                        "{:>width$} = MethodHandle",
-                        format!("#{}", i + 1),
-                        width = constant_pool_index_width
-                    ),
+                    "{:<info_start_index$}{}:#{}",
+                    format!("{:>index_width$} = MethodHandle", format!("#{}", i + 1),),
                     *reference_kind as u8,
                     reference_index,
-                    width = constant_pool_info_start_index
                 ),
                 reference_kind::java_repr(*reference_kind),
                 cp.get_method_ref(*reference_index),
-                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::InvokeDynamic {
                 bootstrap_method_attr_index,
                 name_and_type_index,
             } => println!(
-                "{:<width$}// {}",
+                "{:<comment_index$}// {}",
                 format!(
-                    "{:<width$}#{}:#{}",
-                    format!(
-                        "{:>width$} = InvokeDynamic",
-                        format!("#{}", i + 1),
-                        width = constant_pool_index_width
-                    ),
+                    "{:<info_start_index$}#{}:#{}",
+                    format!("{:>index_width$} = InvokeDynamic", format!("#{}", i + 1),),
                     bootstrap_method_attr_index,
                     name_and_type_index,
-                    width = constant_pool_info_start_index
                 ),
                 cp.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index),
-                width = CP_COMMENT_START_INDEX
             ),
             ConstantPoolInfo::Null {} => unreachable!(),
         }
@@ -976,6 +929,7 @@ fn get_number_of_arguments(cp: &ConstantPool, method: &MethodInfo) -> u8 {
 }
 
 fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodInfo) {
+    let comment_index: usize = get_constant_pool_comment_start_index(cp);
     for attribute in method.attributes.iter() {
         match attribute {
             AttributeInfo::Code {
@@ -998,22 +952,17 @@ fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodIn
                     match comment {
                         Some(content) => {
                             println!(
-                                "{:<width$}// {}",
+                                "{:<BYTECODE_COMMENT_START_INDEX$}// {}",
                                 format!(
-                                    "     {:>width$}: {}",
-                                    position,
-                                    opcode_and_arguments,
-                                    width = BYTECODE_INDEX_LENGTH
+                                    "     {:>BYTECODE_INDEX_LENGTH$}: {}",
+                                    position, opcode_and_arguments,
                                 ),
                                 content,
-                                width = BYTECODE_COMMENT_START_INDEX
                             )
                         }
                         None => println!(
-                            "     {:>width$}: {}",
-                            position,
-                            opcode_and_arguments,
-                            width = BYTECODE_INDEX_LENGTH
+                            "     {:>BYTECODE_INDEX_LENGTH$}: {}",
+                            position, opcode_and_arguments,
                         ),
                     }
                 }
@@ -1050,10 +999,9 @@ fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodIn
             }
             AttributeInfo::Signature { signature_index } => {
                 println!(
-                    "{:<width$}// {}",
+                    "{:<comment_index$}// {}",
                     format!("    Signature: #{}", signature_index),
                     cp.get_utf8_content(*signature_index),
-                    width = CP_COMMENT_START_INDEX
                 );
             }
             _ => unreachable!(),
@@ -1197,6 +1145,7 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
 }
 
 fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
+    let comment_index: usize = get_constant_pool_comment_start_index(cp);
     for attribute in attributes.iter() {
         match attribute {
             AttributeInfo::SourceFile { source_file_index } => {
@@ -1209,7 +1158,7 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                 println!("InnerClasses:");
                 for class in classes.iter() {
                     println!(
-                        "{:<width$}// {}=class {} of class {}",
+                        "{:<comment_index$}// {}=class {} of class {}",
                         format!(
                             "  {} #{}= #{} of #{};",
                             access_flags::modifier_repr_vec(&class.inner_class_access_flags),
@@ -1220,7 +1169,6 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                         cp.get_utf8_content(class.inner_name_index),
                         cp.get_class_name(class.inner_class_info_index),
                         cp.get_class_name(class.outer_class_info_index),
-                        width = CP_COMMENT_START_INDEX
                     );
                 }
             }
@@ -1282,10 +1230,9 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
             }
             AttributeInfo::Signature { signature_index } => {
                 println!(
-                    "{:<width$}// {}",
+                    "{:<comment_index$}// {}",
                     format!("Signature: #{}", signature_index),
                     cp.get_utf8_content(*signature_index),
-                    width = CP_COMMENT_START_INDEX
                 );
             }
             _ => unreachable!(),
