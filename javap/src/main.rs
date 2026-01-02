@@ -195,12 +195,16 @@ fn print_constant_pool(cp: &ConstantPool) {
             } => println!(
                 "{:<info_start_index$}{}l",
                 format!("{:>index_width$} = Long", format!("#{}", i + 1),),
-                ((*high_bytes as u64) << 32) | (*low_bytes as u64),
+                (((*high_bytes as u64) << 32) | (*low_bytes as u64)) as i64,
             ),
             ConstantPoolInfo::Double {
-                high_bytes: _,
-                low_bytes: _,
-            } => print!("Double"),
+                high_bytes,
+                low_bytes,
+            } => println!(
+                "{:<info_start_index$}{:.1}d",
+                format!("{:>index_width$} = Double", format!("#{}", i + 1),),
+                f64::from_bits(((*high_bytes as u64) << 32) | (*low_bytes as u64)),
+            ),
             ConstantPoolInfo::String { string_index } => {
                 print!(
                     "{:<comment_index$}",
@@ -695,16 +699,17 @@ fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
             low_bytes,
         } => {
             "long ".to_owned()
-                + &(((high_bytes as u64) << 32) | (low_bytes as u64)).to_string()
+                + &((((high_bytes as u64) << 32) | (low_bytes as u64)) as i64).to_string()
                 + "l"
         }
         ConstantPoolInfo::Double {
             high_bytes,
             low_bytes,
         } => {
-            "double ".to_owned()
-                + &(((high_bytes as u64) << 32) | (low_bytes as u64)).to_string()
-                + "l"
+            format!(
+                "double {:.1}d",
+                &f64::from_bits(((high_bytes as u64) << 32) | (low_bytes as u64))
+            )
         }
         ConstantPoolInfo::Class { name_index } => {
             "class ".to_owned() + &cp.get_utf8_content(name_index)
@@ -1315,6 +1320,9 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                     cp.get_utf8_content(*signature_index),
                     width = 40 // why is this 40 used only here?
                 );
+            }
+            AttributeInfo::NestMembers { classes: _ } => {
+                println!("NestMembers:");
             }
             _ => unreachable!(),
         }
