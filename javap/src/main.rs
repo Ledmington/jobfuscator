@@ -658,6 +658,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::ISub {} => "isub".to_owned(),
         BytecodeInstruction::I2L {} => "i2l".to_owned(),
         BytecodeInstruction::LAdd {} => "ladd".to_owned(),
+        BytecodeInstruction::LSub {} => "lsub".to_owned(),
         BytecodeInstruction::LMul {} => "lmul".to_owned(),
     }
 }
@@ -922,6 +923,7 @@ fn get_comment(
         BytecodeInstruction::ISub {} => None,
         BytecodeInstruction::I2L {} => None,
         BytecodeInstruction::LAdd {} => None,
+        BytecodeInstruction::LSub {} => None,
         BytecodeInstruction::LMul {} => None,
     }
 }

@@ -152,6 +152,7 @@ pub enum BytecodeInstruction {
     ISub {},
     I2L {},
     LAdd {},
+    LSub{},
     LMul {},
 }
 
@@ -290,6 +291,7 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                 0x60 => BytecodeInstruction::IAdd {},
                 0x61 => BytecodeInstruction::LAdd {},
                 0x64 => BytecodeInstruction::ISub {},
+                0x65 => BytecodeInstruction::LSub {},
                 0x69 => BytecodeInstruction::LMul {},
                 0x6d => BytecodeInstruction::LDiv {},
                 0x84 => BytecodeInstruction::IInc {
