@@ -49,6 +49,9 @@ pub enum AttributeInfo {
     Signature {
         signature_index: u16,
     },
+    NestMembers {
+        classes: Vec<u16>,
+    },
 }
 
 pub struct RecordComponentInfo {
@@ -219,6 +222,11 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
         "Signature" => {
             let signature_index: u16 = reader.read_u16().unwrap();
             AttributeInfo::Signature { signature_index }
+        }
+        "NestMembers" => {
+            let number_of_classes: u16 = reader.read_u16().unwrap();
+            let classes: Vec<u16> = reader.read_u16_vec(number_of_classes.into()).unwrap();
+            AttributeInfo::NestMembers { classes }
         }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a class attribute.",

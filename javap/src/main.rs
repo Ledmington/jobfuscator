@@ -1098,6 +1098,22 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                     );
                 }
             }
+            AttributeInfo::LocalVariableTypeTable {
+                local_variable_type_table,
+            } => {
+                println!("      LocalVariableTypeTable:");
+                println!("        Start  Length  Slot  Name   Signature");
+                for entry in local_variable_type_table.iter() {
+                    println!(
+                        "         {:4}    {:4}    {:2} {:>5}   {}",
+                        entry.start_pc,
+                        entry.length,
+                        entry.index,
+                        cp.get_utf8_content(entry.name_index),
+                        cp.get_utf8_content(entry.descriptor_index)
+                    );
+                }
+            }
             AttributeInfo::StackMapTable { stack_map_table } => {
                 println!(
                     "      StackMapTable: number_of_entries = {}",
