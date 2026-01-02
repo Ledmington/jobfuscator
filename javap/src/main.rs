@@ -28,7 +28,13 @@ fn print_class_file(cf: &ClassFile) {
     print_constant_pool(&cf.constant_pool);
     println!("{{");
     print_fields(&cf.constant_pool, &cf.fields);
-    print_methods(&cf.constant_pool, cf.this_class, &cf.methods);
+    print_methods(
+        &cf.constant_pool,
+        cf.this_class,
+        cf.access_flags
+            .contains(&access_flags::ClassAccessFlag::Enum),
+        &cf.methods,
+    );
     println!("}}");
     print_class_attributes(&cf.constant_pool, &cf.attributes);
 }
@@ -92,15 +98,23 @@ fn print_header(cf: &ClassFile) {
         .unwrap();
     println!("  Compiled from \"{}\"", source_file);
 
+    let this_class_name = cf
+        .constant_pool
+        .get_class_name(cf.this_class)
+        .replace('/', ".");
     print!(
         "{} {}",
         access_flags::modifier_repr_vec(&cf.access_flags),
-        cf.constant_pool
-            .get_class_name(cf.this_class)
-            .replace('/', ".")
+        this_class_name
     );
+
+    let is_enum: bool = cf
+        .access_flags
+        .contains(&access_flags::ClassAccessFlag::Enum);
     let super_class_name = cf.constant_pool.get_class_name(cf.super_class);
-    if super_class_name != "java/lang/Object" {
+    if is_enum {
+        println!(" extends java.lang.Enum<{}>", this_class_name);
+    } else if super_class_name != "java/lang/Object" {
         println!(" extends {}", super_class_name.replace('/', "."));
     } else {
         println!();
@@ -326,7 +340,7 @@ fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
     }
 }
 
-fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
+fn print_methods(cp: &ConstantPool, this_class: u16, is_enum: bool, methods: &[MethodInfo]) {
     for (i, method) in methods.iter().enumerate() {
         let method_name: String = cp.get_utf8_content(method.name_index);
         let raw_descriptor: String = cp.get_utf8_content(method.descriptor_index);
@@ -340,17 +354,32 @@ fn print_methods(cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
             access_flags::modifier_repr_vec(&method.access_flags)
         );
         if method_name == "<clinit>" {
+            // this is the 'static {}' block of the class
             println!("{{}};");
         } else if method_name == "<init>" {
-            println!(
-                "{}({});",
-                cp.get_class_name(this_class).replace("/", "."),
+            // this is a constructor of the class
+
+            let param_types = if is_enum {
+                parsed_descriptor
+                    .parameter_types
+                    .iter()
+                    .skip(2) // if this is an enum's constructor, we omit the first two parameter which are always the name and the ordinal, implicitly added by the compiler
+                    .map(|t| format!("{}", t))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            } else {
                 parsed_descriptor
                     .parameter_types
                     .iter()
                     .map(|t| format!("{}", t))
                     .collect::<Vec<String>>()
                     .join(", ")
+            };
+
+            println!(
+                "{}({});",
+                cp.get_class_name(this_class).replace("/", "."),
+                param_types
             );
         } else {
             println!(
@@ -999,9 +1028,10 @@ fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodIn
             }
             AttributeInfo::Signature { signature_index } => {
                 println!(
-                    "{:<comment_index$}// {}",
+                    "{:<width$}// {}",
                     format!("    Signature: #{}", signature_index),
                     cp.get_utf8_content(*signature_index),
+                    width = comment_index + 2 // why?
                 );
             }
             _ => unreachable!(),
@@ -1230,9 +1260,10 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
             }
             AttributeInfo::Signature { signature_index } => {
                 println!(
-                    "{:<comment_index$}// {}",
+                    "{:<width$}// {}",
                     format!("Signature: #{}", signature_index),
                     cp.get_utf8_content(*signature_index),
+                    width = 40 // why is this 40 used only here?
                 );
             }
             _ => unreachable!(),

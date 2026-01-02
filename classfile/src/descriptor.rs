@@ -49,6 +49,7 @@ impl Display for FieldDescriptor {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct MethodDescriptor {
     pub return_type: Type,
     pub parameter_types: Vec<Type>,
@@ -180,5 +181,19 @@ mod tests {
     #[test_case(Type::Object{class_name:"java.lang.Object".to_string()}, "Ljava/lang/Object;")]
     fn descriptor_parsing(expected: Type, input: &str) {
         assert_eq!(expected, parse_type(input));
+    }
+
+    #[test_case(
+        MethodDescriptor{
+            return_type: Type::Void,
+            parameter_types: vec![
+                Type::Object{class_name:"java.lang.String".to_string()},
+                Type::Int,
+                Type::Long
+            ],
+        }, "(Ljava/lang/String;IJ)V"
+    )]
+    fn method_descriptor_parsing(expected: MethodDescriptor, input: &str) {
+        assert_eq!(expected, parse_method_descriptor(input));
     }
 }
