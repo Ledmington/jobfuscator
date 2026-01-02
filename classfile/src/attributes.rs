@@ -25,6 +25,9 @@ pub enum AttributeInfo {
     LocalVariableTable {
         local_variable_table: Vec<LocalVariableTableEntry>,
     },
+    LocalVariableTypeTable {
+        local_variable_type_table: Vec<LocalVariableTypeTableEntry>,
+    },
     StackMapTable {
         stack_map_table: Vec<StackMapFrame>,
     },
@@ -72,6 +75,14 @@ pub struct LineNumberTableEntry {
 }
 
 pub struct LocalVariableTableEntry {
+    pub start_pc: u16,
+    pub length: u16,
+    pub name_index: u16,
+    pub descriptor_index: u16,
+    pub index: u16,
+}
+
+pub struct LocalVariableTypeTableEntry {
     pub start_pc: u16,
     pub length: u16,
     pub name_index: u16,
@@ -373,6 +384,28 @@ fn parse_code_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attribu
             }
             AttributeInfo::LocalVariableTable {
                 local_variable_table,
+            }
+        }
+        "LocalVariableTypeTable" => {
+            let local_variable_type_table_length: u16 = reader.read_u16().unwrap();
+            let mut local_variable_type_table: Vec<LocalVariableTypeTableEntry> =
+                Vec::with_capacity(local_variable_type_table_length.into());
+            for _ in 0..local_variable_type_table_length {
+                let start_pc: u16 = reader.read_u16().unwrap();
+                let length: u16 = reader.read_u16().unwrap();
+                let name_index: u16 = reader.read_u16().unwrap();
+                let descriptor_index: u16 = reader.read_u16().unwrap();
+                let index: u16 = reader.read_u16().unwrap();
+                local_variable_type_table.push(LocalVariableTypeTableEntry {
+                    start_pc,
+                    length,
+                    name_index,
+                    descriptor_index,
+                    index,
+                });
+            }
+            AttributeInfo::LocalVariableTypeTable {
+                local_variable_type_table,
             }
         }
         "StackMapTable" => {
