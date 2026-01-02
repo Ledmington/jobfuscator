@@ -517,6 +517,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::BiPush { immediate } => {
             "bipush        ".to_owned() + &immediate.to_string()
         }
+        BytecodeInstruction::Pop {} => "pop".to_owned(),
         BytecodeInstruction::Return {} => "return".to_owned(),
         BytecodeInstruction::IReturn {} => "ireturn".to_owned(),
         BytecodeInstruction::LReturn {} => "lreturn".to_owned(),
@@ -538,6 +539,9 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::CheckCast {
             constant_pool_index,
         } => "checkcast     #".to_owned() + &constant_pool_index.to_string(),
+        BytecodeInstruction::Instanceof {
+            constant_pool_index,
+        } => "instanceof    #".to_owned() + &constant_pool_index.to_string(),
 
         // Invocation instructions
         BytecodeInstruction::InvokeSpecial { method_ref_index } => {
@@ -581,6 +585,12 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::IfIcmpLe { offset } => {
             "if_icmple     ".to_owned() + &add_offset(*position, *offset).to_string()
         }
+        BytecodeInstruction::IfAcmpEq { offset } => {
+            "if_acmpeq     ".to_owned() + &add_offset(*position, *offset).to_string()
+        }
+        BytecodeInstruction::IfAcmpNe { offset } => {
+            "if_acmpne     ".to_owned() + &add_offset(*position, *offset).to_string()
+        }
         BytecodeInstruction::IfEq { offset } => {
             "ifeq          ".to_owned() + &add_offset(*position, *offset).to_string()
         }
@@ -598,6 +608,9 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         }
         BytecodeInstruction::IfLe { offset } => {
             "ifle          ".to_owned() + &add_offset(*position, *offset).to_string()
+        }
+        BytecodeInstruction::IfNull { offset } => {
+            "ifnull        ".to_owned() + &add_offset(*position, *offset).to_string()
         }
         BytecodeInstruction::IfNonNull { offset } => {
             "ifnonnull     ".to_owned() + &add_offset(*position, *offset).to_string()
@@ -653,13 +666,17 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::IInc { index, constant } => {
             "iinc          ".to_owned() + &index.to_string() + ", " + &constant.to_string()
         }
-        BytecodeInstruction::LDiv {} => "ldiv".to_owned(),
+        BytecodeInstruction::I2L {} => "i2l".to_owned(),
+        BytecodeInstruction::L2D {} => "l2d".to_owned(),
         BytecodeInstruction::IAdd {} => "iadd".to_owned(),
         BytecodeInstruction::ISub {} => "isub".to_owned(),
-        BytecodeInstruction::I2L {} => "i2l".to_owned(),
         BytecodeInstruction::LAdd {} => "ladd".to_owned(),
         BytecodeInstruction::LSub {} => "lsub".to_owned(),
         BytecodeInstruction::LMul {} => "lmul".to_owned(),
+        BytecodeInstruction::LDiv {} => "ldiv".to_owned(),
+        BytecodeInstruction::LRem {} => "lrem".to_owned(),
+        BytecodeInstruction::LAnd {} => "land".to_owned(),
+        BytecodeInstruction::DDiv {} => "ddiv".to_owned(),
     }
 }
 
@@ -758,6 +775,7 @@ fn get_comment(
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
         BytecodeInstruction::BiPush { immediate: _ } => None,
+        BytecodeInstruction::Pop {} => None,
         BytecodeInstruction::Return {} => None,
         BytecodeInstruction::IReturn {} => None,
         BytecodeInstruction::LReturn {} => None,
@@ -894,12 +912,15 @@ fn get_comment(
         BytecodeInstruction::IfIcmpGe { offset: _ } => None,
         BytecodeInstruction::IfIcmpGt { offset: _ } => None,
         BytecodeInstruction::IfIcmpLe { offset: _ } => None,
+        BytecodeInstruction::IfAcmpEq { offset: _ } => None,
+        BytecodeInstruction::IfAcmpNe { offset: _ } => None,
         BytecodeInstruction::IfEq { offset: _ } => None,
         BytecodeInstruction::IfNe { offset: _ } => None,
         BytecodeInstruction::IfLt { offset: _ } => None,
         BytecodeInstruction::IfGe { offset: _ } => None,
         BytecodeInstruction::IfGt { offset: _ } => None,
         BytecodeInstruction::IfLe { offset: _ } => None,
+        BytecodeInstruction::IfNull { offset: _ } => None,
         BytecodeInstruction::IfNonNull { offset: _ } => None,
         BytecodeInstruction::GoTo { offset: _ } => None,
         BytecodeInstruction::TableSwitch {
@@ -914,17 +935,24 @@ fn get_comment(
         BytecodeInstruction::CheckCast {
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
+        BytecodeInstruction::Instanceof {
+            constant_pool_index,
+        } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
         BytecodeInstruction::IInc {
             index: _,
             constant: _,
         } => None,
-        BytecodeInstruction::LDiv {} => None,
+        BytecodeInstruction::I2L {} => None,
+        BytecodeInstruction::L2D {} => None,
         BytecodeInstruction::IAdd {} => None,
         BytecodeInstruction::ISub {} => None,
-        BytecodeInstruction::I2L {} => None,
         BytecodeInstruction::LAdd {} => None,
         BytecodeInstruction::LSub {} => None,
         BytecodeInstruction::LMul {} => None,
+        BytecodeInstruction::LDiv {} => None,
+        BytecodeInstruction::LRem {} => None,
+        BytecodeInstruction::LAnd {} => None,
+        BytecodeInstruction::DDiv {} => None,
     }
 }
 

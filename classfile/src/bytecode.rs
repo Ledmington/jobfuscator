@@ -55,6 +55,7 @@ pub enum BytecodeInstruction {
     BiPush {
         immediate: u8,
     },
+    Pop {},
     Return {},
     IReturn {},
     LReturn {},
@@ -89,6 +90,12 @@ pub enum BytecodeInstruction {
     },
     ArrayLength {},
     LCmp {},
+    IfAcmpEq {
+        offset: i16,
+    },
+    IfAcmpNe {
+        offset: i16,
+    },
     IfIcmpEq {
         offset: i16,
     },
@@ -125,6 +132,9 @@ pub enum BytecodeInstruction {
     IfLe {
         offset: i16,
     },
+    IfNull {
+        offset: i16,
+    },
     IfNonNull {
         offset: i16,
     },
@@ -143,17 +153,24 @@ pub enum BytecodeInstruction {
     CheckCast {
         constant_pool_index: u16,
     },
-    LDiv {},
+    Instanceof {
+        constant_pool_index: u16,
+    },
     IInc {
         index: u8,
         constant: i8,
     },
+    I2L {},
+    L2D {},
     IAdd {},
     ISub {},
-    I2L {},
     LAdd {},
-    LSub{},
+    LSub {},
     LMul {},
+    LDiv {},
+    LRem {},
+    LAnd {},
+    DDiv {},
 }
 
 pub struct LookupSwitchPair {
@@ -287,6 +304,7 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                     local_variable_index: 3,
                 },
                 0x53 => BytecodeInstruction::AaStore {},
+                0x57 => BytecodeInstruction::Pop {},
                 0x59 => BytecodeInstruction::Dup {},
                 0x60 => BytecodeInstruction::IAdd {},
                 0x61 => BytecodeInstruction::LAdd {},
@@ -294,11 +312,15 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                 0x65 => BytecodeInstruction::LSub {},
                 0x69 => BytecodeInstruction::LMul {},
                 0x6d => BytecodeInstruction::LDiv {},
+                0x6f => BytecodeInstruction::DDiv {},
+                0x71 => BytecodeInstruction::LRem {},
+                0x7f => BytecodeInstruction::LAnd {},
                 0x84 => BytecodeInstruction::IInc {
                     index: reader.read_u8().unwrap(),
                     constant: reader.read_i8().unwrap(),
                 },
                 0x85 => BytecodeInstruction::I2L {},
+                0x8a => BytecodeInstruction::L2D {},
                 0x94 => BytecodeInstruction::LCmp {},
                 0x99 => BytecodeInstruction::IfEq {
                     offset: reader.read_i16().unwrap(),
@@ -334,6 +356,12 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                     offset: reader.read_i16().unwrap(),
                 },
                 0xa4 => BytecodeInstruction::IfIcmpLe {
+                    offset: reader.read_i16().unwrap(),
+                },
+                0xa5 => BytecodeInstruction::IfAcmpEq {
+                    offset: reader.read_i16().unwrap(),
+                },
+                0xa6 => BytecodeInstruction::IfAcmpNe {
                     offset: reader.read_i16().unwrap(),
                 },
                 0xa7 => BytecodeInstruction::GoTo {
@@ -430,6 +458,12 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                 0xbf => BytecodeInstruction::AThrow {},
                 0xc0 => BytecodeInstruction::CheckCast {
                     constant_pool_index: reader.read_u16().unwrap(),
+                },
+                0xc1 => BytecodeInstruction::Instanceof {
+                    constant_pool_index: reader.read_u16().unwrap(),
+                },
+                0xc6 => BytecodeInstruction::IfNull {
+                    offset: reader.read_i16().unwrap(),
                 },
                 0xc7 => BytecodeInstruction::IfNonNull {
                     offset: reader.read_i16().unwrap(),
