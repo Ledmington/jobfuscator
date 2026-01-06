@@ -341,7 +341,25 @@ fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
             access_flags::to_u16(&field.access_flags),
             access_flags::java_repr_vec(&field.access_flags)
         );
+        print_field_attributes(cp, field);
         println!();
+    }
+}
+
+fn print_field_attributes(cp: &ConstantPool, field: &FieldInfo) {
+    let comment_index: usize = get_constant_pool_comment_start_index(cp);
+    for attribute in field.attributes.iter() {
+        match attribute {
+            AttributeInfo::Signature { signature_index } => {
+                println!(
+                    "{:<width$}// {}",
+                    format!("    Signature: #{}", signature_index),
+                    cp.get_utf8_content(*signature_index),
+                    width = comment_index + 2 // why?
+                );
+            }
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -358,6 +376,7 @@ fn print_methods(cp: &ConstantPool, this_class: u16, is_enum: bool, methods: &[M
             "  {} ",
             access_flags::modifier_repr_vec(&method.access_flags)
         );
+
         if method_name == "<clinit>" {
             // this is the 'static {}' block of the class
             println!("{{}};");
@@ -387,16 +406,20 @@ fn print_methods(cp: &ConstantPool, this_class: u16, is_enum: bool, methods: &[M
                 param_types
             );
         } else {
+            let mut param_types = parsed_descriptor
+                .parameter_types
+                .iter()
+                .map(|t| format!("{}", t))
+                .collect::<Vec<String>>()
+                .join(", ");
+
+            if method.access_flags.contains(&MethodAccessFlag::Varargs) {
+                param_types = param_types[..(param_types.len() - 2)].to_owned() + "...";
+            }
+
             println!(
                 "{} {}({});",
-                parsed_descriptor.return_type,
-                method_name,
-                parsed_descriptor
-                    .parameter_types
-                    .iter()
-                    .map(|t| format!("{}", t))
-                    .collect::<Vec<String>>()
-                    .join(", ")
+                parsed_descriptor.return_type, method_name, param_types
             );
         }
         println!("    descriptor: {}", raw_descriptor);
@@ -896,7 +919,34 @@ fn get_comment(
             )
         }
         BytecodeInstruction::InvokeVirtual { method_ref_index } => {
-            Some("Method ".to_owned() + &cp.get_method_ref(*method_ref_index))
+            let method_entry = &cp[method_ref_index - 1];
+            Some(
+                get_method_type(method_entry)
+                    + " "
+                    + &match method_entry {
+                        ConstantPoolInfo::MethodRef {
+                            class_index,
+                            name_and_type_index,
+                        } => {
+                            if *class_index == this_class {
+                                cp.get_name_and_type(*name_and_type_index)
+                            } else {
+                                cp.get_method_ref(*method_ref_index)
+                            }
+                        }
+                        ConstantPoolInfo::InterfaceMethodRef {
+                            class_index,
+                            name_and_type_index,
+                        } => {
+                            if *class_index == this_class {
+                                cp.get_name_and_type(*name_and_type_index)
+                            } else {
+                                cp.get_method_ref(*method_ref_index)
+                            }
+                        }
+                        _ => unreachable!(),
+                    },
+            )
         }
         BytecodeInstruction::InvokeDynamic {
             constant_pool_index,
@@ -1321,8 +1371,11 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                     width = 40 // why is this 40 used only here?
                 );
             }
-            AttributeInfo::NestMembers { classes: _ } => {
+            AttributeInfo::NestMembers { classes } => {
                 println!("NestMembers:");
+                for class_index in classes {
+                    println!("  {}", cp.get_class_name(*class_index));
+                }
             }
             _ => unreachable!(),
         }

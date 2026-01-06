@@ -38,7 +38,7 @@ pub fn java_repr(ref_kind: ReferenceKind) -> String {
         ReferenceKind::GetStatic => "REF_GetStatic",
         ReferenceKind::PutField => "REF_PutField",
         ReferenceKind::PutStatic => "REF_PutStatic",
-        ReferenceKind::InvokeVirtual => "REF_InvokeVirtual",
+        ReferenceKind::InvokeVirtual => "REF_invokeVirtual",
         ReferenceKind::InvokeStatic => "REF_invokeStatic",
         ReferenceKind::InvokeSpecial => "REF_InvokeSpecial",
         ReferenceKind::NewInvokeSpecial => "REF_NewInvokeSpecial",
