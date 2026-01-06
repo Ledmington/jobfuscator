@@ -178,7 +178,7 @@ fn print_constant_pool(cp: &ConstantPool) {
 
         match &cp[i.try_into().unwrap()] {
             ConstantPoolInfo::Utf8 { bytes } => {
-                let content = constant_pool::convert_utf8(bytes);
+                let content: String = constant_pool::convert_utf8(bytes).trim_end().to_owned();
                 if content.trim().is_empty() {
                     println!("{:>index_width$} = Utf8", format!("#{}", i + 1),);
                 } else {
@@ -214,7 +214,8 @@ fn print_constant_pool(cp: &ConstantPool) {
                         string_index,
                     ),
                 );
-                let string_content = cp.get_utf8_content(*string_index);
+                let string_content: String =
+                    cp.get_utf8_content(*string_index).trim_end().to_owned();
                 if string_content.trim().is_empty() {
                     println!("//");
                 } else {
@@ -329,10 +330,19 @@ fn print_constant_pool(cp: &ConstantPool) {
 fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
     for field in fields.iter() {
         let descriptor: String = cp.get_utf8_content(field.descriptor_index);
+        let signature: Option<&AttributeInfo> = field
+            .attributes
+            .iter()
+            .find(|attr| matches!(attr, AttributeInfo::Signature { signature_index: _ }));
         println!(
             "  {} {} {};",
             access_flags::modifier_repr_vec(&field.access_flags),
-            descriptor::parse_field_descriptor(&descriptor),
+            match signature {
+                Some(AttributeInfo::Signature { signature_index }) =>
+                    descriptor::parse_field_descriptor(&cp.get_utf8_content(*signature_index)),
+                Some(_) => unreachable!(),
+                None => descriptor::parse_field_descriptor(&descriptor),
+            },
             cp.get_utf8_content(field.name_index)
         );
         println!("    descriptor: {}", descriptor);
@@ -710,11 +720,11 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
 fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
     match cp[constant_pool_index - 1] {
         ConstantPoolInfo::String { string_index } => {
-            let string_content = cp.get_utf8_content(string_index);
+            let string_content: String = cp.get_utf8_content(string_index).trim_end().to_owned();
             if string_content.trim().is_empty() {
                 "String".to_owned()
             } else {
-                "String ".to_owned() + &cp.get_utf8_content(string_index)
+                "String ".to_owned() + &string_content
             }
         }
         ConstantPoolInfo::Long {

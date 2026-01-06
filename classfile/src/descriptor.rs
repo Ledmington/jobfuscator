@@ -13,8 +13,16 @@ pub enum Type {
     Long,
     Float,
     Double,
-    Array { inner: Box<Type> },
-    Object { class_name: String },
+    Array {
+        inner: Box<Type>,
+    },
+    Object {
+        class_name: String,
+    },
+    Generic {
+        class_name: String,
+        types: Vec<Type>,
+    },
 }
 
 impl Display for Type {
@@ -31,6 +39,16 @@ impl Display for Type {
             Type::Double => write!(f, "double"),
             Type::Array { inner } => write!(f, "{}[]", inner),
             Type::Object { class_name } => write!(f, "{}", class_name),
+            Type::Generic { class_name, types } => write!(
+                f,
+                "{}<{}>",
+                class_name,
+                types
+                    .iter()
+                    .map(|t| format!("{}", t))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }
@@ -164,36 +182,127 @@ pub fn parse_method_descriptor(raw_descriptor: &str) -> MethodDescriptor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_case::test_case;
 
-    #[test_case(Type::Void, "V")]
-    #[test_case(Type::Boolean, "Z")]
-    #[test_case(Type::Char, "C")]
-    #[test_case(Type::Byte, "B")]
-    #[test_case(Type::Short, "S")]
-    #[test_case(Type::Int, "I")]
-    #[test_case(Type::Long, "J")]
-    #[test_case(Type::Float, "F")]
-    #[test_case(Type::Double, "D")]
-    #[test_case(Type::Array{inner:Box::new(Type::Double)}, "[D")]
-    #[test_case(Type::Array{inner:Box::new(Type::Array{inner:Box::new(Type::Byte)})}, "[[B")]
-    #[test_case(Type::Array{inner:Box::new(Type::Array{inner:Box::new(Type::Array{inner:Box::new(Type::Long)})})}, "[[[J")]
-    #[test_case(Type::Object{class_name:"java.lang.Object".to_string()}, "Ljava/lang/Object;")]
-    fn descriptor_parsing(expected: Type, input: &str) {
-        assert_eq!(expected, parse_type(input));
+    #[test]
+    fn descriptor_parsing() {
+        let cases = [
+            (Type::Void, "V"),
+            (Type::Boolean, "Z"),
+            (Type::Char, "C"),
+            (Type::Byte, "B"),
+            (Type::Short, "S"),
+            (Type::Int, "I"),
+            (Type::Long, "J"),
+            (Type::Float, "F"),
+            (Type::Double, "D"),
+            (
+                Type::Array {
+                    inner: Box::new(Type::Double),
+                },
+                "[D",
+            ),
+            (
+                Type::Array {
+                    inner: Box::new(Type::Array {
+                        inner: Box::new(Type::Byte),
+                    }),
+                },
+                "[[B",
+            ),
+            (
+                Type::Array {
+                    inner: Box::new(Type::Array {
+                        inner: Box::new(Type::Array {
+                            inner: Box::new(Type::Long),
+                        }),
+                    }),
+                },
+                "[[[J",
+            ),
+            (
+                Type::Object {
+                    class_name: "java.lang.Object".to_string(),
+                },
+                "Ljava/lang/Object;",
+            ),
+            (
+                Type::Generic {
+                    class_name: "java.lang.List".to_string(),
+                    types: vec![Type::Object {
+                        class_name: "java.lang.String".to_string(),
+                    }],
+                },
+                "Ljava/util/List<Ljava/lang/String;>;",
+            ),
+            (
+                Type::Generic {
+                    class_name: "java.lang.Map".to_string(),
+                    types: vec![
+                        Type::Object {
+                            class_name: "java.lang.String".to_string(),
+                        },
+                        Type::Object {
+                            class_name: "java.lang.Integer".to_string(),
+                        },
+                    ],
+                },
+                "Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;",
+            ),
+            (
+                Type::Generic {
+                    class_name: "java.lang.Map".to_string(),
+                    types: vec![
+                        Type::Generic {
+                            class_name: "java.util.List".to_string(),
+                            types: vec![Type::Object {
+                                class_name: "java.lang.String".to_string(),
+                            }],
+                        },
+                        Type::Generic {
+                            class_name: "java.util.Set".to_string(),
+                            types: vec![Type::Object {
+                                class_name: "java.lang.Integer".to_string(),
+                            }],
+                        },
+                    ],
+                },
+                "Ljava/util/Map<Ljava/util/List<Ljava/lang/String;>;Ljava/util/Set<Ljava/lang/Integer;>;>;",
+            ),
+        ];
+
+        for (expected, input) in cases {
+            assert_eq!(expected, parse_type(input));
+        }
     }
 
-    #[test_case(
-        MethodDescriptor{
-            return_type: Type::Void,
-            parameter_types: vec![
-                Type::Object{class_name:"java.lang.String".to_string()},
-                Type::Int,
-                Type::Long
-            ],
-        }, "(Ljava/lang/String;IJ)V"
-    )]
-    fn method_descriptor_parsing(expected: MethodDescriptor, input: &str) {
-        assert_eq!(expected, parse_method_descriptor(input));
+    #[test]
+    #[should_panic]
+    fn invalid_parsing() {
+        let cases = ["Q", "[", "[]"];
+
+        for input in cases {
+            parse_type(input);
+        }
+    }
+
+    #[test]
+    fn method_descriptor_parsing() {
+        let cases = [(
+            MethodDescriptor {
+                return_type: Type::Void,
+                parameter_types: vec![
+                    Type::Object {
+                        class_name: "java.lang.String".to_string(),
+                    },
+                    Type::Int,
+                    Type::Long,
+                ],
+            },
+            "(Ljava/lang/String;IJ)V",
+        )];
+
+        for (expected, input) in cases {
+            assert_eq!(expected, parse_method_descriptor(input));
+        }
     }
 }
