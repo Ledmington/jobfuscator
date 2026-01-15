@@ -90,43 +90,132 @@ impl Display for MethodDescriptor {
     }
 }
 
-fn parse_type(raw_descriptor: &str) -> Type {
-    assert!(!raw_descriptor.is_empty(), "Empty type descriptor.");
+struct Reader {
+    content: String,
+    pos: usize,
+}
 
-    match raw_descriptor {
-        "V" => Type::Void,
-        "Z" => Type::Boolean,
-        "C" => Type::Char,
-        "B" => Type::Byte,
-        "S" => Type::Short,
-        "I" => Type::Int,
-        "F" => Type::Float,
-        "D" => Type::Double,
-        "J" => Type::Long,
-        _ => {
-            if let Some(stripped) = raw_descriptor.strip_prefix('[') {
-                return Type::Array {
-                    inner: Box::new(parse_type(stripped)),
-                };
-            }
-
-            if raw_descriptor.starts_with('L') {
-                assert!(raw_descriptor.ends_with(';'));
-                assert!(raw_descriptor.len() > 2);
-
-                return Type::Object {
-                    class_name: raw_descriptor[1..(raw_descriptor.len() - 1)].replace('/', "."),
-                };
-            }
-
-            unreachable!("Invalid descriptor: '{}'.", raw_descriptor);
-        }
+impl Reader {
+    /**
+     * Returns the next char without moving.
+     */
+    fn peek(&self) -> char {
+        return self.content.chars().nth(self.pos).unwrap();
     }
+
+    /**
+     * Moves the reader by one character.
+     */
+    fn move_1(&mut self) {
+        self.pos += 1;
+    }
+
+    /**
+     * Returns the next char and moves.
+     */
+    fn next(&mut self) -> char {
+        let ch: char = self.content.chars().nth(self.pos).unwrap();
+        self.pos += 1;
+        return ch;
+    }
+}
+
+fn parse_type(reader: &mut Reader) -> Type {
+    return match reader.peek() {
+        'V' => {
+            reader.move_1();
+            Type::Void
+        }
+        'Z' => {
+            reader.move_1();
+            Type::Boolean
+        }
+        'C' => {
+            reader.move_1();
+            Type::Char
+        }
+        'B' => {
+            reader.move_1();
+            Type::Byte
+        }
+        'S' => {
+            reader.move_1();
+            Type::Short
+        }
+        'I' => {
+            reader.move_1();
+            Type::Int
+        }
+        'J' => {
+            reader.move_1();
+            Type::Long
+        }
+        'F' => {
+            reader.move_1();
+            Type::Float
+        }
+        'D' => {
+            reader.move_1();
+            Type::Double
+        }
+        '[' => {
+            reader.move_1();
+            Type::Array {
+                inner: Box::new(parse_type(reader)),
+            }
+        }
+        'L' => {
+            reader.move_1();
+            let mut s: String = "".to_owned();
+            while (reader.pos < reader.content.len() - 1)
+                && (reader.peek() != ';' && reader.peek() != '<')
+            {
+                let ch = reader.next();
+                if ch == '/' {
+                    s = s + ".";
+                } else {
+                    s = s + &ch.to_string();
+                }
+            }
+
+            if reader.peek() == ';' {
+                reader.move_1();
+                return Type::Object { class_name: s };
+            } else {
+                reader.move_1(); // '<'
+
+                let mut types = Vec::new();
+
+                while (reader.pos < reader.content.len()) && reader.peek() != '>' {
+                    types.push(parse_type(reader));
+                }
+
+                if reader.peek() != '>' {
+                    unreachable!("Invalid descriptor (expected '>'): '{}'.", reader.content);
+                }
+                reader.move_1(); // '>'
+
+                if reader.peek() != ';' {
+                    unreachable!("Invalid descriptor (expected ';'): '{}'.", reader.content);
+                }
+                reader.move_1(); // ';'
+
+                return Type::Generic {
+                    class_name: s,
+                    types: types,
+                };
+            }
+        }
+        _ => unreachable!("Invalid descriptor: '{}'.", reader.content),
+    };
 }
 
 pub fn parse_field_descriptor(raw_descriptor: &str) -> FieldDescriptor {
     FieldDescriptor {
-        field_type: parse_type(raw_descriptor),
+        field_type: parse_type(&mut Reader {
+            content: raw_descriptor.to_owned(),
+            pos: 0,
+        }),
     }
 }
 
@@ -141,36 +230,22 @@ pub fn parse_method_descriptor(raw_descriptor: &str) -> MethodDescriptor {
         raw_descriptor
     );
 
-    let return_type: Type = parse_type(raw_descriptor.split(')').next_back().unwrap());
+    let return_type: Type = parse_type(&mut Reader {
+        content: raw_descriptor.split(')').next_back().unwrap().to_owned(),
+        pos: 0,
+    });
 
     let parameters_string: String = raw_descriptor.split(')').next().unwrap()[1..].to_owned();
 
     let mut parameter_types = Vec::new();
-    let mut chars = parameters_string.as_str();
 
-    while !chars.is_empty() {
-        let (ty, consumed) = match chars.chars().next().unwrap() {
-            'B' | 'C' | 'D' | 'F' | 'I' | 'J' | 'S' | 'Z' | 'V' => (parse_type(&chars[..1]), 1),
-            '[' => {
-                // consume all leading '['
-                let array_len = chars.chars().take_while(|c| *c == '[').count();
+    let mut reader: Reader = Reader {
+        content: parameters_string,
+        pos: 0,
+    };
 
-                if chars.chars().nth(array_len).unwrap() == 'L' {
-                    let semicolon = chars.find(';').unwrap();
-                    (parse_type(&chars[..=semicolon]), semicolon + 1)
-                } else {
-                    (parse_type(&chars[..array_len + 1]), array_len + 1)
-                }
-            }
-            'L' => {
-                let semicolon = chars.find(';').unwrap();
-                (parse_type(&chars[..=semicolon]), semicolon + 1)
-            }
-            _ => unreachable!("Invalid parameter descriptor: '{}'", chars),
-        };
-
-        parameter_types.push(ty);
-        chars = &chars[consumed..];
+    while reader.pos < reader.content.len() {
+        parameter_types.push(parse_type(&mut reader));
     }
 
     MethodDescriptor {
@@ -227,7 +302,7 @@ mod tests {
             ),
             (
                 Type::Generic {
-                    class_name: "java.lang.List".to_string(),
+                    class_name: "java.util.List".to_string(),
                     types: vec![Type::Object {
                         class_name: "java.lang.String".to_string(),
                     }],
@@ -236,7 +311,7 @@ mod tests {
             ),
             (
                 Type::Generic {
-                    class_name: "java.lang.Map".to_string(),
+                    class_name: "java.util.Map".to_string(),
                     types: vec![
                         Type::Object {
                             class_name: "java.lang.String".to_string(),
@@ -250,7 +325,7 @@ mod tests {
             ),
             (
                 Type::Generic {
-                    class_name: "java.lang.Map".to_string(),
+                    class_name: "java.util.Map".to_string(),
                     types: vec![
                         Type::Generic {
                             class_name: "java.util.List".to_string(),
@@ -271,7 +346,13 @@ mod tests {
         ];
 
         for (expected, input) in cases {
-            assert_eq!(expected, parse_type(input));
+            assert_eq!(
+                expected,
+                parse_type(&mut Reader {
+                    content: input.to_string(),
+                    pos: 0
+                })
+            );
         }
     }
 
@@ -281,7 +362,10 @@ mod tests {
         let cases = ["Q", "[", "[]"];
 
         for input in cases {
-            parse_type(input);
+            parse_type(&mut Reader {
+                content: input.to_string(),
+                pos: 0,
+            });
         }
     }
 
