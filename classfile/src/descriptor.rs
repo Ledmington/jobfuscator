@@ -100,7 +100,7 @@ impl Reader {
      * Returns the next char without moving.
      */
     fn peek(&self) -> char {
-        return self.content.chars().nth(self.pos).unwrap();
+        self.content.chars().nth(self.pos).unwrap()
     }
 
     /**
@@ -116,12 +116,12 @@ impl Reader {
     fn next(&mut self) -> char {
         let ch: char = self.content.chars().nth(self.pos).unwrap();
         self.pos += 1;
-        return ch;
+        ch
     }
 }
 
 fn parse_type(reader: &mut Reader) -> Type {
-    return match reader.peek() {
+    match reader.peek() {
         'V' => {
             reader.move_1();
             Type::Void
@@ -172,15 +172,15 @@ fn parse_type(reader: &mut Reader) -> Type {
             {
                 let ch = reader.next();
                 if ch == '/' {
-                    s = s + ".";
+                    s += ".";
                 } else {
-                    s = s + &ch.to_string();
+                    s += &ch.to_string();
                 }
             }
 
             if reader.peek() == ';' {
                 reader.move_1();
-                return Type::Object { class_name: s };
+                Type::Object { class_name: s }
             } else {
                 reader.move_1(); // '<'
 
@@ -200,14 +200,14 @@ fn parse_type(reader: &mut Reader) -> Type {
                 }
                 reader.move_1(); // ';'
 
-                return Type::Generic {
+                Type::Generic {
                     class_name: s,
-                    types: types,
-                };
+                    types,
+                }
             }
         }
         _ => unreachable!("Invalid descriptor: '{}'.", reader.content),
-    };
+    }
 }
 
 pub fn parse_field_descriptor(raw_descriptor: &str) -> FieldDescriptor {
