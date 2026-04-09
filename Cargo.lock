@@ -26,7 +26,6 @@ name = "classfile"
 version = "0.1.0"
 dependencies = [
  "binary_reader",
- "sha2",
 ]
 
 [[package]]
@@ -82,14 +81,15 @@ name = "javap"
 version = "0.1.0"
 dependencies = [
  "classfile",
+ "sha2",
  "time",
 ]
 
 [[package]]
 name = "libc"
-version = "0.2.178"
+version = "0.2.184"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37c93d8daa9d8a012fd8ab92f088405fb202ea0b6ab73ee2482ae66af4f42091"
+checksum = "48f5d2a454e16a5ea0f4ced81bd44e4cfc7bd3a507b61887c99fd3538b28e4af"
 
 [[package]]
 name = "num-conv"
@@ -149,6 +149,10 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "sha"
+version = "0.1.0"
 
 [[package]]
 name = "sha2"

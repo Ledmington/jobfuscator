@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 classfile = { path = "../classfile" }
 time = "0.3.44"
+sha2 = "0.10.9"

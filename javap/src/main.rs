@@ -1,16 +1,22 @@
 #![forbid(unsafe_code)]
 
 use std::env;
-use std::io::Result;
+use std::fs::File;
+use std::io::{BufReader, Read, Result};
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use classfile::access_flags::MethodAccessFlag;
 use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
 use classfile::bytecode::BytecodeInstruction;
+use classfile::classfile::{ClassFile, parse_class_file};
 use classfile::constant_pool::{self, ConstantPool, ConstantPoolInfo};
 use classfile::descriptor::MethodDescriptor;
 use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
-use classfile::{ClassFile, access_flags, descriptor, parse_class_file, reference_kind};
+use classfile::utils::absolute_no_symlinks;
+use classfile::{access_flags, descriptor, reference_kind};
+use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
 
 /**
@@ -23,8 +29,49 @@ const BYTECODE_COMMENT_START_INDEX: usize = 46;
  */
 const BYTECODE_INDEX_LENGTH: usize = 5;
 
-fn print_class_file(cf: &ClassFile) {
-    print_header(cf);
+fn print_class_file(filename: String) {
+    let abs_file_path: PathBuf = absolute_no_symlinks(Path::new(&filename)).unwrap();
+    let absolute_file_path: String = abs_file_path.to_str().unwrap().to_owned();
+    println!("Classfile {}", absolute_file_path);
+
+    let file: File = File::open(&abs_file_path).expect("File does not exist");
+    let modified_time: SystemTime = file.metadata().unwrap().modified().unwrap();
+
+    let mut file_reader: BufReader<File> = BufReader::new(file);
+    let mut file_bytes: Vec<u8> = Vec::with_capacity(file_reader.capacity());
+    file_reader
+        .read_to_end(&mut file_bytes)
+        .expect("Could not read whole file");
+    let file_size: usize = file_bytes.len();
+
+    let digest = Sha256::digest(&file_bytes);
+
+    println!(
+        "  Last modified {} {}, {}; size {} bytes",
+        OffsetDateTime::from(modified_time)
+            .month()
+            .to_string()
+            .chars()
+            .take(3)
+            .map(|c| c.to_string())
+            .collect::<Vec<String>>()
+            .join(""),
+        OffsetDateTime::from(modified_time).day(),
+        OffsetDateTime::from(modified_time).year(),
+        file_size
+    );
+    println!(
+        "  SHA-256 checksum {}",
+        digest
+            .iter()
+            .map(|x| format!("{:02x}", x))
+            .collect::<Vec<String>>()
+            .concat()
+    );
+
+    let cf: ClassFile = parse_class_file(filename);
+
+    print_header(&cf);
     print_constant_pool(&cf.constant_pool);
     println!("{{");
     print_fields(&cf.constant_pool, &cf.fields);
@@ -61,29 +108,6 @@ fn get_constant_pool_comment_start_index(cp: &ConstantPool) -> usize {
 }
 
 fn print_header(cf: &ClassFile) {
-    println!("Classfile {}", cf.absolute_file_path);
-    println!(
-        "  Last modified {} {}, {}; size {} bytes",
-        OffsetDateTime::from(cf.modified_time)
-            .month()
-            .to_string()
-            .chars()
-            .take(3)
-            .map(|c| c.to_string())
-            .collect::<Vec<String>>()
-            .join(""),
-        OffsetDateTime::from(cf.modified_time).day(),
-        OffsetDateTime::from(cf.modified_time).year(),
-        cf.file_size
-    );
-    println!(
-        "  SHA-256 checksum {}",
-        cf.sha256_digest
-            .iter()
-            .map(|x| format!("{:02x}", x))
-            .collect::<Vec<String>>()
-            .concat()
-    );
     let source_file: String = cf
         .attributes
         .iter()
@@ -543,7 +567,11 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
             }
         }
         BytecodeInstruction::AaLoad {} => "aaload".to_owned(),
+        BytecodeInstruction::BaLoad {} => "baload".to_owned(),
         BytecodeInstruction::AaStore {} => "aastore".to_owned(),
+        BytecodeInstruction::NewArray { atype } => {
+            "newarray       ".to_owned() + &format!("{}", atype)
+        }
         BytecodeInstruction::ANewArray {
             constant_pool_index,
         } => "anewarray     #".to_owned() + &constant_pool_index.to_string(),
@@ -553,6 +581,9 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         } => "new           #".to_owned() + &constant_pool_index.to_string(),
         BytecodeInstruction::BiPush { immediate } => {
             "bipush        ".to_owned() + &immediate.to_string()
+        }
+        BytecodeInstruction::SiPush { immediate } => {
+            "sipush        ".to_owned() + &immediate.to_string()
         }
         BytecodeInstruction::Pop {} => "pop".to_owned(),
         BytecodeInstruction::Return {} => "return".to_owned(),
@@ -707,6 +738,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::L2D {} => "l2d".to_owned(),
         BytecodeInstruction::IAdd {} => "iadd".to_owned(),
         BytecodeInstruction::ISub {} => "isub".to_owned(),
+        BytecodeInstruction::IMul {} => "imul".to_owned(),
         BytecodeInstruction::LAdd {} => "ladd".to_owned(),
         BytecodeInstruction::LSub {} => "lsub".to_owned(),
         BytecodeInstruction::LMul {} => "lmul".to_owned(),
@@ -804,7 +836,9 @@ fn get_comment(
             local_variable_index: _,
         } => None,
         BytecodeInstruction::AaLoad {} => None,
+        BytecodeInstruction::BaLoad {} => None,
         BytecodeInstruction::AaStore {} => None,
+        BytecodeInstruction::NewArray { atype: _ } => None,
         BytecodeInstruction::ANewArray {
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
@@ -813,6 +847,7 @@ fn get_comment(
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
         BytecodeInstruction::BiPush { immediate: _ } => None,
+        BytecodeInstruction::SiPush { immediate: _ } => None,
         BytecodeInstruction::Pop {} => None,
         BytecodeInstruction::Return {} => None,
         BytecodeInstruction::IReturn {} => None,
@@ -1011,6 +1046,7 @@ fn get_comment(
         BytecodeInstruction::L2D {} => None,
         BytecodeInstruction::IAdd {} => None,
         BytecodeInstruction::ISub {} => None,
+        BytecodeInstruction::IMul {} => None,
         BytecodeInstruction::LAdd {} => None,
         BytecodeInstruction::LSub {} => None,
         BytecodeInstruction::LMul {} => None,
@@ -1395,9 +1431,7 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
 fn main() -> Result<()> {
     let filename = env::args().nth(1).expect("Usage: program <filename>");
 
-    let classfile: ClassFile = parse_class_file(filename);
-
-    print_class_file(&classfile);
+    print_class_file(filename);
 
     Ok(())
 }

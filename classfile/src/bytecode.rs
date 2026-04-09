@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
-use std::{collections::BTreeMap, io::Result};
+use std::{
+    collections::BTreeMap,
+    fmt::{Display, Formatter},
+    io::Result,
+};
 
 use binary_reader::BinaryReader;
 
@@ -44,7 +48,11 @@ pub enum BytecodeInstruction {
         local_variable_index: u8,
     },
     AaLoad {},
+    BaLoad {},
     AaStore {},
+    NewArray {
+        atype: ArrayType,
+    },
     ANewArray {
         constant_pool_index: u16,
     },
@@ -54,6 +62,9 @@ pub enum BytecodeInstruction {
     },
     BiPush {
         immediate: u8,
+    },
+    SiPush {
+        immediate: u16,
     },
     Pop {},
     Return {},
@@ -164,6 +175,7 @@ pub enum BytecodeInstruction {
     L2D {},
     IAdd {},
     ISub {},
+    IMul {},
     LAdd {},
     LSub {},
     LMul {},
@@ -176,6 +188,49 @@ pub enum BytecodeInstruction {
 pub struct LookupSwitchPair {
     pub match_value: i32,
     pub offset: i32,
+}
+
+#[repr(u8)]
+pub enum ArrayType {
+    Boolean = 4,
+    Char = 5,
+    Float = 6,
+    Double = 7,
+    Byte = 8,
+    Short = 9,
+    Int = 10,
+    Long = 11,
+}
+
+impl From<u8> for ArrayType {
+    fn from(value: u8) -> Self {
+        match value {
+            4 => ArrayType::Boolean,
+            5 => ArrayType::Char,
+            6 => ArrayType::Float,
+            7 => ArrayType::Double,
+            8 => ArrayType::Byte,
+            9 => ArrayType::Short,
+            10 => ArrayType::Int,
+            11 => ArrayType::Long,
+            _ => panic!("Unknown array type value {}.", value),
+        }
+    }
+}
+
+impl Display for ArrayType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArrayType::Boolean => write!(f, "boolean"),
+            ArrayType::Char => write!(f, "char"),
+            ArrayType::Float => write!(f, "float"),
+            ArrayType::Double => write!(f, "double"),
+            ArrayType::Byte => write!(f, "byte"),
+            ArrayType::Short => write!(f, "short"),
+            ArrayType::Int => write!(f, "int"),
+            ArrayType::Long => write!(f, "long"),
+        }
+    }
 }
 
 pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstruction> {
@@ -202,6 +257,9 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                 0x0a => BytecodeInstruction::LConst { constant: 1 },
                 0x10 => BytecodeInstruction::BiPush {
                     immediate: reader.read_u8().unwrap(),
+                },
+                0x11 => BytecodeInstruction::SiPush {
+                    immediate: reader.read_u16().unwrap(),
                 },
                 0x12 => BytecodeInstruction::Ldc {
                     constant_pool_index: reader.read_u8().unwrap(),
@@ -258,6 +316,7 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                     local_variable_index: 3,
                 },
                 0x32 => BytecodeInstruction::AaLoad {},
+                0x33 => BytecodeInstruction::BaLoad {},
                 0x36 => BytecodeInstruction::IStore {
                     local_variable_index: reader.read_u8().unwrap(),
                 },
@@ -310,6 +369,7 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                 0x61 => BytecodeInstruction::LAdd {},
                 0x64 => BytecodeInstruction::ISub {},
                 0x65 => BytecodeInstruction::LSub {},
+                0x68 => BytecodeInstruction::IMul {},
                 0x69 => BytecodeInstruction::LMul {},
                 0x6d => BytecodeInstruction::LDiv {},
                 0x6f => BytecodeInstruction::DDiv {},
@@ -450,6 +510,9 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                 }
                 0xbb => BytecodeInstruction::New {
                     constant_pool_index: reader.read_u16().unwrap(),
+                },
+                0xbc => BytecodeInstruction::NewArray {
+                    atype: ArrayType::from(reader.read_u8().unwrap()),
                 },
                 0xbd => BytecodeInstruction::ANewArray {
                     constant_pool_index: reader.read_u16().unwrap(),

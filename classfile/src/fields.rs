@@ -3,9 +3,8 @@
 use binary_reader::BinaryReader;
 
 use crate::{
-    AttributeInfo,
     access_flags::{FieldAccessFlag, parse_field_access_flags},
-    attributes::parse_field_attributes,
+    attributes::{AttributeInfo, parse_field_attributes},
     constant_pool::ConstantPool,
 };
 
