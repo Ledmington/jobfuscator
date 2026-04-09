@@ -16,7 +16,6 @@ use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
 use classfile::utils::absolute_no_symlinks;
 use classfile::{access_flags, descriptor, reference_kind};
-use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
 
 /**
@@ -44,7 +43,7 @@ fn print_class_file(filename: String) {
         .expect("Could not read whole file");
     let file_size: usize = file_bytes.len();
 
-    let digest = Sha256::digest(&file_bytes);
+    let digest = sha::sha256(&file_bytes);
 
     println!(
         "  Last modified {} {}, {}; size {} bytes",
