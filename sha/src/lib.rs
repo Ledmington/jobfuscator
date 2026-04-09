@@ -132,7 +132,7 @@ mod tests {
             ),
             (
                 "hello world",
-                "b94d27b9934d3e08a52e52d7da7dabfadeb7f7d37c2e0e68e9d7c2c2c2b6c2e0",
+                "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
             ),
             (
                 "abcdefghijklmnopqrstuvwxyz",
@@ -140,11 +140,11 @@ mod tests {
             ),
             (
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
-                "db4bfcbd4da0cd85a60c3c37d3fbd8805c77f15faf0f6b6c6f2b1f3a3e6a4a4c",
+                "db4bfcbd4da0cd85a60c3c37d3fbd8805c77f15fc6b1fdfe614ee0a7c8fdb4c0",
             ),
             (
                 "The quick brown fox jumps over the lazy dog",
-                "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb761d02f6a1b5c1e5f2",
+                "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
             ),
         ];
 
