@@ -182,6 +182,12 @@ pub enum ConstantPoolInfo {
     Utf8 {
         bytes: Vec<u8>,
     },
+    Integer {
+        bytes: u32,
+    },
+    Float {
+        bytes: u32,
+    },
     Long {
         high_bytes: u32,
         low_bytes: u32,
@@ -294,6 +300,12 @@ fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> 
                 bytes: reader.read_u8_vec(length.into()).unwrap(),
             }
         }
+        ConstantPoolTag::Integer => ConstantPoolInfo::Integer {
+            bytes: reader.read_u32().unwrap(),
+        },
+        ConstantPoolTag::Float => ConstantPoolInfo::Float {
+            bytes: reader.read_u32().unwrap(),
+        },
         ConstantPoolTag::Long => ConstantPoolInfo::Long {
             high_bytes: reader.read_u32().unwrap(),
             low_bytes: reader.read_u32().unwrap(),

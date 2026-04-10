@@ -212,6 +212,16 @@ fn print_constant_pool(cp: &ConstantPool) {
                     )
                 }
             }
+            ConstantPoolInfo::Integer { bytes } => println!(
+                "{:<info_start_index$}{}",
+                format!("{:>index_width$} = Integer", format!("#{}", i + 1),),
+                bytes,
+            ),
+            ConstantPoolInfo::Float { bytes } => println!(
+                "{:<info_start_index$}{:.1}",
+                format!("{:>index_width$} = Float", format!("#{}", i + 1),),
+                f32::from_bits(*bytes),
+            ),
             ConstantPoolInfo::Long {
                 high_bytes,
                 low_bytes,
