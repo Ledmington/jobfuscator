@@ -47,9 +47,9 @@ fn do_sha256(input: &[u8]) -> [u8; 32] {
     let num_chunks = input.len() / 64;
     for chunk_index in 0..num_chunks {
         let mut w = [0u32; 64];
-        for j in 0..16 {
+        for (j, wj) in w.iter_mut().enumerate().take(16) {
             let base = chunk_index * 64 + j * 4;
-            w[j] = u32::from_be_bytes([
+            *wj = u32::from_be_bytes([
                 input[base],
                 input[base + 1],
                 input[base + 2],
