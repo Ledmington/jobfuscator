@@ -418,15 +418,15 @@ fn parse_annotation(cp: &ConstantPool, reader: &mut BinaryReader) -> Annotation 
             value,
         });
     }
-    return Annotation {
+    Annotation {
         type_index,
         element_value_pairs,
-    };
+    }
 }
 
 fn parse_element_value(cp: &ConstantPool, reader: &mut BinaryReader) -> ElementValue {
     let element_value_tag: char = reader.read_u8().unwrap() as char;
-    return match element_value_tag {
+    match element_value_tag {
         'B' => ElementValue::Byte {
             const_value_index: reader.read_u16().unwrap(),
         },
@@ -473,7 +473,7 @@ fn parse_element_value(cp: &ConstantPool, reader: &mut BinaryReader) -> ElementV
             ElementValue::Array { values }
         }
         _ => panic!("'{}' is not a valid element value tag.", element_value_tag),
-    };
+    }
 }
 
 fn parse_code_attributes(
