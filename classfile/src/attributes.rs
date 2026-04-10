@@ -52,6 +52,62 @@ pub enum AttributeInfo {
     NestMembers {
         classes: Vec<u16>,
     },
+    RuntimeVisibleAnnotations {
+        annotations: Vec<Annotation>,
+    },
+}
+
+pub struct Annotation {
+    type_index: u16,
+    element_value_pairs: Vec<ElementValuePair>,
+}
+
+pub struct ElementValuePair {
+    element_name_index: u16,
+    value: ElementValue,
+}
+
+pub enum ElementValue {
+    Byte {
+        const_value_index: u16,
+    },
+    Char {
+        const_value_index: u16,
+    },
+    Double {
+        const_value_index: u16,
+    },
+    Float {
+        const_value_index: u16,
+    },
+    Int {
+        const_value_index: u16,
+    },
+    Long {
+        const_value_index: u16,
+    },
+    Short {
+        const_value_index: u16,
+    },
+    Boolean {
+        const_value_index: u16,
+    },
+    String {
+        const_value_index: u16,
+    },
+    Enum {
+        type_name_index: u16,
+        const_name_index: u16,
+    },
+    Class {
+        class_info_index: u16,
+    },
+    Annotation {
+        value: Annotation,
+    },
+    Array {
+        values: Vec<ElementValue>,
+    },
 }
 
 pub struct RecordComponentInfo {
@@ -334,11 +390,90 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
             let signature_index: u16 = reader.read_u16().unwrap();
             AttributeInfo::Signature { signature_index }
         }
+        "RuntimeVisibleAnnotations" => {
+            let num_annotations: u16 = reader.read_u16().unwrap();
+            let mut annotations: Vec<Annotation> = Vec::with_capacity(num_annotations.into());
+            for _ in 0..num_annotations {
+                annotations.push(parse_annotation(cp, reader));
+            }
+            AttributeInfo::RuntimeVisibleAnnotations { annotations }
+        }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a method attribute.",
             attribute_name
         ),
     }
+}
+
+fn parse_annotation(cp: &ConstantPool, reader: &mut BinaryReader) -> Annotation {
+    let type_index: u16 = reader.read_u16().unwrap();
+    let num_element_value_pairs: u16 = reader.read_u16().unwrap();
+    let mut element_value_pairs: Vec<ElementValuePair> =
+        Vec::with_capacity(num_element_value_pairs.into());
+    for _ in 0..num_element_value_pairs {
+        let element_name_index: u16 = reader.read_u16().unwrap();
+        let value: ElementValue = parse_element_value(cp, reader);
+        element_value_pairs.push(ElementValuePair {
+            element_name_index,
+            value,
+        });
+    }
+    return Annotation {
+        type_index,
+        element_value_pairs,
+    };
+}
+
+fn parse_element_value(cp: &ConstantPool, reader: &mut BinaryReader) -> ElementValue {
+    let element_value_tag: char = reader.read_u8().unwrap() as char;
+    return match element_value_tag {
+        'B' => ElementValue::Byte {
+            const_value_index: reader.read_u16().unwrap(),
+        },
+        'C' => ElementValue::Char {
+            const_value_index: reader.read_u16().unwrap(),
+        },
+        'D' => ElementValue::Double {
+            const_value_index: reader.read_u16().unwrap(),
+        },
+        'F' => ElementValue::Float {
+            const_value_index: reader.read_u16().unwrap(),
+        },
+        'I' => ElementValue::Int {
+            const_value_index: reader.read_u16().unwrap(),
+        },
+        'J' => ElementValue::Long {
+            const_value_index: reader.read_u16().unwrap(),
+        },
+        'S' => ElementValue::Short {
+            const_value_index: reader.read_u16().unwrap(),
+        },
+        'Z' => ElementValue::Boolean {
+            const_value_index: reader.read_u16().unwrap(),
+        },
+        's' => ElementValue::String {
+            const_value_index: reader.read_u16().unwrap(),
+        },
+        'e' => ElementValue::Enum {
+            type_name_index: reader.read_u16().unwrap(),
+            const_name_index: reader.read_u16().unwrap(),
+        },
+        'c' => ElementValue::Class {
+            class_info_index: reader.read_u16().unwrap(),
+        },
+        '@' => ElementValue::Annotation {
+            value: parse_annotation(cp, reader),
+        },
+        '[' => {
+            let num_values: u16 = reader.read_u16().unwrap();
+            let mut values: Vec<ElementValue> = Vec::with_capacity(num_values.into());
+            for _ in 0..num_values {
+                values.push(parse_element_value(cp, reader));
+            }
+            ElementValue::Array { values }
+        }
+        _ => panic!("'{}' is not a valid element value tag.", element_value_tag),
+    };
 }
 
 fn parse_code_attributes(
