@@ -31,20 +31,20 @@ impl<'a> BinaryReader<'a> {
         Ok(slice)
     }
 
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N]> {
+        Ok(self.read_bytes(N)?.try_into().unwrap()) // try_into on a &[u8] of known size N cannot fail
+    }
+
     pub fn read_u8(&mut self) -> Result<u8> {
         Ok(self.read_bytes(1)?[0])
     }
 
-    pub fn read_u8_vec(&mut self, count: usize) -> Result<Vec<u8>> {
-        Ok(self.read_bytes(count)?.to_vec())
-    }
-
     pub fn read_i8(&mut self) -> Result<i8> {
-        Ok(self.read_bytes(1)?[0].try_into().unwrap())
+        Ok(self.read_u8()? as i8)
     }
 
     pub fn read_u16(&mut self) -> Result<u16> {
-        let bytes: [u8; 2] = self.read_bytes(2).unwrap().try_into().unwrap();
+        let bytes = self.read_array::<2>()?;
         Ok(match self.endian {
             Endian::Little => u16::from_le_bytes(bytes),
             Endian::Big => u16::from_be_bytes(bytes),
@@ -52,23 +52,15 @@ impl<'a> BinaryReader<'a> {
     }
 
     pub fn read_i16(&mut self) -> Result<i16> {
-        let bytes: [u8; 2] = self.read_bytes(2).unwrap().try_into().unwrap();
+        let bytes = self.read_array::<2>()?;
         Ok(match self.endian {
             Endian::Little => i16::from_le_bytes(bytes),
             Endian::Big => i16::from_be_bytes(bytes),
         })
     }
 
-    pub fn read_u16_vec(&mut self, count: usize) -> Result<Vec<u16>> {
-        let mut res: Vec<u16> = vec![0u16; count];
-        for x in res.iter_mut().take(count) {
-            *x = self.read_u16().unwrap();
-        }
-        Ok(res)
-    }
-
     pub fn read_u32(&mut self) -> Result<u32> {
-        let bytes: [u8; 4] = self.read_bytes(4).unwrap().try_into().unwrap();
+        let bytes = self.read_array::<4>()?;
         Ok(match self.endian {
             Endian::Little => u32::from_le_bytes(bytes),
             Endian::Big => u32::from_be_bytes(bytes),
@@ -76,19 +68,23 @@ impl<'a> BinaryReader<'a> {
     }
 
     pub fn read_i32(&mut self) -> Result<i32> {
-        let bytes: [u8; 4] = self.read_bytes(4).unwrap().try_into().unwrap();
+        let bytes = self.read_array::<4>()?;
         Ok(match self.endian {
             Endian::Little => i32::from_le_bytes(bytes),
             Endian::Big => i32::from_be_bytes(bytes),
         })
     }
 
+    pub fn read_u8_vec(&mut self, count: usize) -> Result<Vec<u8>> {
+        Ok(self.read_bytes(count)?.to_vec())
+    }
+
+    pub fn read_u16_vec(&mut self, count: usize) -> Result<Vec<u16>> {
+        (0..count).map(|_| self.read_u16()).collect()
+    }
+
     pub fn read_i32_vec(&mut self, count: usize) -> Result<Vec<i32>> {
-        let mut res: Vec<i32> = vec![0i32; count];
-        for x in res.iter_mut().take(count) {
-            *x = self.read_i32().unwrap();
-        }
-        Ok(res)
+        (0..count).map(|_| self.read_i32()).collect()
     }
 
     pub fn position(&self) -> usize {
@@ -100,6 +96,6 @@ impl<'a> BinaryReader<'a> {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.buf.is_empty()
     }
 }
