@@ -13,7 +13,7 @@ fn preprocess_input(input: &[u8]) -> Vec<u8> {
     output.push(0x80);
 
     // append '0' bits until the length of the input (in bytes) is 56 modulo 64
-    while output.len() % 64 < 56 {
+    while output.len() % 64 != 56 {
         output.push(0x00);
     }
 
@@ -117,10 +117,13 @@ fn do_sha256(input: &[u8]) -> [u8; 32] {
 
 #[cfg(test)]
 mod tests {
+    use rand::{Rng, RngExt, SeedableRng};
+    use sha2::{Digest, Sha256};
+
     use super::*;
 
     #[test]
-    fn hashing() {
+    fn known_hashes() {
         let cases = [
             (
                 "",
@@ -152,7 +155,48 @@ mod tests {
             let input_bytes = input.to_owned().into_bytes();
             let output = sha256(&input_bytes);
             let output_string: String = output.iter().map(|b| format!("{:02x}", b)).collect();
-            assert_eq!(expected, output_string);
+            assert_eq!(
+                Sha256::digest(input_bytes)
+                    .iter()
+                    .map(|b| format!("{:02x}", b))
+                    .collect::<String>(),
+                expected
+            );
+            assert_eq!(
+                expected, output_string,
+                "input = '{input}'\n expected = {expected}\n actual   = {output_string}"
+            );
+        }
+    }
+
+    #[test]
+    fn fuzzing() {
+        let mut rnd = rand::rng();
+
+        for _ in 0..1000 {
+            let seed: u64 = rnd.next_u64();
+
+            let mut seeded_rng = rand::rngs::SmallRng::seed_from_u64(seed);
+
+            let length = seeded_rng.random_range(0..1024);
+            let input_bytes: Vec<u8> = (0..length).map(|_| seeded_rng.random::<u8>()).collect();
+            let input_bytes_hex: String = input_bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>();
+
+            let output = sha256(&input_bytes);
+            let actual: String = output.iter().map(|b| format!("{:02x}", b)).collect();
+
+            let expected = Sha256::digest(&input_bytes)
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>();
+
+            assert_eq!(
+                expected, actual,
+                "Input: b'{input_bytes_hex}' (length={length}, seed=0x{seed:016x})\nExpected : {expected}\nActual   : {actual}"
+            );
         }
     }
 }
