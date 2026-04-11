@@ -113,7 +113,7 @@ fn get_constant_pool_info_start_index(cp: &ConstantPool) -> usize {
  * Returns the index of the column (on the terminal) where the comments (the '//') start for the constant pool.
  */
 fn get_constant_pool_comment_start_index(cp: &ConstantPool) -> usize {
-    39 + num_digits(cp.len())
+    40 + num_digits(cp.len())
 }
 
 fn print_header(cf: &ClassFile) {
