@@ -9,7 +9,7 @@ use crate::access_flags::{
     parse_method_parameter_access_flags,
 };
 use crate::bytecode::{BytecodeInstruction, parse_bytecode};
-use crate::constant_pool::ConstantPool;
+use crate::constant_pool::{ConstantPool, ConstantPoolTag, assert_valid_and_type};
 
 pub enum AttributeInfo {
     Code {
@@ -108,8 +108,8 @@ impl AttributeInfo {
 }
 
 pub struct Annotation {
-    type_index: u16,
-    element_value_pairs: Vec<ElementValuePair>,
+    pub type_index: u16,
+    pub element_value_pairs: Vec<ElementValuePair>,
 }
 
 pub struct ElementValuePair {
@@ -506,11 +506,13 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
 
 fn parse_annotation(cp: &ConstantPool, reader: &mut BinaryReader) -> Annotation {
     let type_index: u16 = reader.read_u16().unwrap();
+    assert_valid_and_type(cp, type_index, ConstantPoolTag::Utf8);
     let num_element_value_pairs: u16 = reader.read_u16().unwrap();
     let mut element_value_pairs: Vec<ElementValuePair> =
         Vec::with_capacity(num_element_value_pairs.into());
     for _ in 0..num_element_value_pairs {
         let element_name_index: u16 = reader.read_u16().unwrap();
+        assert_valid_and_type(cp, element_name_index, ConstantPoolTag::Utf8);
         let value: ElementValue = parse_element_value(cp, reader);
         element_value_pairs.push(ElementValuePair {
             element_name_index,

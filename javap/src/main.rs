@@ -411,7 +411,12 @@ fn print_field_attributes(cp: &ConstantPool, field: &FieldInfo) {
                     width = comment_index + 2 // why?
                 );
             }
-            _ => unreachable!("Unknown field attribute."),
+            AttributeInfo::ConstantValue {
+                constant_value_index,
+            } => {
+                println!("ConstantValue: #{}", constant_value_index);
+            }
+            _ => unreachable!("Unknown field attribute {}.", attribute.kind()),
         }
     }
 }
@@ -873,36 +878,42 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
 }
 
 fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
-    match cp[constant_pool_index - 1] {
+    let entry = &cp[constant_pool_index - 1];
+    match entry {
         ConstantPoolInfo::String { string_index } => {
-            let string_content: String = cp.get_utf8_content(string_index).trim_end().to_owned();
+            let string_content: String = cp.get_utf8_content(*string_index).trim_end().to_owned();
             if string_content.trim().is_empty() {
                 "String".to_owned()
             } else {
                 "String ".to_owned() + &string_content
             }
         }
+        ConstantPoolInfo::Integer { bytes } => "int ".to_owned() + &bytes.to_string(),
         ConstantPoolInfo::Long {
             high_bytes,
             low_bytes,
         } => {
             "long ".to_owned()
-                + &((((high_bytes as u64) << 32) | (low_bytes as u64)) as i64).to_string()
+                + &((((*high_bytes as u64) << 32) | (*low_bytes as u64)) as i64).to_string()
                 + "l"
         }
+        ConstantPoolInfo::Float { bytes } => format!("float {:.1}", &f32::from_bits(*bytes)),
         ConstantPoolInfo::Double {
             high_bytes,
             low_bytes,
         } => {
             format!(
                 "double {:.1}d",
-                &f64::from_bits(((high_bytes as u64) << 32) | (low_bytes as u64))
+                &f64::from_bits(((*high_bytes as u64) << 32) | (*low_bytes as u64))
             )
         }
         ConstantPoolInfo::Class { name_index } => {
-            "class ".to_owned() + &cp.get_utf8_content(name_index)
+            "class ".to_owned() + &cp.get_utf8_content(*name_index)
         }
-        _ => unreachable!(),
+        _ => unreachable!(
+            "Unknown CP entry to get constant string from: {}.",
+            entry.tag()
+        ),
     }
 }
 
@@ -1215,7 +1226,7 @@ fn get_comment(
 
 fn get_verification_type_info_string(cp: &ConstantPool, vti: &VerificationTypeInfo) -> String {
     match vti {
-        VerificationTypeInfo::TopVariable => todo!(),
+        VerificationTypeInfo::TopVariable => "top".to_owned(),
         VerificationTypeInfo::IntegerVariable => "int".to_owned(),
         VerificationTypeInfo::FloatVariable => "float".to_owned(),
         VerificationTypeInfo::LongVariable => "long".to_owned(),
@@ -1325,7 +1336,18 @@ fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodIn
                     width = comment_index + 2 // why?
                 );
             }
-            _ => unreachable!(),
+            AttributeInfo::RuntimeVisibleAnnotations { annotations } => {
+                println!("RuntimeVisibleAnnotations:");
+                for annotation in annotations {
+                    let annotation_type = cp.get_utf8_content(annotation.type_index);
+                    println!(
+                        "{} {}",
+                        annotation_type,
+                        annotation.element_value_pairs.len()
+                    );
+                }
+            }
+            _ => unreachable!("Unknown method attribute {}.", attribute.kind()),
         }
     }
 }
