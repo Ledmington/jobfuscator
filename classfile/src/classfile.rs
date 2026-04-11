@@ -24,7 +24,7 @@ pub struct ClassFile {
     pub attributes: Vec<AttributeInfo>,
 }
 
-pub fn parse_class_file(mut reader: &mut BinaryReader) -> ClassFile {
+pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
     let actual_magic_number: u32 = reader.read_u32().unwrap();
     const EXPECTED_MAGIC_NUMBER: u32 = 0xcafebabe;
     if actual_magic_number != EXPECTED_MAGIC_NUMBER {
@@ -38,7 +38,7 @@ pub fn parse_class_file(mut reader: &mut BinaryReader) -> ClassFile {
     let major_version: u16 = reader.read_u16().unwrap();
 
     let cp_count: u16 = reader.read_u16().unwrap();
-    let constant_pool: ConstantPool = parse_constant_pool(&mut reader, (cp_count - 1).into());
+    let constant_pool: ConstantPool = parse_constant_pool(reader, (cp_count - 1).into());
 
     let access_flags: Vec<ClassAccessFlag> = parse_class_access_flags(reader.read_u16().unwrap());
 
@@ -49,14 +49,14 @@ pub fn parse_class_file(mut reader: &mut BinaryReader) -> ClassFile {
     let interfaces: Vec<u16> = reader.read_u16_vec(interfaces_count.into()).unwrap();
 
     let fields_count: u16 = reader.read_u16().unwrap();
-    let fields: Vec<FieldInfo> = parse_fields(&mut reader, &constant_pool, fields_count.into());
+    let fields: Vec<FieldInfo> = parse_fields(reader, &constant_pool, fields_count.into());
 
     let methods_count: u16 = reader.read_u16().unwrap();
-    let methods: Vec<MethodInfo> = parse_methods(&mut reader, &constant_pool, methods_count.into());
+    let methods: Vec<MethodInfo> = parse_methods(reader, &constant_pool, methods_count.into());
 
     let attributes_count: u16 = reader.read_u16().unwrap();
     let attributes: Vec<AttributeInfo> =
-        parse_class_attributes(&mut reader, &constant_pool, attributes_count.into());
+        parse_class_attributes(reader, &constant_pool, attributes_count.into());
 
     ClassFile {
         minor_version,
