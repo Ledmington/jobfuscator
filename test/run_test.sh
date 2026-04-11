@@ -21,18 +21,33 @@ echo " system's javap: ${SYSTEM_JAVAP}"
 echo " tested javap:   ${OUR_JAVAP}"
 echo ""
 
-TEST_FILES=$(find "${TEST_DIR}" -type f -name '*.class')
+run_test() {
+    local TEST_NAME="$1"
+    local TEST_FILE="${TEST_DIR}/${TEST_NAME}.class"
+    local EXPECTED_OUTPUT
+    local ACTUAL_OUTPUT
+    local DIFF_OUTPUT
 
-for TEST_FILE in ${TEST_FILES} ; do
     EXPECTED_OUTPUT=$(mktemp)
     ACTUAL_OUTPUT=$(mktemp)
+    DIFF_OUTPUT=$(mktemp)
 
     ${SYSTEM_JAVAP} -l -v -p "${TEST_FILE}" > "${EXPECTED_OUTPUT}"
     ${OUR_JAVAP} "${TEST_FILE}" > "${ACTUAL_OUTPUT}"
 
-    diff "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}"
-    
+    diff "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}" > "${DIFF_OUTPUT}"
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        echo -e "${TEST_FILE} ... \033[0;31mFAILED\033[0m"
+        echo "Expected output: ${EXPECTED_OUTPUT}"
+        echo "Actual output: ${ACTUAL_OUTPUT}"
+        cat "${DIFF_OUTPUT}"
+        return 1
+    fi
+
     echo -e "${TEST_FILE} ... \033[0;32mOK\033[0m"
-    
-    rm -f "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}"
-done
+    rm -f "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}" "${DIFF_OUTPUT}"
+}
+
+run_test "HelloWorld"
+run_test "Math"
