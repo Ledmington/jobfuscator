@@ -49,5 +49,10 @@ run_test() {
     rm -f "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}" "${DIFF_OUTPUT}"
 }
 
-run_test "HelloWorld"
-run_test "Math"
+set +e
+exit_code=0
+run_test "HelloWorld" || exit_code=1
+run_test "Math"       || exit_code=1
+set -e
+
+exit $exit_code
