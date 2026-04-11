@@ -1,25 +1,21 @@
 #![forbid(unsafe_code)]
 
-use std::io::Write;
+const TAB_COLUMN: usize = 40;
 
-struct LineWriter<W: Write> {
-    out: W,
+const INDENT_WIDTH: usize = 2;
+
+pub(crate) struct LineWriter {
     buffer: String,
     indent_count: usize,
-    indent_width: usize,
-    tab_column: usize,
     pending_newline: bool,
     pending_spaces: usize,
 }
 
-impl<W: Write> LineWriter<W> {
-    fn new(out: W, indent_width: usize, tab_column: usize) -> Self {
+impl LineWriter {
+    pub(crate) fn new() -> Self {
         Self {
-            out,
             buffer: String::new(),
             indent_count: 0,
-            indent_width,
-            tab_column,
             pending_newline: false,
             pending_spaces: 0,
         }
@@ -27,14 +23,14 @@ impl<W: Write> LineWriter<W> {
 
     fn print(&mut self, s: &str) {
         if self.pending_newline {
-            self.println();
+            self.do_println();
             self.pending_newline = false;
         }
 
         for c in s.chars() {
             match c {
                 ' ' => self.pending_spaces += 1,
-                '\n' => self.println(),
+                '\n' => self.do_println(),
                 _ => {
                     if self.buffer.is_empty() {
                         self.indent();
@@ -51,9 +47,9 @@ impl<W: Write> LineWriter<W> {
         }
     }
 
-    fn println(&mut self) {
+    fn do_println(&mut self) {
         self.pending_spaces = 0;
-        writeln!(self.out, "{}", self.buffer).expect("failed to write");
+        println!("{}", self.buffer);
         self.buffer.clear();
     }
 
@@ -62,7 +58,7 @@ impl<W: Write> LineWriter<W> {
     }
 
     fn tab(&mut self) {
-        let col = self.indent_count * self.indent_width + self.tab_column;
+        let col = self.indent_count * INDENT_WIDTH + TAB_COLUMN;
         self.pending_spaces += if col <= self.buffer.len() {
             1
         } else {
@@ -71,6 +67,15 @@ impl<W: Write> LineWriter<W> {
     }
 
     fn indent(&mut self) {
-        self.pending_spaces += self.indent_count * self.indent_width;
+        self.pending_spaces += self.indent_count * INDENT_WIDTH;
     }
+}
+
+macro_rules! println {
+    ($self:expr) => {
+        $self.print("\n")
+    };
+    ($self:expr, $fmt:literal $(, $args:expr)*) => {
+        $self.print(&format!($fmt $(, $args)*))
+    };
 }

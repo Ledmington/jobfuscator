@@ -20,6 +20,8 @@ use classfile::utils::absolute_no_symlinks;
 use classfile::{access_flags, descriptor, reference_kind};
 use time::OffsetDateTime;
 
+use crate::line_writer::LineWriter;
+
 /**
  * The index of the column (on the terminal) where the comments (the '//') start for the bytecode printing.
  */
@@ -31,9 +33,11 @@ const BYTECODE_COMMENT_START_INDEX: usize = 46;
 const BYTECODE_INDEX_LENGTH: usize = 5;
 
 pub(crate) fn print_class_file(filename: String) {
+    let lw: LineWriter = LineWriter::new();
+
     let abs_file_path: PathBuf = absolute_no_symlinks(Path::new(&filename)).unwrap();
     let absolute_file_path: String = abs_file_path.to_str().unwrap().to_owned();
-    println!("Classfile {}", absolute_file_path);
+    lw.println!("Classfile {}", absolute_file_path);
 
     let file: File = File::open(&abs_file_path).expect("File does not exist");
     let modified_time: SystemTime = file.metadata().unwrap().modified().unwrap();
