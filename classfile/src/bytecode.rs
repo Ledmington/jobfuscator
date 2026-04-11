@@ -47,6 +47,9 @@ pub enum BytecodeInstruction {
     LStore {
         local_variable_index: u8,
     },
+    DLoad {
+        local_variable_index: u8,
+    },
     AaLoad {},
     BaLoad {},
     AaStore {},
@@ -301,6 +304,18 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                     local_variable_index: 2,
                 },
                 0x21 => BytecodeInstruction::LLoad {
+                    local_variable_index: 3,
+                },
+                0x26 => BytecodeInstruction::DLoad {
+                    local_variable_index: 0,
+                },
+                0x27 => BytecodeInstruction::DLoad {
+                    local_variable_index: 1,
+                },
+                0x28 => BytecodeInstruction::DLoad {
+                    local_variable_index: 2,
+                },
+                0x29 => BytecodeInstruction::DLoad {
                     local_variable_index: 3,
                 },
                 0x2a => BytecodeInstruction::ALoad {

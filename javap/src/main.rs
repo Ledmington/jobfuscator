@@ -585,6 +585,15 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                 "lstore        ".to_owned() + &local_variable_index.to_string()
             }
         }
+        BytecodeInstruction::DLoad {
+            local_variable_index,
+        } => {
+            if *local_variable_index <= 3 {
+                "dload_".to_owned() + &local_variable_index.to_string()
+            } else {
+                "dload         ".to_owned() + &local_variable_index.to_string()
+            }
+        }
         BytecodeInstruction::AaLoad {} => "aaload".to_owned(),
         BytecodeInstruction::BaLoad {} => "baload".to_owned(),
         BytecodeInstruction::AaStore {} => "aastore".to_owned(),
@@ -852,6 +861,9 @@ fn get_comment(
             local_variable_index: _,
         } => None,
         BytecodeInstruction::LStore {
+            local_variable_index: _,
+        } => None,
+        BytecodeInstruction::DLoad {
             local_variable_index: _,
         } => None,
         BytecodeInstruction::AaLoad {} => None,
