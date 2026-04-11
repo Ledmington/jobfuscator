@@ -1,14 +1,14 @@
 #![forbid(unsafe_code)]
 
-const TAB_COLUMN: usize = 40;
+const TAB_COLUMN: isize = 40;
 
-const INDENT_WIDTH: usize = 2;
+const INDENT_WIDTH: isize = 2;
 
 pub(crate) struct LineWriter {
     buffer: String,
-    indent_count: usize,
+    indent_count: isize,
     pending_newline: bool,
-    pending_spaces: usize,
+    pending_spaces: isize,
 }
 
 impl LineWriter {
@@ -21,7 +21,12 @@ impl LineWriter {
         }
     }
 
-    fn print(&mut self, s: &str) {
+    pub(crate) fn println(&mut self, s: &str) -> &mut Self {
+        self.print(s).print("\n");
+        self
+    }
+
+    pub(crate) fn print(&mut self, s: &str) -> &mut Self {
         if self.pending_newline {
             self.do_println();
             self.pending_newline = false;
@@ -33,7 +38,7 @@ impl LineWriter {
                 '\n' => self.do_println(),
                 _ => {
                     if self.buffer.is_empty() {
-                        self.indent();
+                        self.do_indent();
                     }
                     if self.pending_spaces > 0 {
                         for _ in 0..self.pending_spaces {
@@ -45,6 +50,8 @@ impl LineWriter {
                 }
             }
         }
+
+        self
     }
 
     fn do_println(&mut self) {
@@ -54,28 +61,21 @@ impl LineWriter {
     }
 
     fn indent_delta(&mut self, delta: isize) {
-        self.indent_count = (self.indent_count as isize + delta) as usize;
+        self.indent_count = self.indent_count + delta;
     }
 
-    fn tab(&mut self) {
+    pub(crate) fn tab(&mut self) -> &mut Self {
         let col = self.indent_count * INDENT_WIDTH + TAB_COLUMN;
-        self.pending_spaces += if col <= self.buffer.len() {
-            1
-        } else {
-            col - self.buffer.len()
-        };
+        let buf_len = self.buffer.len().try_into().unwrap();
+        self.pending_spaces += if col <= buf_len { 1 } else { col - buf_len };
+        self
     }
 
-    fn indent(&mut self) {
+    fn do_indent(&mut self) {
         self.pending_spaces += self.indent_count * INDENT_WIDTH;
     }
-}
 
-macro_rules! println {
-    ($self:expr) => {
-        $self.print("\n")
-    };
-    ($self:expr, $fmt:literal $(, $args:expr)*) => {
-        $self.print(&format!($fmt $(, $args)*))
-    };
+    pub(crate) fn indent(&mut self, delta: isize) {
+        self.indent_count += delta;
+    }
 }

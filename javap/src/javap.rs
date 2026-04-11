@@ -3,6 +3,7 @@
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
+use std::string;
 use std::time::SystemTime;
 
 use binary_reader::{BinaryReader, Endianness};
@@ -33,11 +34,11 @@ const BYTECODE_COMMENT_START_INDEX: usize = 46;
 const BYTECODE_INDEX_LENGTH: usize = 5;
 
 pub(crate) fn print_class_file(filename: String) {
-    let lw: LineWriter = LineWriter::new();
+    let mut lw: LineWriter = LineWriter::new();
 
     let abs_file_path: PathBuf = absolute_no_symlinks(Path::new(&filename)).unwrap();
     let absolute_file_path: String = abs_file_path.to_str().unwrap().to_owned();
-    lw.println!("Classfile {}", absolute_file_path);
+    lw.println(&("Classfile ".to_owned() + &absolute_file_path.to_string()));
 
     let file: File = File::open(&abs_file_path).expect("File does not exist");
     let modified_time: SystemTime = file.metadata().unwrap().modified().unwrap();
@@ -51,27 +52,31 @@ pub(crate) fn print_class_file(filename: String) {
 
     let digest = sha::sha256(&file_bytes);
 
-    println!(
-        "  Last modified {} {}, {}; size {} bytes",
-        OffsetDateTime::from(modified_time)
-            .month()
-            .to_string()
-            .chars()
-            .take(3)
-            .map(|c| c.to_string())
-            .collect::<Vec<String>>()
-            .join(""),
-        OffsetDateTime::from(modified_time).day(),
-        OffsetDateTime::from(modified_time).year(),
-        file_size
-    );
-    println!(
-        "  SHA-256 checksum {}",
-        digest
+    lw.print("  Last modified ")
+        .print(
+            &OffsetDateTime::from(modified_time)
+                .month()
+                .to_string()
+                .chars()
+                .take(3)
+                .map(|c| c.to_string())
+                .collect::<Vec<String>>()
+                .join(""),
+        )
+        .print(" ")
+        .print(&OffsetDateTime::from(modified_time).day().to_string())
+        .print(", ")
+        .print(&OffsetDateTime::from(modified_time).year().to_string())
+        .print("; size ")
+        .print(&file_size.to_string())
+        .println(" bytes");
+
+    lw.print("  SHA-256 checksum ").println(
+        &digest
             .iter()
             .map(|x| format!("{:02x}", x))
             .collect::<Vec<String>>()
-            .concat()
+            .concat(),
     );
 
     let abs_file_path: PathBuf = absolute_no_symlinks(Path::new(&filename)).unwrap();
@@ -85,9 +90,9 @@ pub(crate) fn print_class_file(filename: String) {
     let mut reader = BinaryReader::new(&file_bytes, Endianness::Big);
     let cf: ClassFile = parse_class_file(&mut reader);
 
-    print_header(&cf);
-    print_constant_pool(&cf.constant_pool);
-    println!("{{");
+    print_header(&mut lw, &cf);
+    print_constant_pool(&mut lw, &cf.constant_pool);
+    lw.println("{");
     print_fields(&cf.constant_pool, &cf.fields);
     print_methods(
         &cf.constant_pool,
@@ -96,7 +101,7 @@ pub(crate) fn print_class_file(filename: String) {
             .contains(&access_flags::ClassAccessFlag::Enum),
         &cf.methods,
     );
-    println!("}}");
+    lw.println("}");
     print_class_attributes(&cf.constant_pool, &cf.attributes);
 }
 
@@ -125,7 +130,7 @@ fn num_digits(n: usize) -> usize {
     (n as f64).log10().floor() as usize
 }
 
-fn print_header(cf: &ClassFile) {
+fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
     let source_file: String = cf
         .attributes
         .iter()
@@ -138,64 +143,75 @@ fn print_header(cf: &ClassFile) {
         })
         .next()
         .unwrap();
-    println!("  Compiled from \"{}\"", source_file);
+    lw.print("  Compiled from \"")
+        .print(&source_file)
+        .println("\"");
 
     let this_class_name = cf
         .constant_pool
         .get_class_name(cf.this_class)
         .replace('/', ".");
-    print!(
-        "{} {}",
-        access_flags::modifier_repr_vec(&cf.access_flags),
-        this_class_name
-    );
+    lw.print(&access_flags::modifier_repr_vec(&cf.access_flags))
+        .print(" ")
+        .print(&this_class_name);
 
     let is_enum: bool = cf
         .access_flags
         .contains(&access_flags::ClassAccessFlag::Enum);
     let super_class_name = cf.constant_pool.get_class_name(cf.super_class);
     if is_enum {
-        println!(" extends java.lang.Enum<{}>", this_class_name);
+        lw.print(" extends java.lang.Enum<")
+            .print(&this_class_name)
+            .println(">");
     } else if super_class_name != "java/lang/Object" {
-        println!(" extends {}", super_class_name.replace('/', "."));
+        lw.print(" extends ")
+            .println(&super_class_name.replace('/', "."));
     } else {
-        println!();
+        lw.println("");
     }
 
-    println!("  minor version: {}", cf.minor_version);
-    println!("  major version: {}", cf.major_version);
-    println!(
-        "  flags: (0x{:04x}) {}",
-        access_flags::to_u16(&cf.access_flags),
-        access_flags::java_repr_vec(&cf.access_flags)
-    );
+    lw.indent(1);
 
-    let comment_index: usize = get_constant_pool_comment_start_index(&cf.constant_pool);
-    println!(
-        "{:<comment_index$}// {}",
-        format!("  this_class: #{}", cf.this_class),
-        cf.constant_pool.get_class_name(cf.this_class),
-    );
-    println!(
-        "{:<comment_index$}// {}",
-        format!("  super_class: #{}", cf.super_class),
-        cf.constant_pool.get_class_name(cf.super_class),
-    );
-    println!(
-        "  interfaces: {}, fields: {}, methods: {}, attributes: {}",
-        cf.interfaces.len(),
-        cf.fields.len(),
-        cf.methods.len(),
-        cf.attributes.len()
-    );
+    lw.print("minor version: ")
+        .println(&cf.minor_version.to_string())
+        .print("major version: ")
+        .println(&cf.major_version.to_string())
+        .print("flags: (")
+        .print(&format!("0x{:04x}", access_flags::to_u16(&cf.access_flags)))
+        .print(") ")
+        .println(&access_flags::java_repr_vec(&cf.access_flags));
+    lw.print("this_class: #")
+        .print(&cf.this_class.to_string())
+        .tab()
+        .print("// ")
+        .println(&cf.constant_pool.get_class_name(cf.this_class));
+    lw.print("super_class: #")
+        .print(&cf.super_class.to_string())
+        .tab()
+        .print("// ")
+        .println(&cf.constant_pool.get_class_name(cf.super_class));
+    lw.print("interfaces: ")
+        .print(&cf.interfaces.len().to_string())
+        .print(", fields: ")
+        .print(&cf.fields.len().to_string())
+        .print(", methods: ")
+        .print(&cf.methods.len().to_string())
+        .print(", attributes: ")
+        .println(&cf.attributes.len().to_string());
+
+    lw.indent(-1);
 }
 
-fn print_constant_pool(cp: &ConstantPool) {
+fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
     let index_width: usize = get_constant_pool_index_width(cp);
     let info_start_index: usize = get_constant_pool_info_start_index(cp);
     let comment_index: usize = get_constant_pool_comment_start_index(cp);
 
-    println!("Constant pool:");
+    lw.println("Constant pool:");
+    lw.indent(1);
+
+    let width = cp.len().to_string().len() + 1;
+
     for i in 0..cp.len() {
         /*
             We skip entries right after Long and Double. Why?
@@ -214,24 +230,25 @@ fn print_constant_pool(cp: &ConstantPool) {
             continue;
         }
 
-        match &cp[i.try_into().unwrap()] {
+        lw.print(&format!(
+            "{:>width$}",
+            ("#".to_owned() + &(i + 1).to_string())
+        ));
+
+        let entry = &cp[i.try_into().unwrap()];
+
+        lw.print(&format!(" = {:<18} ", entry.tag()));
+
+        match entry {
             ConstantPoolInfo::Utf8 { bytes } => {
                 let content: String = constant_pool::convert_utf8(bytes).trim_end().to_owned();
-                if content.trim().is_empty() {
-                    println!("{:>index_width$} = Utf8", format!("#{}", i + 1),);
-                } else {
-                    println!(
-                        "{:<info_start_index$}{}",
-                        format!("{:>index_width$} = Utf8", format!("#{}", i + 1),),
-                        content,
-                    )
+                if !content.trim().is_empty() {
+                    lw.tab().println(&content);
                 }
             }
-            ConstantPoolInfo::Integer { bytes } => println!(
-                "{:<info_start_index$}{}",
-                format!("{:>index_width$} = Integer", format!("#{}", i + 1),),
-                bytes,
-            ),
+            ConstantPoolInfo::Integer { bytes } => {
+                lw.tab().println(&bytes.to_string());
+            }
             ConstantPoolInfo::Float { bytes } => println!(
                 "{:<info_start_index$}{:.1}",
                 format!("{:>index_width$} = Float", format!("#{}", i + 1),),
@@ -254,57 +271,40 @@ fn print_constant_pool(cp: &ConstantPool) {
                 f64::from_bits(((*high_bytes as u64) << 32) | (*low_bytes as u64)),
             ),
             ConstantPoolInfo::String { string_index } => {
-                print!(
-                    "{:<comment_index$}",
-                    format!(
-                        "{:<info_start_index$}#{}",
-                        format!("{:>index_width$} = String", format!("#{}", i + 1),),
-                        string_index,
-                    ),
-                );
+                lw.print(&format!("#{}", string_index)).tab();
                 let string_content: String =
                     cp.get_utf8_content(*string_index).trim_end().to_owned();
                 if string_content.trim().is_empty() {
-                    println!("//");
+                    lw.println("//");
                 } else {
-                    println!("// {}", string_content);
+                    lw.print("// ").println(&string_content);
                 }
             }
-            ConstantPoolInfo::Class { name_index } => println!(
-                "{:<comment_index$}// {}",
-                format!(
-                    "{:<info_start_index$}#{}",
-                    format!("{:>index_width$} = Class", format!("#{}", i + 1),),
-                    name_index,
-                ),
-                cp.get_wrapped_utf8_content(*name_index),
-            ),
+            ConstantPoolInfo::Class { name_index } => {
+                lw.print("#")
+                    .print(&name_index.to_string())
+                    .tab()
+                    .print("// ")
+                    .println(&cp.get_wrapped_utf8_content(*name_index));
+            }
             ConstantPoolInfo::FieldRef {
                 class_index,
                 name_and_type_index,
-            } => println!(
-                "{:<comment_index$}// {}",
-                format!(
-                    "{:<info_start_index$}#{}.#{}",
-                    format!("{:>index_width$} = Fieldref", format!("#{}", i + 1),),
-                    class_index,
-                    name_and_type_index,
-                ),
-                cp.get_field_ref_string(*class_index, *name_and_type_index),
-            ),
+            } => {
+                lw.print(&format!("#{}.#{}", class_index, name_and_type_index))
+                    .tab()
+                    .print("// ")
+                    .println(&cp.get_field_ref_string(*class_index, *name_and_type_index));
+            }
             ConstantPoolInfo::MethodRef {
                 class_index,
                 name_and_type_index,
-            } => println!(
-                "{:<comment_index$}// {}",
-                format!(
-                    "{:<info_start_index$}#{}.#{}",
-                    format!("{:>index_width$} = Methodref", format!("#{}", i + 1),),
-                    class_index,
-                    name_and_type_index,
-                ),
-                cp.get_method_ref_string(*class_index, *name_and_type_index),
-            ),
+            } => {
+                lw.print(&format!("#{}.#{}", class_index, name_and_type_index))
+                    .tab()
+                    .print("// ")
+                    .println(&cp.get_method_ref_string(*class_index, *name_and_type_index));
+            }
             ConstantPoolInfo::InterfaceMethodRef {
                 class_index,
                 name_and_type_index,
@@ -324,16 +324,12 @@ fn print_constant_pool(cp: &ConstantPool) {
             ConstantPoolInfo::NameAndType {
                 name_index,
                 descriptor_index,
-            } => println!(
-                "{:<comment_index$}// {}",
-                format!(
-                    "{:<info_start_index$}#{}:#{}",
-                    format!("{:>index_width$} = NameAndType", format!("#{}", i + 1),),
-                    name_index,
-                    descriptor_index,
-                ),
-                cp.get_name_and_type_string(*name_index, *descriptor_index),
-            ),
+            } => {
+                lw.print(&format!("#{}:#{}", name_index, descriptor_index))
+                    .tab()
+                    .print("// ")
+                    .println(&cp.get_name_and_type_string(*name_index, *descriptor_index));
+            }
             ConstantPoolInfo::MethodType { descriptor_index } => println!(
                 "{:<comment_index$}//  {}",
                 format!(
@@ -373,6 +369,8 @@ fn print_constant_pool(cp: &ConstantPool) {
             ConstantPoolInfo::Null {} => unreachable!(),
         }
     }
+
+    lw.indent(-1);
 }
 
 fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
