@@ -1,5 +1,5 @@
 [workspace]
-members = ["binary_reader", "classfile", "sha", "javap"]
+members = ["binary_reader", "classfile", "sha", "javap", "jobf"]
 resolver = "3"
 
 [profile.dev]

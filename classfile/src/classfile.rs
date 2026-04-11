@@ -1,17 +1,12 @@
 #![forbid(unsafe_code)]
 
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::{Path, PathBuf};
-
-use binary_reader::{BinaryReader, Endian};
+use binary_reader::BinaryReader;
 
 use crate::access_flags::{ClassAccessFlag, parse_class_access_flags};
 use crate::attributes::{AttributeInfo, parse_class_attributes};
 use crate::constant_pool::{ConstantPool, parse_constant_pool};
 use crate::fields::{FieldInfo, parse_fields};
 use crate::methods::{MethodInfo, parse_methods};
-use crate::utils::absolute_no_symlinks;
 
 /**
  * Specification available at <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html>
@@ -29,17 +24,7 @@ pub struct ClassFile {
     pub attributes: Vec<AttributeInfo>,
 }
 
-pub fn parse_class_file(filename: String) -> ClassFile {
-    let abs_file_path: PathBuf = absolute_no_symlinks(Path::new(&filename)).unwrap();
-    let file: File = File::open(&abs_file_path).expect("File does not exist");
-    let mut file_reader: BufReader<File> = BufReader::new(file);
-    let mut file_bytes: Vec<u8> = Vec::with_capacity(file_reader.capacity());
-    file_reader
-        .read_to_end(&mut file_bytes)
-        .expect("Could not read whole file");
-
-    let mut reader = BinaryReader::new(&file_bytes, Endian::Big);
-
+pub fn parse_class_file(mut reader: &mut BinaryReader) -> ClassFile {
     let actual_magic_number: u32 = reader.read_u32().unwrap();
     const EXPECTED_MAGIC_NUMBER: u32 = 0xcafebabe;
     if actual_magic_number != EXPECTED_MAGIC_NUMBER {

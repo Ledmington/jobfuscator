@@ -1,10 +1,9 @@
 [package]
-name = "javap"
+name = "jobf"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 binary_reader = { path = "../binary_reader" }
 classfile = { path = "../classfile" }
-sha = { path = "../sha" }
-time = "0.3.44"
+zip = "8.5.1"

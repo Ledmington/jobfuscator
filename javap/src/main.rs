@@ -6,6 +6,7 @@ use std::io::{BufReader, Read, Result};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use binary_reader::{BinaryReader, Endian};
 use classfile::access_flags::MethodAccessFlag;
 use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
 use classfile::bytecode::BytecodeInstruction;
@@ -68,7 +69,16 @@ fn print_class_file(filename: String) {
             .concat()
     );
 
-    let cf: ClassFile = parse_class_file(filename);
+    let abs_file_path: PathBuf = absolute_no_symlinks(Path::new(&filename)).unwrap();
+    let file: File = File::open(&abs_file_path).expect("File does not exist");
+    let mut file_reader: BufReader<File> = BufReader::new(file);
+    let mut file_bytes: Vec<u8> = Vec::with_capacity(file_reader.capacity());
+    file_reader
+        .read_to_end(&mut file_bytes)
+        .expect("Could not read whole file");
+
+    let mut reader = BinaryReader::new(&file_bytes, Endian::Big);
+    let cf: ClassFile = parse_class_file(&mut reader);
 
     print_header(&cf);
     print_constant_pool(&cf.constant_pool);
