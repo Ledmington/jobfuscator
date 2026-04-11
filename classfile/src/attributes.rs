@@ -55,6 +55,9 @@ pub enum AttributeInfo {
     RuntimeVisibleAnnotations {
         annotations: Vec<Annotation>,
     },
+    ConstantValue {
+        constant_value_index: u16,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -72,6 +75,7 @@ pub enum AttributeKind {
     Signature,
     NestMembers,
     RuntimeVisibleAnnotations,
+    ConstantValue,
 }
 
 impl std::fmt::Display for AttributeKind {
@@ -98,6 +102,7 @@ impl AttributeInfo {
             AttributeInfo::RuntimeVisibleAnnotations { .. } => {
                 AttributeKind::RuntimeVisibleAnnotations
             }
+            AttributeInfo::ConstantValue { .. } => AttributeKind::ConstantValue,
         }
     }
 }
@@ -376,6 +381,12 @@ fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attrib
         "Signature" => {
             let signature_index: u16 = reader.read_u16().unwrap();
             AttributeInfo::Signature { signature_index }
+        }
+        "ConstantValue" => {
+            let constant_value_index: u16 = reader.read_u16().unwrap();
+            AttributeInfo::ConstantValue {
+                constant_value_index,
+            }
         }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a field attribute.",

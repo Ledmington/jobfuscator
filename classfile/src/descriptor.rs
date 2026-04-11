@@ -56,7 +56,7 @@ impl Display for Type {
 pub trait Descriptor: Display {}
 
 pub struct FieldDescriptor {
-    field_type: Type,
+    pub(crate) field_type: Type,
 }
 
 impl Descriptor for FieldDescriptor {}
