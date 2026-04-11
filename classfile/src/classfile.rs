@@ -5,7 +5,7 @@ use binary_reader::BinaryReader;
 use crate::access_flags::{ClassAccessFlag, parse_class_access_flags};
 use crate::attributes::{AttributeInfo, parse_class_attributes};
 use crate::constant_pool::{
-    ConstantPool, ConstantPoolTag, assert_valid_and_type, parse_constant_pool,
+    ConstantPool, ConstantPoolTag, assert_valid_and_type, check_constant_pool, parse_constant_pool,
 };
 use crate::fields::{FieldInfo, parse_fields};
 use crate::methods::{MethodInfo, parse_methods};
@@ -63,6 +63,7 @@ pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
 
     let cp_count: u16 = reader.read_u16().unwrap();
     let constant_pool: ConstantPool = parse_constant_pool(reader, (cp_count - 1).into());
+    check_constant_pool(&constant_pool);
 
     let access_flags: Vec<ClassAccessFlag> = parse_class_access_flags(reader.read_u16().unwrap());
 

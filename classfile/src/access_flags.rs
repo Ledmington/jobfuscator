@@ -363,12 +363,11 @@ const ALL_METHOD_PARAMETER_ACCESS_FLAGS: &[(MethodParameterAccessFlag, u16)] = &
 const METHOD_PARAMETER_ACCESS_FLAGS_MASK: u16 = 0x9010;
 
 pub fn parse_class_access_flags(flags: u16) -> Vec<ClassAccessFlag> {
-    if (flags & !CLASS_ACCESS_FLAGS_MASK) != 0 {
-        panic!(
-            "{} is not a valid combination of class access flags.",
-            flags
-        );
-    }
+    assert!(
+        (flags & !CLASS_ACCESS_FLAGS_MASK) == 0,
+        "{} is not a valid combination of class access flags.",
+        flags
+    );
 
     let mut result: Vec<ClassAccessFlag> = Vec::new();
     for (f, mask) in ALL_CLASS_ACCESS_FLAGS.iter() {
@@ -380,12 +379,11 @@ pub fn parse_class_access_flags(flags: u16) -> Vec<ClassAccessFlag> {
 }
 
 pub fn parse_inner_class_access_flags(flags: u16) -> Vec<InnerClassAccessFlag> {
-    if (flags & !INNER_CLASS_ACCESS_FLAGS_MASK) != 0 {
-        panic!(
-            "{} is not a valid combination of inner class access flags.",
-            flags
-        );
-    }
+    assert!(
+        (flags & !INNER_CLASS_ACCESS_FLAGS_MASK) == 0,
+        "{} is not a valid combination of inner class access flags.",
+        flags
+    );
 
     let mut result: Vec<InnerClassAccessFlag> = Vec::new();
     for (f, mask) in ALL_INNER_CLASS_ACCESS_FLAGS.iter() {
@@ -397,12 +395,11 @@ pub fn parse_inner_class_access_flags(flags: u16) -> Vec<InnerClassAccessFlag> {
 }
 
 pub fn parse_field_access_flags(flags: u16) -> Vec<FieldAccessFlag> {
-    if (flags & !FIELD_ACCESS_FLAGS_MASK) != 0 {
-        panic!(
-            "{} is not a valid combination of field access flags.",
-            flags
-        );
-    }
+    assert!(
+        (flags & !FIELD_ACCESS_FLAGS_MASK) == 0,
+        "{} is not a valid combination of field access flags.",
+        flags
+    );
 
     let mut result: Vec<FieldAccessFlag> = Vec::new();
     for (f, mask) in ALL_FIELD_ACCESS_FLAGS.iter() {
@@ -414,12 +411,11 @@ pub fn parse_field_access_flags(flags: u16) -> Vec<FieldAccessFlag> {
 }
 
 pub fn parse_method_access_flags(flags: u16) -> Vec<MethodAccessFlag> {
-    if (flags & !METHOD_ACCESS_FLAGS_MASK) != 0 {
-        panic!(
-            "{} is not a valid combination of method access flags.",
-            flags
-        );
-    }
+    assert!(
+        (flags & !METHOD_ACCESS_FLAGS_MASK) == 0,
+        "{} is not a valid combination of method access flags.",
+        flags
+    );
 
     let mut result: Vec<MethodAccessFlag> = Vec::new();
     for (f, mask) in ALL_METHOD_ACCESS_FLAGS.iter() {
@@ -431,12 +427,11 @@ pub fn parse_method_access_flags(flags: u16) -> Vec<MethodAccessFlag> {
 }
 
 pub fn parse_method_parameter_access_flags(flags: u16) -> Vec<MethodParameterAccessFlag> {
-    if (flags & !METHOD_PARAMETER_ACCESS_FLAGS_MASK) != 0 {
-        panic!(
-            "{} is not a valid combination of method parameter access flags.",
-            flags
-        );
-    }
+    assert!(
+        (flags & !METHOD_PARAMETER_ACCESS_FLAGS_MASK) == 0,
+        "{} is not a valid combination of method parameter access flags.",
+        flags
+    );
 
     let mut result: Vec<MethodParameterAccessFlag> = Vec::new();
     for (f, mask) in ALL_METHOD_PARAMETER_ACCESS_FLAGS.iter() {

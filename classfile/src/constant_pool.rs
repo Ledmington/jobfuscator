@@ -310,7 +310,8 @@ pub fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> Consta
     let mut i = 0;
     while i < cp_count {
         let tag = ConstantPoolTag::from(reader.read_u8().unwrap());
-        entries.push(parse_constant_pool_info(reader, tag.clone()));
+        entries.push(parse_constant_pool_entry(reader, tag.clone()));
+
         if matches!(tag, ConstantPoolTag::Long) || matches!(tag, ConstantPoolTag::Double) {
             entries.push(ConstantPoolInfo::Null {});
             i += 1;
@@ -320,7 +321,7 @@ pub fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> Consta
     ConstantPool { entries }
 }
 
-fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> ConstantPoolInfo {
+fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) -> ConstantPoolInfo {
     match tag {
         ConstantPoolTag::Utf8 => {
             let length: u16 = reader.read_u16().unwrap();
@@ -376,6 +377,68 @@ fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> 
             name_and_type_index: reader.read_u16().unwrap(),
         },
         _ => panic!("Unknown constant pool tag {:?}.", tag),
+    }
+}
+
+pub(crate) fn check_constant_pool(cp: &ConstantPool) {
+    for i in 0..cp.len() {
+        let entry = &cp[i.try_into().unwrap()];
+        match entry {
+            ConstantPoolInfo::Null {} => {
+                unreachable!("Checking a null CP entry.");
+            }
+            ConstantPoolInfo::Utf8 { .. } => {}
+            ConstantPoolInfo::Integer { bytes } => todo!(),
+            ConstantPoolInfo::Float { bytes } => todo!(),
+            ConstantPoolInfo::Long {
+                high_bytes,
+                low_bytes,
+            } => todo!(),
+            ConstantPoolInfo::Double {
+                high_bytes,
+                low_bytes,
+            } => todo!(),
+            ConstantPoolInfo::String { string_index } => {
+                assert_valid_and_type(cp, *string_index, ConstantPoolTag::Utf8);
+            }
+            ConstantPoolInfo::Class { name_index } => {
+                assert_valid_and_type(cp, *name_index, ConstantPoolTag::Utf8);
+            }
+            ConstantPoolInfo::FieldRef {
+                class_index,
+                name_and_type_index,
+            } => {
+                assert_valid_and_type(cp, *class_index, ConstantPoolTag::Class);
+                assert_valid_and_type(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+            }
+            ConstantPoolInfo::MethodRef {
+                class_index,
+                name_and_type_index,
+            } => {
+                assert_valid_and_type(cp, *class_index, ConstantPoolTag::Class);
+                assert_valid_and_type(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+            }
+            ConstantPoolInfo::InterfaceMethodRef {
+                class_index,
+                name_and_type_index,
+            } => todo!(),
+            ConstantPoolInfo::NameAndType {
+                name_index,
+                descriptor_index,
+            } => {
+                assert_valid_and_type(cp, *name_index, ConstantPoolTag::Utf8);
+                assert_valid_and_type(cp, *descriptor_index, ConstantPoolTag::Utf8);
+            }
+            ConstantPoolInfo::MethodType { descriptor_index } => todo!(),
+            ConstantPoolInfo::MethodHandle {
+                reference_kind,
+                reference_index,
+            } => todo!(),
+            ConstantPoolInfo::InvokeDynamic {
+                bootstrap_method_attr_index,
+                name_and_type_index,
+            } => todo!(),
+        }
     }
 }
 
