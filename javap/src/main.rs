@@ -6,7 +6,7 @@ use std::io::{BufReader, Read, Result};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use binary_reader::{BinaryReader, Endian};
+use binary_reader::{BinaryReader, Endianness};
 use classfile::access_flags::MethodAccessFlag;
 use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
 use classfile::bytecode::BytecodeInstruction;
@@ -77,7 +77,7 @@ fn print_class_file(filename: String) {
         .read_to_end(&mut file_bytes)
         .expect("Could not read whole file");
 
-    let mut reader = BinaryReader::new(&file_bytes, Endian::Big);
+    let mut reader = BinaryReader::new(&file_bytes, Endianness::Big);
     let cf: ClassFile = parse_class_file(&mut reader);
 
     print_header(&cf);

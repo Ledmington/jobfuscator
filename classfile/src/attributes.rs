@@ -343,7 +343,7 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
             let code_bytes: Vec<u8> = reader.read_u8_vec(code_length.try_into().unwrap()).unwrap();
             let code: BTreeMap<u32, BytecodeInstruction> = parse_bytecode(&mut BinaryReader::new(
                 &code_bytes,
-                binary_reader::Endian::Big,
+                binary_reader::Endianness::Big,
             ));
             let exception_table_length: u16 = reader.read_u16().unwrap();
             let mut exception_table: Vec<ExceptionTableEntry> =

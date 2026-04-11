@@ -2,7 +2,7 @@
 
 use std::io::{Error, ErrorKind, Result};
 
-pub enum Endian {
+pub enum Endianness {
     Little,
     Big,
 }
@@ -10,15 +10,15 @@ pub enum Endian {
 pub struct BinaryReader<'a> {
     buf: &'a [u8],
     pos: usize,
-    endian: Endian,
+    endianness: Endianness,
 }
 
 impl<'a> BinaryReader<'a> {
-    pub fn new(buf: &'a [u8], endian: Endian) -> Self {
+    pub fn new(buf: &'a [u8], endianness: Endianness) -> Self {
         Self {
             buf,
             pos: 0,
-            endian,
+            endianness,
         }
     }
 
@@ -45,33 +45,33 @@ impl<'a> BinaryReader<'a> {
 
     pub fn read_u16(&mut self) -> Result<u16> {
         let bytes = self.read_array::<2>()?;
-        Ok(match self.endian {
-            Endian::Little => u16::from_le_bytes(bytes),
-            Endian::Big => u16::from_be_bytes(bytes),
+        Ok(match self.endianness {
+            Endianness::Little => u16::from_le_bytes(bytes),
+            Endianness::Big => u16::from_be_bytes(bytes),
         })
     }
 
     pub fn read_i16(&mut self) -> Result<i16> {
         let bytes = self.read_array::<2>()?;
-        Ok(match self.endian {
-            Endian::Little => i16::from_le_bytes(bytes),
-            Endian::Big => i16::from_be_bytes(bytes),
+        Ok(match self.endianness {
+            Endianness::Little => i16::from_le_bytes(bytes),
+            Endianness::Big => i16::from_be_bytes(bytes),
         })
     }
 
     pub fn read_u32(&mut self) -> Result<u32> {
         let bytes = self.read_array::<4>()?;
-        Ok(match self.endian {
-            Endian::Little => u32::from_le_bytes(bytes),
-            Endian::Big => u32::from_be_bytes(bytes),
+        Ok(match self.endianness {
+            Endianness::Little => u32::from_le_bytes(bytes),
+            Endianness::Big => u32::from_be_bytes(bytes),
         })
     }
 
     pub fn read_i32(&mut self) -> Result<i32> {
         let bytes = self.read_array::<4>()?;
-        Ok(match self.endian {
-            Endian::Little => i32::from_le_bytes(bytes),
-            Endian::Big => i32::from_be_bytes(bytes),
+        Ok(match self.endianness {
+            Endianness::Little => i32::from_le_bytes(bytes),
+            Endianness::Big => i32::from_be_bytes(bytes),
         })
     }
 

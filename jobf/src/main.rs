@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let mut file_bytes: Vec<u8> = Vec::with_capacity(entry.size().try_into().unwrap());
         entry.read_to_end(&mut file_bytes)?;
-        let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endian::Big);
+        let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endianness::Big);
         let _cf: ClassFile = parse_class_file(&mut reader);
         println!("{} ({} bytes) OK", entry.name(), entry.size());
     }
