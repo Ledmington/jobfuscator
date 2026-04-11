@@ -26,8 +26,13 @@ TEST_FILES=$(find "${TEST_DIR}" -type f -name '*.class')
 for TEST_FILE in ${TEST_FILES} ; do
     EXPECTED_OUTPUT=$(mktemp)
     ACTUAL_OUTPUT=$(mktemp)
+
     ${SYSTEM_JAVAP} -l -v -p "${TEST_FILE}" > "${EXPECTED_OUTPUT}"
     ${OUR_JAVAP} "${TEST_FILE}" > "${ACTUAL_OUTPUT}"
+
     diff "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}"
-    printf "%s ... \033[31mOK\033[0m" "${TEST_FILE}"
+    
+    printf "%s ... \033[0;32mOK\033[0m" "${TEST_FILE}"
+    
+    rm -f "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}"
 done
