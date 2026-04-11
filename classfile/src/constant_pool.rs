@@ -231,7 +231,29 @@ pub enum ConstantPoolInfo {
     },
 }
 
-#[derive(Debug, Clone)]
+impl ConstantPoolInfo {
+    pub fn tag(&self) -> ConstantPoolTag {
+        match self {
+            ConstantPoolInfo::Null {} => panic!("Null entries have no tag"),
+            ConstantPoolInfo::Utf8 { .. } => ConstantPoolTag::Utf8,
+            ConstantPoolInfo::Integer { .. } => ConstantPoolTag::Integer,
+            ConstantPoolInfo::Float { .. } => ConstantPoolTag::Float,
+            ConstantPoolInfo::Long { .. } => ConstantPoolTag::Long,
+            ConstantPoolInfo::Double { .. } => ConstantPoolTag::Double,
+            ConstantPoolInfo::String { .. } => ConstantPoolTag::String,
+            ConstantPoolInfo::Class { .. } => ConstantPoolTag::Class,
+            ConstantPoolInfo::FieldRef { .. } => ConstantPoolTag::Fieldref,
+            ConstantPoolInfo::MethodRef { .. } => ConstantPoolTag::Methodref,
+            ConstantPoolInfo::InterfaceMethodRef { .. } => ConstantPoolTag::InterfaceMethodref,
+            ConstantPoolInfo::NameAndType { .. } => ConstantPoolTag::NameAndType,
+            ConstantPoolInfo::MethodHandle { .. } => ConstantPoolTag::MethodHandle,
+            ConstantPoolInfo::MethodType { .. } => ConstantPoolTag::MethodType,
+            ConstantPoolInfo::InvokeDynamic { .. } => ConstantPoolTag::InvokeDynamic,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum ConstantPoolTag {
     Utf8,
     Integer,
@@ -274,6 +296,12 @@ impl From<u8> for ConstantPoolTag {
             20 => ConstantPoolTag::Package,
             _ => panic!("Unknown constant pool tag value {}.", value),
         }
+    }
+}
+
+impl std::fmt::Display for ConstantPoolTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -349,4 +377,26 @@ fn parse_constant_pool_info(reader: &mut BinaryReader, tag: ConstantPoolTag) -> 
         },
         _ => panic!("Unknown constant pool tag {:?}.", tag),
     }
+}
+
+// TODO: find a better name
+pub(crate) fn assert_valid_and_type(
+    cp: &ConstantPool,
+    cp_index: u16,
+    expected_tag: ConstantPoolTag,
+) {
+    assert!(
+        cp_index >= 1 && cp_index < (cp.len() as u16),
+        "Expected a valid CP index but was {} ({:04x}).",
+        cp_index,
+        cp_index
+    );
+    let actual_tag = cp[cp_index - 1].tag();
+    assert!(
+        actual_tag == expected_tag,
+        "Expected an entry with tag {} at index {} but was {}.",
+        expected_tag,
+        cp_index,
+        actual_tag
+    );
 }
