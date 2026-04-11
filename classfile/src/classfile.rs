@@ -40,21 +40,22 @@ pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
     let major_version: u16 = reader.read_u16().unwrap();
     {
         // class file format version of java 1.0
-        const OLDEST_MAJOR_VERSION: u16 = 44;
+        const OLDEST_MAJOR_VERSION: u16 = 45;
         assert!(
             major_version >= OLDEST_MAJOR_VERSION,
-            "Invalid class file version {},{} (0x{:04x}.{:04x})",
+            "Invalid class file version {}.{} (0x{:04x}.{:04x}) is older than the oldest supported java class file version {}.0",
             major_version,
             minor_version,
             major_version,
-            minor_version
+            minor_version,
+            OLDEST_MAJOR_VERSION
         );
 
         // class file format version of java 25
         const LATEST_MAJOR_VERSION: u16 = 69;
         assert!(
             major_version <= LATEST_MAJOR_VERSION,
-            "Class file version {}.{} is greater than {}.0",
+            "Class file version {}.{} is greater than the latest supported version {}.0",
             major_version,
             minor_version,
             LATEST_MAJOR_VERSION
