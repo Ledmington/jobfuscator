@@ -75,6 +75,9 @@ pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
 
     let interfaces_count: u16 = reader.read_u16().unwrap();
     let interfaces: Vec<u16> = reader.read_u16_vec(interfaces_count.into()).unwrap();
+    for interface_idx in interfaces.iter() {
+        assert_valid_and_type(&constant_pool, *interface_idx, ConstantPoolTag::Class);
+    }
 
     let fields_count: u16 = reader.read_u16().unwrap();
     let fields: Vec<FieldInfo> = parse_fields(reader, &constant_pool, fields_count.into());

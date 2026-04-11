@@ -5,7 +5,7 @@ use binary_reader::BinaryReader;
 use crate::{
     access_flags::{FieldAccessFlag, parse_field_access_flags},
     attributes::{AttributeInfo, parse_field_attributes},
-    constant_pool::ConstantPool,
+    constant_pool::{ConstantPool, ConstantPoolTag, assert_valid_and_type},
 };
 
 pub struct FieldInfo {
@@ -24,7 +24,9 @@ pub fn parse_fields(
     for _ in 0..num_fields {
         let access_flags = parse_field_access_flags(reader.read_u16().unwrap());
         let name_index: u16 = reader.read_u16().unwrap();
+        assert_valid_and_type(cp, name_index, ConstantPoolTag::Utf8);
         let descriptor_index: u16 = reader.read_u16().unwrap();
+        assert_valid_and_type(cp, descriptor_index, ConstantPoolTag::Utf8);
         let attributes_count: u16 = reader.read_u16().unwrap();
         let attributes: Vec<AttributeInfo> =
             parse_field_attributes(reader, cp, attributes_count.into());
