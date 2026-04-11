@@ -32,7 +32,7 @@ for TEST_FILE in ${TEST_FILES} ; do
 
     diff "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}"
     
-    printf "%s ... \033[0;32mOK\033[0m" "${TEST_FILE}"
+    echo -e "${TEST_FILE} ... \033[0;32mOK\033[0m"
     
     rm -f "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}"
 done
