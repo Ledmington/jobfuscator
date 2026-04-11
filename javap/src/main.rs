@@ -8,7 +8,9 @@ use std::time::SystemTime;
 
 use binary_reader::{BinaryReader, Endianness};
 use classfile::access_flags::MethodAccessFlag;
-use classfile::attributes::{AttributeInfo, StackMapFrame, VerificationTypeInfo};
+use classfile::attributes::{
+    AttributeInfo, AttributeKind, StackMapFrame, VerificationTypeInfo, find_attribute,
+};
 use classfile::bytecode::BytecodeInstruction;
 use classfile::classfile::{ClassFile, parse_class_file};
 use classfile::constant_pool::{self, ConstantPool, ConstantPoolInfo};
@@ -373,10 +375,8 @@ fn print_constant_pool(cp: &ConstantPool) {
 fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
     for field in fields.iter() {
         let descriptor: String = cp.get_utf8_content(field.descriptor_index);
-        let signature: Option<&AttributeInfo> = field
-            .attributes
-            .iter()
-            .find(|attr| matches!(attr, AttributeInfo::Signature { signature_index: _ }));
+        let signature: Option<&AttributeInfo> =
+            find_attribute(&field.attributes, AttributeKind::Signature);
         println!(
             "  {} {} {};",
             access_flags::modifier_repr_vec(&field.access_flags),
@@ -813,14 +813,8 @@ fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
 
 fn get_method_type(cpe: &ConstantPoolInfo) -> String {
     match cpe {
-        ConstantPoolInfo::MethodRef {
-            class_index: _,
-            name_and_type_index: _,
-        } => "Method",
-        ConstantPoolInfo::InterfaceMethodRef {
-            class_index: _,
-            name_and_type_index: _,
-        } => "InterfaceMethod",
+        ConstantPoolInfo::MethodRef { .. } => "Method",
+        ConstantPoolInfo::InterfaceMethodRef { .. } => "InterfaceMethod",
         _ => unreachable!(),
     }
     .to_owned()
@@ -834,8 +828,8 @@ fn get_comment(
     match instruction {
         BytecodeInstruction::Dup {} => None,
         BytecodeInstruction::AConstNull {} => None,
-        BytecodeInstruction::IConst { constant: _ } => None,
-        BytecodeInstruction::LConst { constant: _ } => None,
+        BytecodeInstruction::IConst { .. } => None,
+        BytecodeInstruction::LConst { .. } => None,
         BytecodeInstruction::Ldc {
             constant_pool_index,
         } => Some(get_constant_string(cp, (*constant_pool_index).into())),
@@ -845,31 +839,17 @@ fn get_comment(
         BytecodeInstruction::Ldc2W {
             constant_pool_index,
         } => Some(get_constant_string(cp, *constant_pool_index)),
-        BytecodeInstruction::ALoad {
-            local_variable_index: _,
-        } => None,
-        BytecodeInstruction::AStore {
-            local_variable_index: _,
-        } => None,
-        BytecodeInstruction::ILoad {
-            local_variable_index: _,
-        } => None,
-        BytecodeInstruction::IStore {
-            local_variable_index: _,
-        } => None,
-        BytecodeInstruction::LLoad {
-            local_variable_index: _,
-        } => None,
-        BytecodeInstruction::LStore {
-            local_variable_index: _,
-        } => None,
-        BytecodeInstruction::DLoad {
-            local_variable_index: _,
-        } => None,
+        BytecodeInstruction::ALoad { .. } => None,
+        BytecodeInstruction::AStore { .. } => None,
+        BytecodeInstruction::ILoad { .. } => None,
+        BytecodeInstruction::IStore { .. } => None,
+        BytecodeInstruction::LLoad { .. } => None,
+        BytecodeInstruction::LStore { .. } => None,
+        BytecodeInstruction::DLoad { .. } => None,
         BytecodeInstruction::AaLoad {} => None,
         BytecodeInstruction::BaLoad {} => None,
         BytecodeInstruction::AaStore {} => None,
-        BytecodeInstruction::NewArray { atype: _ } => None,
+        BytecodeInstruction::NewArray { .. } => None,
         BytecodeInstruction::ANewArray {
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
@@ -877,8 +857,8 @@ fn get_comment(
         BytecodeInstruction::New {
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
-        BytecodeInstruction::BiPush { immediate: _ } => None,
-        BytecodeInstruction::SiPush { immediate: _ } => None,
+        BytecodeInstruction::BiPush { .. } => None,
+        BytecodeInstruction::SiPush { .. } => None,
         BytecodeInstruction::Pop {} => None,
         BytecodeInstruction::Return {} => None,
         BytecodeInstruction::IReturn {} => None,
@@ -1029,7 +1009,7 @@ fn get_comment(
         } => Some("InvokeDynamic ".to_owned() + &cp.get_invoke_dynamic(*constant_pool_index)),
         BytecodeInstruction::InvokeInterface {
             constant_pool_index,
-            count: _,
+            ..
         } => Some(
             get_method_type(&cp[constant_pool_index - 1])
                 + " "
@@ -1037,42 +1017,32 @@ fn get_comment(
         ),
         BytecodeInstruction::ArrayLength {} => None,
         BytecodeInstruction::LCmp {} => None,
-        BytecodeInstruction::IfIcmpEq { offset: _ } => None,
-        BytecodeInstruction::IfIcmpNe { offset: _ } => None,
-        BytecodeInstruction::IfIcmpLt { offset: _ } => None,
-        BytecodeInstruction::IfIcmpGe { offset: _ } => None,
-        BytecodeInstruction::IfIcmpGt { offset: _ } => None,
-        BytecodeInstruction::IfIcmpLe { offset: _ } => None,
-        BytecodeInstruction::IfAcmpEq { offset: _ } => None,
-        BytecodeInstruction::IfAcmpNe { offset: _ } => None,
-        BytecodeInstruction::IfEq { offset: _ } => None,
-        BytecodeInstruction::IfNe { offset: _ } => None,
-        BytecodeInstruction::IfLt { offset: _ } => None,
-        BytecodeInstruction::IfGe { offset: _ } => None,
-        BytecodeInstruction::IfGt { offset: _ } => None,
-        BytecodeInstruction::IfLe { offset: _ } => None,
-        BytecodeInstruction::IfNull { offset: _ } => None,
-        BytecodeInstruction::IfNonNull { offset: _ } => None,
-        BytecodeInstruction::GoTo { offset: _ } => None,
-        BytecodeInstruction::TableSwitch {
-            default: _,
-            low: _,
-            offsets: _,
-        } => None,
-        BytecodeInstruction::LookupSwitch {
-            default: _,
-            pairs: _,
-        } => None,
+        BytecodeInstruction::IfIcmpEq { .. } => None,
+        BytecodeInstruction::IfIcmpNe { .. } => None,
+        BytecodeInstruction::IfIcmpLt { .. } => None,
+        BytecodeInstruction::IfIcmpGe { .. } => None,
+        BytecodeInstruction::IfIcmpGt { .. } => None,
+        BytecodeInstruction::IfIcmpLe { .. } => None,
+        BytecodeInstruction::IfAcmpEq { .. } => None,
+        BytecodeInstruction::IfAcmpNe { .. } => None,
+        BytecodeInstruction::IfEq { .. } => None,
+        BytecodeInstruction::IfNe { .. } => None,
+        BytecodeInstruction::IfLt { .. } => None,
+        BytecodeInstruction::IfGe { .. } => None,
+        BytecodeInstruction::IfGt { .. } => None,
+        BytecodeInstruction::IfLe { .. } => None,
+        BytecodeInstruction::IfNull { .. } => None,
+        BytecodeInstruction::IfNonNull { .. } => None,
+        BytecodeInstruction::GoTo { .. } => None,
+        BytecodeInstruction::TableSwitch { .. } => None,
+        BytecodeInstruction::LookupSwitch { .. } => None,
         BytecodeInstruction::CheckCast {
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
         BytecodeInstruction::Instanceof {
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
-        BytecodeInstruction::IInc {
-            index: _,
-            constant: _,
-        } => None,
+        BytecodeInstruction::IInc { .. } => None,
         BytecodeInstruction::I2L {} => None,
         BytecodeInstruction::L2D {} => None,
         BytecodeInstruction::IAdd {} => None,
@@ -1100,7 +1070,7 @@ fn get_verification_type_info_string(cp: &ConstantPool, vti: &VerificationTypeIn
         VerificationTypeInfo::ObjectVariable {
             constant_pool_index,
         } => "class ".to_owned() + &cp.get_class_name(*constant_pool_index),
-        VerificationTypeInfo::UninitializedVariable { offset: _ } => todo!(),
+        VerificationTypeInfo::UninitializedVariable { .. } => todo!(),
     }
 }
 

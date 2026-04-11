@@ -70,8 +70,8 @@ impl ConstantPool {
         let field_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match field_ref_entry {
             ConstantPoolInfo::FieldRef {
-                class_index: _,
                 name_and_type_index,
+                ..
             } => self.get_name_and_type(*name_and_type_index),
             _ => panic!(
                 "Expected entry #{} to be of Fieldref type but it wasn't.",
