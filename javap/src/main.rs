@@ -101,14 +101,14 @@ fn print_class_file(filename: String) {
  * Returns the index of the column (on the terminal) where the index of each constant pool entry ends.
  */
 fn get_constant_pool_index_width(cp: &ConstantPool) -> usize {
-    3 + num_digits(cp.len())
+    4 + num_digits(cp.len())
 }
 
 /**
  * Returns the index of the column (on the terminal) where the information of each entry is displayed.
  */
 fn get_constant_pool_info_start_index(cp: &ConstantPool) -> usize {
-    25 + num_digits(cp.len())
+    26 + num_digits(cp.len())
 }
 
 /**
@@ -116,6 +116,10 @@ fn get_constant_pool_info_start_index(cp: &ConstantPool) -> usize {
  */
 fn get_constant_pool_comment_start_index(cp: &ConstantPool) -> usize {
     40 + num_digits(cp.len())
+}
+
+fn num_digits(n: usize) -> usize {
+    (n as f64).log10().floor() as usize
 }
 
 fn print_header(cf: &ClassFile) {
@@ -181,10 +185,6 @@ fn print_header(cf: &ClassFile) {
         cf.methods.len(),
         cf.attributes.len()
     );
-}
-
-fn num_digits(n: usize) -> usize {
-    (n as f64).log10().floor() as usize + 1
 }
 
 fn print_constant_pool(cp: &ConstantPool) {
@@ -657,10 +657,10 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
             constant_pool_index,
         } => "new           #".to_owned() + &constant_pool_index.to_string(),
         BytecodeInstruction::BiPush { immediate } => {
-            "bipush        ".to_owned() + &immediate.to_string()
+            "bipush        ".to_owned() + &(*immediate as i8).to_string()
         }
         BytecodeInstruction::SiPush { immediate } => {
-            "sipush        ".to_owned() + &immediate.to_string()
+            "sipush        ".to_owned() + &(*immediate as i16).to_string()
         }
         BytecodeInstruction::Pop {} => "pop".to_owned(),
         BytecodeInstruction::Pop2 {} => "pop2".to_owned(),
@@ -888,7 +888,7 @@ fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
                 "String ".to_owned() + &string_content
             }
         }
-        ConstantPoolInfo::Integer { bytes } => "int ".to_owned() + &bytes.to_string(),
+        ConstantPoolInfo::Integer { bytes } => "int ".to_owned() + &(*bytes as i32).to_string(),
         ConstantPoolInfo::Long {
             high_bytes,
             low_bytes,
@@ -897,13 +897,13 @@ fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
                 + &((((*high_bytes as u64) << 32) | (*low_bytes as u64)) as i64).to_string()
                 + "l"
         }
-        ConstantPoolInfo::Float { bytes } => format!("float {:.1}", &f32::from_bits(*bytes)),
+        ConstantPoolInfo::Float { bytes } => format!("float {:.1}f", &f32::from_bits(*bytes)),
         ConstantPoolInfo::Double {
             high_bytes,
             low_bytes,
         } => {
             format!(
-                "double {:.1}d",
+                "double {:.1E}d",
                 &f64::from_bits(((*high_bytes as u64) << 32) | (*low_bytes as u64))
             )
         }
