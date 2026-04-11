@@ -411,7 +411,7 @@ fn print_field_attributes(cp: &ConstantPool, field: &FieldInfo) {
                     width = comment_index + 2 // why?
                 );
             }
-            _ => unreachable!(),
+            _ => unreachable!("Unknown field attribute."),
         }
     }
 }
@@ -522,6 +522,20 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                 "lconst    ".to_owned() + &constant.to_string()
             }
         }
+        BytecodeInstruction::FConst { constant } => {
+            if *constant <= 2.0f32 {
+                "fconst_".to_owned() + &constant.to_string()
+            } else {
+                "fconst    ".to_owned() + &constant.to_string()
+            }
+        }
+        BytecodeInstruction::DConst { constant } => {
+            if *constant <= 1.0 {
+                "dconst_".to_owned() + &constant.to_string()
+            } else {
+                "dconst    ".to_owned() + &constant.to_string()
+            }
+        }
         BytecodeInstruction::Ldc {
             constant_pool_index,
         } => "ldc           #".to_owned() + &constant_pool_index.to_string(),
@@ -585,6 +599,24 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                 "lstore        ".to_owned() + &local_variable_index.to_string()
             }
         }
+        BytecodeInstruction::FLoad {
+            local_variable_index,
+        } => {
+            if *local_variable_index <= 3 {
+                "fload_".to_owned() + &local_variable_index.to_string()
+            } else {
+                "fload         ".to_owned() + &local_variable_index.to_string()
+            }
+        }
+        BytecodeInstruction::FStore {
+            local_variable_index,
+        } => {
+            if *local_variable_index <= 3 {
+                "fstore_".to_owned() + &local_variable_index.to_string()
+            } else {
+                "fstore        ".to_owned() + &local_variable_index.to_string()
+            }
+        }
         BytecodeInstruction::DLoad {
             local_variable_index,
         } => {
@@ -594,9 +626,21 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                 "dload         ".to_owned() + &local_variable_index.to_string()
             }
         }
+        BytecodeInstruction::DStore {
+            local_variable_index,
+        } => {
+            if *local_variable_index <= 3 {
+                "dstore_".to_owned() + &local_variable_index.to_string()
+            } else {
+                "dstore        ".to_owned() + &local_variable_index.to_string()
+            }
+        }
         BytecodeInstruction::AaLoad {} => "aaload".to_owned(),
         BytecodeInstruction::BaLoad {} => "baload".to_owned(),
         BytecodeInstruction::AaStore {} => "aastore".to_owned(),
+        BytecodeInstruction::BaStore {} => "bastore".to_owned(),
+        BytecodeInstruction::CaStore {} => "castore".to_owned(),
+        BytecodeInstruction::SaStore {} => "sastore".to_owned(),
         BytecodeInstruction::NewArray { atype } => {
             "newarray       ".to_owned() + &format!("{}", atype)
         }
@@ -614,12 +658,19 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
             "sipush        ".to_owned() + &immediate.to_string()
         }
         BytecodeInstruction::Pop {} => "pop".to_owned(),
+        BytecodeInstruction::Pop2 {} => "pop2".to_owned(),
         BytecodeInstruction::Return {} => "return".to_owned(),
         BytecodeInstruction::IReturn {} => "ireturn".to_owned(),
         BytecodeInstruction::LReturn {} => "lreturn".to_owned(),
+        BytecodeInstruction::FReturn {} => "freturn".to_owned(),
+        BytecodeInstruction::DReturn {} => "dreturn".to_owned(),
         BytecodeInstruction::AReturn {} => "areturn".to_owned(),
         BytecodeInstruction::ArrayLength {} => "arraylength".to_owned(),
         BytecodeInstruction::LCmp {} => "lcmp".to_owned(),
+        BytecodeInstruction::FCmpL {} => "fcmpl".to_owned(),
+        BytecodeInstruction::FCmpG {} => "fcmpg".to_owned(),
+        BytecodeInstruction::DCmpL {} => "dcmpl".to_owned(),
+        BytecodeInstruction::DCmpG {} => "dcmpg".to_owned(),
         BytecodeInstruction::GetStatic { field_ref_index } => {
             "getstatic     #".to_owned() + &field_ref_index.to_string()
         }
@@ -762,18 +813,62 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::IInc { index, constant } => {
             "iinc          ".to_owned() + &index.to_string() + ", " + &constant.to_string()
         }
+
         BytecodeInstruction::I2L {} => "i2l".to_owned(),
+        BytecodeInstruction::I2F {} => "i2f".to_owned(),
+        BytecodeInstruction::I2D {} => "i2d".to_owned(),
+        BytecodeInstruction::L2I {} => "l2i".to_owned(),
+        BytecodeInstruction::L2F {} => "l2f".to_owned(),
         BytecodeInstruction::L2D {} => "l2d".to_owned(),
+        BytecodeInstruction::F2I {} => "f2i".to_owned(),
+        BytecodeInstruction::F2L {} => "f2l".to_owned(),
+        BytecodeInstruction::F2D {} => "f2d".to_owned(),
+        BytecodeInstruction::D2I {} => "d2i".to_owned(),
+        BytecodeInstruction::D2L {} => "d2l".to_owned(),
+        BytecodeInstruction::D2F {} => "d2f".to_owned(),
+        BytecodeInstruction::I2B {} => "i2b".to_owned(),
+        BytecodeInstruction::I2C {} => "i2c".to_owned(),
+        BytecodeInstruction::I2S {} => "i2s".to_owned(),
+
         BytecodeInstruction::IAdd {} => "iadd".to_owned(),
         BytecodeInstruction::ISub {} => "isub".to_owned(),
         BytecodeInstruction::IMul {} => "imul".to_owned(),
+        BytecodeInstruction::IDiv {} => "idiv".to_owned(),
+        BytecodeInstruction::IRem {} => "irem".to_owned(),
+        BytecodeInstruction::IAnd {} => "iand".to_owned(),
+        BytecodeInstruction::IShl {} => "ishl".to_owned(),
+        BytecodeInstruction::IShr {} => "ishr".to_owned(),
+        BytecodeInstruction::IUshr {} => "iushr".to_owned(),
+        BytecodeInstruction::IOr {} => "ior".to_owned(),
+        BytecodeInstruction::IXor {} => "ixor".to_owned(),
+        BytecodeInstruction::INeg {} => "ineg".to_owned(),
+
         BytecodeInstruction::LAdd {} => "ladd".to_owned(),
         BytecodeInstruction::LSub {} => "lsub".to_owned(),
         BytecodeInstruction::LMul {} => "lmul".to_owned(),
         BytecodeInstruction::LDiv {} => "ldiv".to_owned(),
         BytecodeInstruction::LRem {} => "lrem".to_owned(),
         BytecodeInstruction::LAnd {} => "land".to_owned(),
+        BytecodeInstruction::LShl {} => "lshl".to_owned(),
+        BytecodeInstruction::LShr {} => "lshr".to_owned(),
+        BytecodeInstruction::LUshr {} => "lushr".to_owned(),
+        BytecodeInstruction::LOr {} => "lor".to_owned(),
+        BytecodeInstruction::LXor {} => "lxor".to_owned(),
+        BytecodeInstruction::LNeg {} => "lneg".to_owned(),
+
+        BytecodeInstruction::FAdd {} => "fadd".to_owned(),
+        BytecodeInstruction::FMul {} => "fmul".to_owned(),
+        BytecodeInstruction::FNeg {} => "fneg".to_owned(),
+        BytecodeInstruction::FDiv {} => "fdiv".to_owned(),
+        BytecodeInstruction::FRem {} => "frem".to_owned(),
+        BytecodeInstruction::FSub {} => "fsub".to_owned(),
+
+        BytecodeInstruction::DAdd {} => "dadd".to_owned(),
+        BytecodeInstruction::DMul {} => "dmul".to_owned(),
+        BytecodeInstruction::DNeg {} => "dneg".to_owned(),
         BytecodeInstruction::DDiv {} => "ddiv".to_owned(),
+        BytecodeInstruction::DRem {} => "drem".to_owned(),
+        BytecodeInstruction::DSub {} => "dsub".to_owned(),
     }
 }
 
@@ -830,6 +925,8 @@ fn get_comment(
         BytecodeInstruction::AConstNull {} => None,
         BytecodeInstruction::IConst { .. } => None,
         BytecodeInstruction::LConst { .. } => None,
+        BytecodeInstruction::FConst { .. } => None,
+        BytecodeInstruction::DConst { .. } => None,
         BytecodeInstruction::Ldc {
             constant_pool_index,
         } => Some(get_constant_string(cp, (*constant_pool_index).into())),
@@ -845,10 +942,16 @@ fn get_comment(
         BytecodeInstruction::IStore { .. } => None,
         BytecodeInstruction::LLoad { .. } => None,
         BytecodeInstruction::LStore { .. } => None,
+        BytecodeInstruction::FLoad { .. } => None,
+        BytecodeInstruction::FStore { .. } => None,
         BytecodeInstruction::DLoad { .. } => None,
+        BytecodeInstruction::DStore { .. } => None,
         BytecodeInstruction::AaLoad {} => None,
         BytecodeInstruction::BaLoad {} => None,
         BytecodeInstruction::AaStore {} => None,
+        BytecodeInstruction::BaStore {} => None,
+        BytecodeInstruction::CaStore {} => None,
+        BytecodeInstruction::SaStore {} => None,
         BytecodeInstruction::NewArray { .. } => None,
         BytecodeInstruction::ANewArray {
             constant_pool_index,
@@ -860,9 +963,12 @@ fn get_comment(
         BytecodeInstruction::BiPush { .. } => None,
         BytecodeInstruction::SiPush { .. } => None,
         BytecodeInstruction::Pop {} => None,
+        BytecodeInstruction::Pop2 {} => None,
         BytecodeInstruction::Return {} => None,
         BytecodeInstruction::IReturn {} => None,
         BytecodeInstruction::LReturn {} => None,
+        BytecodeInstruction::FReturn {} => None,
+        BytecodeInstruction::DReturn {} => None,
         BytecodeInstruction::AReturn {} => None,
         BytecodeInstruction::GetStatic { field_ref_index } => Some(
             "Field ".to_owned()
@@ -1017,6 +1123,10 @@ fn get_comment(
         ),
         BytecodeInstruction::ArrayLength {} => None,
         BytecodeInstruction::LCmp {} => None,
+        BytecodeInstruction::FCmpL {} => None,
+        BytecodeInstruction::FCmpG {} => None,
+        BytecodeInstruction::DCmpL {} => None,
+        BytecodeInstruction::DCmpG {} => None,
         BytecodeInstruction::IfIcmpEq { .. } => None,
         BytecodeInstruction::IfIcmpNe { .. } => None,
         BytecodeInstruction::IfIcmpLt { .. } => None,
@@ -1042,19 +1152,64 @@ fn get_comment(
         BytecodeInstruction::Instanceof {
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
+
         BytecodeInstruction::IInc { .. } => None,
+
         BytecodeInstruction::I2L {} => None,
+        BytecodeInstruction::I2F {} => None,
+        BytecodeInstruction::I2D {} => None,
+        BytecodeInstruction::L2I {} => None,
+        BytecodeInstruction::L2F {} => None,
         BytecodeInstruction::L2D {} => None,
+        BytecodeInstruction::F2I {} => None,
+        BytecodeInstruction::F2L {} => None,
+        BytecodeInstruction::F2D {} => None,
+        BytecodeInstruction::D2I {} => None,
+        BytecodeInstruction::D2L {} => None,
+        BytecodeInstruction::D2F {} => None,
+        BytecodeInstruction::I2B {} => None,
+        BytecodeInstruction::I2C {} => None,
+        BytecodeInstruction::I2S {} => None,
+
         BytecodeInstruction::IAdd {} => None,
         BytecodeInstruction::ISub {} => None,
         BytecodeInstruction::IMul {} => None,
+        BytecodeInstruction::IDiv {} => None,
+        BytecodeInstruction::IRem {} => None,
+        BytecodeInstruction::IAnd {} => None,
+        BytecodeInstruction::IShl {} => None,
+        BytecodeInstruction::IShr {} => None,
+        BytecodeInstruction::IUshr {} => None,
+        BytecodeInstruction::IOr {} => None,
+        BytecodeInstruction::IXor {} => None,
+        BytecodeInstruction::INeg {} => None,
+
         BytecodeInstruction::LAdd {} => None,
         BytecodeInstruction::LSub {} => None,
         BytecodeInstruction::LMul {} => None,
         BytecodeInstruction::LDiv {} => None,
         BytecodeInstruction::LRem {} => None,
         BytecodeInstruction::LAnd {} => None,
+        BytecodeInstruction::LShl {} => None,
+        BytecodeInstruction::LShr {} => None,
+        BytecodeInstruction::LUshr {} => None,
+        BytecodeInstruction::LOr {} => None,
+        BytecodeInstruction::LXor {} => None,
+        BytecodeInstruction::LNeg {} => None,
+
+        BytecodeInstruction::FAdd {} => None,
+        BytecodeInstruction::FMul {} => None,
+        BytecodeInstruction::FNeg {} => None,
+        BytecodeInstruction::FDiv {} => None,
+        BytecodeInstruction::FRem {} => None,
+        BytecodeInstruction::FSub {} => None,
+
+        BytecodeInstruction::DAdd {} => None,
+        BytecodeInstruction::DMul {} => None,
+        BytecodeInstruction::DNeg {} => None,
         BytecodeInstruction::DDiv {} => None,
+        BytecodeInstruction::DRem {} => None,
+        BytecodeInstruction::DSub {} => None,
     }
 }
 
