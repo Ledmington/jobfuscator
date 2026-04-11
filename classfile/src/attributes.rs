@@ -57,6 +57,51 @@ pub enum AttributeInfo {
     },
 }
 
+#[derive(Debug, PartialEq)]
+pub enum AttributeKind {
+    Code,
+    LineNumberTable,
+    LocalVariableTable,
+    LocalVariableTypeTable,
+    StackMapTable,
+    SourceFile,
+    BootstrapMethods,
+    InnerClasses,
+    MethodParameters,
+    Record,
+    Signature,
+    NestMembers,
+    RuntimeVisibleAnnotations,
+}
+
+impl std::fmt::Display for AttributeKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl AttributeInfo {
+    pub fn kind(&self) -> AttributeKind {
+        match self {
+            AttributeInfo::Code { .. } => AttributeKind::Code,
+            AttributeInfo::LineNumberTable { .. } => AttributeKind::LineNumberTable,
+            AttributeInfo::LocalVariableTable { .. } => AttributeKind::LocalVariableTable,
+            AttributeInfo::LocalVariableTypeTable { .. } => AttributeKind::LocalVariableTypeTable,
+            AttributeInfo::StackMapTable { .. } => AttributeKind::StackMapTable,
+            AttributeInfo::SourceFile { .. } => AttributeKind::SourceFile,
+            AttributeInfo::BootstrapMethods { .. } => AttributeKind::BootstrapMethods,
+            AttributeInfo::InnerClasses { .. } => AttributeKind::InnerClasses,
+            AttributeInfo::MethodParameters { .. } => AttributeKind::MethodParameters,
+            AttributeInfo::Record { .. } => AttributeKind::Record,
+            AttributeInfo::Signature { .. } => AttributeKind::Signature,
+            AttributeInfo::NestMembers { .. } => AttributeKind::NestMembers,
+            AttributeInfo::RuntimeVisibleAnnotations { .. } => {
+                AttributeKind::RuntimeVisibleAnnotations
+            }
+        }
+    }
+}
+
 pub struct Annotation {
     type_index: u16,
     element_value_pairs: Vec<ElementValuePair>,
@@ -212,8 +257,18 @@ pub fn parse_class_attributes(
     num_attributes: usize,
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
-    for _ in 0..num_attributes {
-        attributes.push(parse_classfile_attribute(reader, cp));
+    for i in 0..num_attributes {
+        let attr = parse_classfile_attribute(reader, cp);
+        for j in 0..i {
+            assert!(
+                attributes[i].kind() != attributes[j].kind(),
+                "Found duplicate class attributes with kind {} at indices {} and {}.",
+                attributes[i].kind(),
+                i,
+                j
+            );
+        }
+        attributes.push(attr);
     }
     attributes
 }
@@ -297,8 +352,18 @@ pub fn parse_field_attributes(
     num_attributes: usize,
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
-    for _ in 0..num_attributes {
-        attributes.push(parse_field_attribute(reader, cp));
+    for i in 0..num_attributes {
+        let attr = parse_field_attribute(reader, cp);
+        for j in 0..i {
+            assert!(
+                attributes[i].kind() != attributes[j].kind(),
+                "Found duplicate field attributes with kind {} at indices {} and {}.",
+                attributes[i].kind(),
+                i,
+                j
+            );
+        }
+        attributes.push(attr);
     }
     attributes
 }
@@ -325,8 +390,18 @@ pub fn parse_method_attributes(
     num_attributes: usize,
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
-    for _ in 0..num_attributes {
-        attributes.push(parse_method_attribute(cp, reader));
+    for i in 0..num_attributes {
+        let attr = parse_method_attribute(cp, reader);
+        for j in 0..i {
+            assert!(
+                attributes[i].kind() != attributes[j].kind(),
+                "Found duplicate method attributes with kind {} at indices {} and {}.",
+                attributes[i].kind(),
+                i,
+                j
+            );
+        }
+        attributes.push(attr);
     }
     attributes
 }
@@ -482,8 +557,18 @@ fn parse_code_attributes(
     num_attributes: usize,
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
-    for _ in 0..num_attributes {
-        attributes.push(parse_code_attribute(cp, reader));
+    for i in 0..num_attributes {
+        let attr = parse_code_attribute(cp, reader);
+        for j in 0..i {
+            assert!(
+                attributes[i].kind() != attributes[j].kind(),
+                "Found duplicate code attributes with kind {} at indices {} and {}.",
+                attributes[i].kind(),
+                i,
+                j
+            );
+        }
+        attributes.push(attr);
     }
     attributes
 }
@@ -638,4 +723,8 @@ fn parse_verification_type_info(reader: &mut BinaryReader) -> VerificationTypeIn
         },
         _ => panic!("Wrong verification type info tag {}", tag),
     }
+}
+
+pub fn find_attribute(attributes: &[AttributeInfo], kind: AttributeKind) -> Option<&AttributeInfo> {
+    attributes.iter().find(|a| a.kind() == kind)
 }
