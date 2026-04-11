@@ -1,2 +1,2 @@
 * text=auto eol=lf
-*.class -text -diff binary
+*.class binary
