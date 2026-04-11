@@ -263,7 +263,7 @@ pub fn parse_class_attributes(
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for i in 0..num_attributes {
-        let attr = parse_classfile_attribute(reader, cp);
+        attributes.push(parse_classfile_attribute(reader, cp));
         for j in 0..i {
             assert!(
                 attributes[i].kind() != attributes[j].kind(),
@@ -273,7 +273,6 @@ pub fn parse_class_attributes(
                 j
             );
         }
-        attributes.push(attr);
     }
     attributes
 }
@@ -281,7 +280,7 @@ pub fn parse_class_attributes(
 fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
-    let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
+    let _attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
         "SourceFile" => AttributeInfo::SourceFile {
             source_file_index: reader.read_u16().unwrap(),
@@ -358,7 +357,7 @@ pub fn parse_field_attributes(
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for i in 0..num_attributes {
-        let attr = parse_field_attribute(reader, cp);
+        attributes.push(parse_field_attribute(reader, cp));
         for j in 0..i {
             assert!(
                 attributes[i].kind() != attributes[j].kind(),
@@ -368,22 +367,37 @@ pub fn parse_field_attributes(
                 j
             );
         }
-        attributes.push(attr);
     }
     attributes
+}
+
+fn check_attribute_length(
+    expected_attribute_length: u32,
+    actual_attribute_length: u32,
+    attribute_name: String,
+) {
+    assert!(
+        expected_attribute_length == actual_attribute_length,
+        "Expected length of attribute {} to be {} bytes but was {} bytes.",
+        attribute_name,
+        expected_attribute_length,
+        actual_attribute_length
+    );
 }
 
 fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
-    let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
+    let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
         "Signature" => {
             let signature_index: u16 = reader.read_u16().unwrap();
+            check_attribute_length(attribute_length, 2, attribute_name);
             AttributeInfo::Signature { signature_index }
         }
         "ConstantValue" => {
             let constant_value_index: u16 = reader.read_u16().unwrap();
+            check_attribute_length(attribute_length, 2, attribute_name);
             AttributeInfo::ConstantValue {
                 constant_value_index,
             }
@@ -402,7 +416,7 @@ pub fn parse_method_attributes(
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for i in 0..num_attributes {
-        let attr = parse_method_attribute(cp, reader);
+        attributes.push(parse_method_attribute(cp, reader));
         for j in 0..i {
             assert!(
                 attributes[i].kind() != attributes[j].kind(),
@@ -412,7 +426,6 @@ pub fn parse_method_attributes(
                 j
             );
         }
-        attributes.push(attr);
     }
     attributes
 }
@@ -420,7 +433,7 @@ pub fn parse_method_attributes(
 fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
-    let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
+    let _attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
         "Code" => {
             let max_stack: u16 = reader.read_u16().unwrap();
@@ -569,7 +582,7 @@ fn parse_code_attributes(
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for i in 0..num_attributes {
-        let attr = parse_code_attribute(cp, reader);
+        attributes.push(parse_code_attribute(cp, reader));
         for j in 0..i {
             assert!(
                 attributes[i].kind() != attributes[j].kind(),
@@ -579,7 +592,6 @@ fn parse_code_attributes(
                 j
             );
         }
-        attributes.push(attr);
     }
     attributes
 }
@@ -587,7 +599,7 @@ fn parse_code_attributes(
 fn parse_code_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
-    let _attribute_length: u32 = reader.read_u32().unwrap(); // ignored
+    let _attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
         "LineNumberTable" => {
             let line_number_table_length: u16 = reader.read_u16().unwrap();
