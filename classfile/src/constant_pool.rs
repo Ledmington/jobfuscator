@@ -381,23 +381,22 @@ fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) ->
 }
 
 pub(crate) fn check_constant_pool(cp: &ConstantPool) {
-    for i in 0..cp.len() {
+    let mut i = 0;
+    while i < cp.len() {
         let entry = &cp[i.try_into().unwrap()];
         match entry {
             ConstantPoolInfo::Null {} => {
                 unreachable!("Checking a null CP entry.");
             }
             ConstantPoolInfo::Utf8 { .. } => {}
-            ConstantPoolInfo::Integer { bytes } => todo!(),
-            ConstantPoolInfo::Float { bytes } => todo!(),
-            ConstantPoolInfo::Long {
-                high_bytes,
-                low_bytes,
-            } => todo!(),
-            ConstantPoolInfo::Double {
-                high_bytes,
-                low_bytes,
-            } => todo!(),
+            ConstantPoolInfo::Integer { .. } => {}
+            ConstantPoolInfo::Float { .. } => {}
+            ConstantPoolInfo::Long { .. } => {
+                i += 1;
+            }
+            ConstantPoolInfo::Double { .. } => {
+                i += 1;
+            }
             ConstantPoolInfo::String { string_index } => {
                 assert_valid_and_type(cp, *string_index, ConstantPoolTag::Utf8);
             }
@@ -439,6 +438,8 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool) {
                 name_and_type_index,
             } => todo!(),
         }
+
+        i += 1;
     }
 }
 
