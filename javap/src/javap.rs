@@ -930,12 +930,118 @@ fn get_comment(
     instruction: &BytecodeInstruction,
 ) -> Option<String> {
     match instruction {
-        BytecodeInstruction::Dup {} => None,
-        BytecodeInstruction::AConstNull {} => None,
-        BytecodeInstruction::IConst { .. } => None,
-        BytecodeInstruction::LConst { .. } => None,
-        BytecodeInstruction::FConst { .. } => None,
-        BytecodeInstruction::DConst { .. } => None,
+        BytecodeInstruction::Dup {}
+        | BytecodeInstruction::AConstNull {}
+        | BytecodeInstruction::IConst { .. }
+        | BytecodeInstruction::LConst { .. }
+        | BytecodeInstruction::FConst { .. }
+        | BytecodeInstruction::DConst { .. }
+        | BytecodeInstruction::ALoad { .. }
+        | BytecodeInstruction::AStore { .. }
+        | BytecodeInstruction::ILoad { .. }
+        | BytecodeInstruction::IStore { .. }
+        | BytecodeInstruction::LLoad { .. }
+        | BytecodeInstruction::LStore { .. }
+        | BytecodeInstruction::FLoad { .. }
+        | BytecodeInstruction::FStore { .. }
+        | BytecodeInstruction::DLoad { .. }
+        | BytecodeInstruction::DStore { .. }
+        | BytecodeInstruction::AaLoad {}
+        | BytecodeInstruction::BaLoad {}
+        | BytecodeInstruction::AaStore {}
+        | BytecodeInstruction::BaStore {}
+        | BytecodeInstruction::CaStore {}
+        | BytecodeInstruction::SaStore {}
+        | BytecodeInstruction::NewArray { .. }
+        | BytecodeInstruction::AThrow {}
+        | BytecodeInstruction::BiPush { .. }
+        | BytecodeInstruction::SiPush { .. }
+        | BytecodeInstruction::Pop {}
+        | BytecodeInstruction::Pop2 {}
+        | BytecodeInstruction::Return {}
+        | BytecodeInstruction::IReturn {}
+        | BytecodeInstruction::LReturn {}
+        | BytecodeInstruction::FReturn {}
+        | BytecodeInstruction::DReturn {}
+        | BytecodeInstruction::AReturn {}
+        | BytecodeInstruction::ArrayLength {}
+        | BytecodeInstruction::LCmp {}
+        | BytecodeInstruction::FCmpL {}
+        | BytecodeInstruction::FCmpG {}
+        | BytecodeInstruction::DCmpL {}
+        | BytecodeInstruction::DCmpG {}
+        | BytecodeInstruction::IfIcmpEq { .. }
+        | BytecodeInstruction::IfIcmpNe { .. }
+        | BytecodeInstruction::IfIcmpLt { .. }
+        | BytecodeInstruction::IfIcmpGe { .. }
+        | BytecodeInstruction::IfIcmpGt { .. }
+        | BytecodeInstruction::IfIcmpLe { .. }
+        | BytecodeInstruction::IfAcmpEq { .. }
+        | BytecodeInstruction::IfAcmpNe { .. }
+        | BytecodeInstruction::IfEq { .. }
+        | BytecodeInstruction::IfNe { .. }
+        | BytecodeInstruction::IfLt { .. }
+        | BytecodeInstruction::IfGe { .. }
+        | BytecodeInstruction::IfGt { .. }
+        | BytecodeInstruction::IfLe { .. }
+        | BytecodeInstruction::IfNull { .. }
+        | BytecodeInstruction::IfNonNull { .. }
+        | BytecodeInstruction::GoTo { .. }
+        | BytecodeInstruction::TableSwitch { .. }
+        | BytecodeInstruction::LookupSwitch { .. }
+        | BytecodeInstruction::IInc { .. }
+        | BytecodeInstruction::I2L {}
+        | BytecodeInstruction::I2F {}
+        | BytecodeInstruction::I2D {}
+        | BytecodeInstruction::L2I {}
+        | BytecodeInstruction::L2F {}
+        | BytecodeInstruction::L2D {}
+        | BytecodeInstruction::F2I {}
+        | BytecodeInstruction::F2L {}
+        | BytecodeInstruction::F2D {}
+        | BytecodeInstruction::D2I {}
+        | BytecodeInstruction::D2L {}
+        | BytecodeInstruction::D2F {}
+        | BytecodeInstruction::I2B {}
+        | BytecodeInstruction::I2C {}
+        | BytecodeInstruction::I2S {}
+        | BytecodeInstruction::IAdd {}
+        | BytecodeInstruction::ISub {}
+        | BytecodeInstruction::IMul {}
+        | BytecodeInstruction::IDiv {}
+        | BytecodeInstruction::IRem {}
+        | BytecodeInstruction::IAnd {}
+        | BytecodeInstruction::IShl {}
+        | BytecodeInstruction::IShr {}
+        | BytecodeInstruction::IUshr {}
+        | BytecodeInstruction::IOr {}
+        | BytecodeInstruction::IXor {}
+        | BytecodeInstruction::INeg {}
+        | BytecodeInstruction::LAdd {}
+        | BytecodeInstruction::LSub {}
+        | BytecodeInstruction::LMul {}
+        | BytecodeInstruction::LDiv {}
+        | BytecodeInstruction::LRem {}
+        | BytecodeInstruction::LAnd {}
+        | BytecodeInstruction::LShl {}
+        | BytecodeInstruction::LShr {}
+        | BytecodeInstruction::LUshr {}
+        | BytecodeInstruction::LOr {}
+        | BytecodeInstruction::LXor {}
+        | BytecodeInstruction::LNeg {}
+        | BytecodeInstruction::FAdd {}
+        | BytecodeInstruction::FMul {}
+        | BytecodeInstruction::FNeg {}
+        | BytecodeInstruction::FDiv {}
+        | BytecodeInstruction::FRem {}
+        | BytecodeInstruction::FSub {}
+        | BytecodeInstruction::DAdd {}
+        | BytecodeInstruction::DMul {}
+        | BytecodeInstruction::DNeg {}
+        | BytecodeInstruction::DDiv {}
+        | BytecodeInstruction::DRem {}
+        | BytecodeInstruction::DSub {} => None,
+
         BytecodeInstruction::Ldc {
             constant_pool_index,
         } => Some(get_constant_string(cp, (*constant_pool_index).into())),
@@ -945,40 +1051,20 @@ fn get_comment(
         BytecodeInstruction::Ldc2W {
             constant_pool_index,
         } => Some(get_constant_string(cp, *constant_pool_index)),
-        BytecodeInstruction::ALoad { .. } => None,
-        BytecodeInstruction::AStore { .. } => None,
-        BytecodeInstruction::ILoad { .. } => None,
-        BytecodeInstruction::IStore { .. } => None,
-        BytecodeInstruction::LLoad { .. } => None,
-        BytecodeInstruction::LStore { .. } => None,
-        BytecodeInstruction::FLoad { .. } => None,
-        BytecodeInstruction::FStore { .. } => None,
-        BytecodeInstruction::DLoad { .. } => None,
-        BytecodeInstruction::DStore { .. } => None,
-        BytecodeInstruction::AaLoad {} => None,
-        BytecodeInstruction::BaLoad {} => None,
-        BytecodeInstruction::AaStore {} => None,
-        BytecodeInstruction::BaStore {} => None,
-        BytecodeInstruction::CaStore {} => None,
-        BytecodeInstruction::SaStore {} => None,
-        BytecodeInstruction::NewArray { .. } => None,
+
         BytecodeInstruction::ANewArray {
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
-        BytecodeInstruction::AThrow {} => None,
         BytecodeInstruction::New {
             constant_pool_index,
         } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
-        BytecodeInstruction::BiPush { .. } => None,
-        BytecodeInstruction::SiPush { .. } => None,
-        BytecodeInstruction::Pop {} => None,
-        BytecodeInstruction::Pop2 {} => None,
-        BytecodeInstruction::Return {} => None,
-        BytecodeInstruction::IReturn {} => None,
-        BytecodeInstruction::LReturn {} => None,
-        BytecodeInstruction::FReturn {} => None,
-        BytecodeInstruction::DReturn {} => None,
-        BytecodeInstruction::AReturn {} => None,
+        BytecodeInstruction::CheckCast {
+            constant_pool_index,
+        } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
+        BytecodeInstruction::Instanceof {
+            constant_pool_index,
+        } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
+
         BytecodeInstruction::GetStatic { field_ref_index } => Some(
             "Field ".to_owned()
                 + &match cp[field_ref_index - 1] {
@@ -1130,95 +1216,6 @@ fn get_comment(
                 + " "
                 + &cp.get_method_ref(*constant_pool_index),
         ),
-        BytecodeInstruction::ArrayLength {} => None,
-        BytecodeInstruction::LCmp {} => None,
-        BytecodeInstruction::FCmpL {} => None,
-        BytecodeInstruction::FCmpG {} => None,
-        BytecodeInstruction::DCmpL {} => None,
-        BytecodeInstruction::DCmpG {} => None,
-        BytecodeInstruction::IfIcmpEq { .. } => None,
-        BytecodeInstruction::IfIcmpNe { .. } => None,
-        BytecodeInstruction::IfIcmpLt { .. } => None,
-        BytecodeInstruction::IfIcmpGe { .. } => None,
-        BytecodeInstruction::IfIcmpGt { .. } => None,
-        BytecodeInstruction::IfIcmpLe { .. } => None,
-        BytecodeInstruction::IfAcmpEq { .. } => None,
-        BytecodeInstruction::IfAcmpNe { .. } => None,
-        BytecodeInstruction::IfEq { .. } => None,
-        BytecodeInstruction::IfNe { .. } => None,
-        BytecodeInstruction::IfLt { .. } => None,
-        BytecodeInstruction::IfGe { .. } => None,
-        BytecodeInstruction::IfGt { .. } => None,
-        BytecodeInstruction::IfLe { .. } => None,
-        BytecodeInstruction::IfNull { .. } => None,
-        BytecodeInstruction::IfNonNull { .. } => None,
-        BytecodeInstruction::GoTo { .. } => None,
-        BytecodeInstruction::TableSwitch { .. } => None,
-        BytecodeInstruction::LookupSwitch { .. } => None,
-        BytecodeInstruction::CheckCast {
-            constant_pool_index,
-        } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
-        BytecodeInstruction::Instanceof {
-            constant_pool_index,
-        } => Some("class ".to_owned() + &cp.get_class_name(*constant_pool_index)),
-
-        BytecodeInstruction::IInc { .. } => None,
-
-        BytecodeInstruction::I2L {} => None,
-        BytecodeInstruction::I2F {} => None,
-        BytecodeInstruction::I2D {} => None,
-        BytecodeInstruction::L2I {} => None,
-        BytecodeInstruction::L2F {} => None,
-        BytecodeInstruction::L2D {} => None,
-        BytecodeInstruction::F2I {} => None,
-        BytecodeInstruction::F2L {} => None,
-        BytecodeInstruction::F2D {} => None,
-        BytecodeInstruction::D2I {} => None,
-        BytecodeInstruction::D2L {} => None,
-        BytecodeInstruction::D2F {} => None,
-        BytecodeInstruction::I2B {} => None,
-        BytecodeInstruction::I2C {} => None,
-        BytecodeInstruction::I2S {} => None,
-
-        BytecodeInstruction::IAdd {} => None,
-        BytecodeInstruction::ISub {} => None,
-        BytecodeInstruction::IMul {} => None,
-        BytecodeInstruction::IDiv {} => None,
-        BytecodeInstruction::IRem {} => None,
-        BytecodeInstruction::IAnd {} => None,
-        BytecodeInstruction::IShl {} => None,
-        BytecodeInstruction::IShr {} => None,
-        BytecodeInstruction::IUshr {} => None,
-        BytecodeInstruction::IOr {} => None,
-        BytecodeInstruction::IXor {} => None,
-        BytecodeInstruction::INeg {} => None,
-
-        BytecodeInstruction::LAdd {} => None,
-        BytecodeInstruction::LSub {} => None,
-        BytecodeInstruction::LMul {} => None,
-        BytecodeInstruction::LDiv {} => None,
-        BytecodeInstruction::LRem {} => None,
-        BytecodeInstruction::LAnd {} => None,
-        BytecodeInstruction::LShl {} => None,
-        BytecodeInstruction::LShr {} => None,
-        BytecodeInstruction::LUshr {} => None,
-        BytecodeInstruction::LOr {} => None,
-        BytecodeInstruction::LXor {} => None,
-        BytecodeInstruction::LNeg {} => None,
-
-        BytecodeInstruction::FAdd {} => None,
-        BytecodeInstruction::FMul {} => None,
-        BytecodeInstruction::FNeg {} => None,
-        BytecodeInstruction::FDiv {} => None,
-        BytecodeInstruction::FRem {} => None,
-        BytecodeInstruction::FSub {} => None,
-
-        BytecodeInstruction::DAdd {} => None,
-        BytecodeInstruction::DMul {} => None,
-        BytecodeInstruction::DNeg {} => None,
-        BytecodeInstruction::DDiv {} => None,
-        BytecodeInstruction::DRem {} => None,
-        BytecodeInstruction::DSub {} => None,
     }
 }
 
