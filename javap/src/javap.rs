@@ -3,7 +3,6 @@
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::string;
 use std::time::SystemTime;
 
 use binary_reader::{BinaryReader, Endianness};
@@ -237,39 +236,36 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
 
         let entry = &cp[i.try_into().unwrap()];
 
-        lw.print(&format!(" = {:<18} ", entry.tag()));
+        lw.print(&format!(" = {:<18} ", entry.tag().to_string()));
 
         match entry {
             ConstantPoolInfo::Utf8 { bytes } => {
                 let content: String = constant_pool::convert_utf8(bytes).trim_end().to_owned();
                 if !content.trim().is_empty() {
-                    lw.tab().println(&content);
+                    lw.println(&content);
                 }
             }
             ConstantPoolInfo::Integer { bytes } => {
-                lw.tab().println(&bytes.to_string());
+                lw.println(&(*bytes as i32).to_string());
             }
-            ConstantPoolInfo::Float { bytes } => println!(
-                "{:<info_start_index$}{:.1}",
-                format!("{:>index_width$} = Float", format!("#{}", i + 1),),
-                f32::from_bits(*bytes),
-            ),
+            ConstantPoolInfo::Float { bytes } => {
+                lw.println(&format!("{:.1}", f32::from_bits(*bytes)));
+            }
             ConstantPoolInfo::Long {
                 high_bytes,
                 low_bytes,
-            } => println!(
-                "{:<info_start_index$}{}l",
-                format!("{:>index_width$} = Long", format!("#{}", i + 1),),
-                (((*high_bytes as u64) << 32) | (*low_bytes as u64)) as i64,
-            ),
+            } => {
+                lw.println(&format!("{}l", get_long_value(*high_bytes, *low_bytes)));
+            }
             ConstantPoolInfo::Double {
                 high_bytes,
                 low_bytes,
-            } => println!(
-                "{:<info_start_index$}{:.1}d",
-                format!("{:>index_width$} = Double", format!("#{}", i + 1),),
-                f64::from_bits(((*high_bytes as u64) << 32) | (*low_bytes as u64)),
-            ),
+            } => {
+                lw.println(&format!(
+                    "{:.1}d",
+                    get_double_value(*high_bytes, *low_bytes)
+                ));
+            }
             ConstantPoolInfo::String { string_index } => {
                 lw.print(&format!("#{}", string_index)).tab();
                 let string_content: String =
@@ -878,6 +874,14 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
     }
 }
 
+fn get_long_value(high_bytes: u32, low_bytes: u32) -> i64 {
+    (((high_bytes as u64) << 32) | (low_bytes as u64)) as i64
+}
+
+fn get_double_value(high_bytes: u32, low_bytes: u32) -> f64 {
+    f64::from_bits(((high_bytes as u64) << 32) | (low_bytes as u64))
+}
+
 fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
     let entry = &cp[constant_pool_index - 1];
     match entry {
@@ -893,20 +897,13 @@ fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
         ConstantPoolInfo::Long {
             high_bytes,
             low_bytes,
-        } => {
-            "long ".to_owned()
-                + &((((*high_bytes as u64) << 32) | (*low_bytes as u64)) as i64).to_string()
-                + "l"
-        }
+        } => "long ".to_owned() + &get_long_value(*high_bytes, *low_bytes).to_string() + "l",
         ConstantPoolInfo::Float { bytes } => format!("float {:.1}f", &f32::from_bits(*bytes)),
         ConstantPoolInfo::Double {
             high_bytes,
             low_bytes,
         } => {
-            format!(
-                "double {:.1E}d",
-                &f64::from_bits(((*high_bytes as u64) << 32) | (*low_bytes as u64))
-            )
+            format!("double {:.1E}d", &get_double_value(*high_bytes, *low_bytes))
         }
         ConstantPoolInfo::Class { name_index } => {
             "class ".to_owned() + &cp.get_utf8_content(*name_index)

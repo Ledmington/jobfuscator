@@ -417,10 +417,7 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool) {
                 assert_valid_and_type(cp, *class_index, ConstantPoolTag::Class);
                 assert_valid_and_type(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
             }
-            ConstantPoolInfo::InterfaceMethodRef {
-                class_index,
-                name_and_type_index,
-            } => todo!(),
+            ConstantPoolInfo::InterfaceMethodRef { .. } => todo!(),
             ConstantPoolInfo::NameAndType {
                 name_index,
                 descriptor_index,
@@ -428,15 +425,9 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool) {
                 assert_valid_and_type(cp, *name_index, ConstantPoolTag::Utf8);
                 assert_valid_and_type(cp, *descriptor_index, ConstantPoolTag::Utf8);
             }
-            ConstantPoolInfo::MethodType { descriptor_index } => todo!(),
-            ConstantPoolInfo::MethodHandle {
-                reference_kind,
-                reference_index,
-            } => todo!(),
-            ConstantPoolInfo::InvokeDynamic {
-                bootstrap_method_attr_index,
-                name_and_type_index,
-            } => todo!(),
+            ConstantPoolInfo::MethodType { .. } => todo!(),
+            ConstantPoolInfo::MethodHandle { .. } => todo!(),
+            ConstantPoolInfo::InvokeDynamic { .. } => todo!(),
         }
 
         i += 1;

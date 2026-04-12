@@ -60,10 +60,6 @@ impl LineWriter {
         self.buffer.clear();
     }
 
-    fn indent_delta(&mut self, delta: isize) {
-        self.indent_count = self.indent_count + delta;
-    }
-
     pub(crate) fn tab(&mut self) -> &mut Self {
         let col = self.indent_count * INDENT_WIDTH + TAB_COLUMN;
         let buf_len = self.buffer.len().try_into().unwrap();
