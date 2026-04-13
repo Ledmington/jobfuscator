@@ -249,7 +249,7 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
                 lw.println(&(*bytes as i32).to_string());
             }
             ConstantPoolInfo::Float { bytes } => {
-                lw.println(&format!("{:.1}", f32::from_bits(*bytes)));
+                lw.println(&java_format_float(f32::from_bits(*bytes)));
             }
             ConstantPoolInfo::Long {
                 high_bytes,
@@ -898,7 +898,9 @@ fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
             high_bytes,
             low_bytes,
         } => "long ".to_owned() + &get_long_value(*high_bytes, *low_bytes).to_string() + "l",
-        ConstantPoolInfo::Float { bytes } => format!("float {:.1}f", &f32::from_bits(*bytes)),
+        ConstantPoolInfo::Float { bytes } => {
+            format!("float {}f", java_format_float(f32::from_bits(*bytes)))
+        }
         ConstantPoolInfo::Double {
             high_bytes,
             low_bytes,
@@ -1623,8 +1625,8 @@ fn java_format_double(val: f64) -> String {
         } else {
             "0.0".to_owned()
         }
-    } else if val.abs() < f64::MIN_POSITIVE {
-        // Denormals
+    } else if val.abs() == 5e-324 {
+        // The smallest denormal is hard-coded because formatted incorrectly
         if val > 0.0 {
             "4.9E-324".to_owned()
         } else {
@@ -1633,34 +1635,89 @@ fn java_format_double(val: f64) -> String {
     } else if val.abs() >= 1.0e-3 && val.abs() < 1.0e7 {
         format!("{:?}", val)
     } else {
-        format_scientific(val)
+        format_scientific_f64(val)
     }
 }
 
-fn format_scientific(val: f64) -> String {
-    // Use 17 significant digits, then trim
-    let raw = format!("{:.17E}", val);
+fn format_scientific_f64(val: f64) -> String {
+    let raw = format!("{:E}", val);
 
-    // Find the exponent
     let e_pos = raw.find('E').unwrap();
     let mantissa = &raw[..e_pos];
     let exp: i32 = raw[e_pos + 1..].parse().unwrap();
 
-    // Trim trailing zeros from mantissa, keep at least one decimal digit
-    let trimmed = mantissa.trim_end_matches('0');
-    let trimmed = if trimmed.ends_with('.') {
-        format!("{}0", trimmed)
+    // Trim trailing zeros but ensure at least one decimal digit
+    let trimmed = if mantissa.find('.').is_some() {
+        let trimmed = mantissa.trim_end_matches('0');
+        if trimmed.ends_with('.') {
+            format!("{}0", trimmed)
+        } else {
+            trimmed.to_owned()
+        }
     } else {
-        trimmed.to_owned()
+        // No decimal point at all (e.g. "1E8") — add ".0"
+        format!("{}.0", mantissa)
     };
 
-    // Java exponent: no leading zeros, no + sign padding (but keeps the sign)
-    // E-4, E7, E307, E-308
-    if exp >= 0 {
-        format!("{}E{}", trimmed, exp)
+    format!("{}E{}", trimmed, exp)
+}
+
+/**
+ * Formats the given f32 as Java's default format.
+ */
+fn java_format_float(val: f32) -> String {
+    if val.is_nan() {
+        "NaN".to_owned()
+    } else if val.is_infinite() {
+        if val > 0.0f32 {
+            "Infinity".to_owned()
+        } else {
+            "-Infinity".to_owned()
+        }
+    } else if val == 0.0f32 {
+        // both +0.0 and -0.0 compare equal to 0.0, so check the sign bit
+        if val.is_sign_negative() {
+            "-0.0".to_owned()
+        } else {
+            "0.0".to_owned()
+        }
+    } else if val.abs() == 1.4E-45f32 {
+        // The smallest denormal is hard-coded because formatted incorrectly
+        if val > 0.0f32 {
+            "1.4E-45".to_owned()
+        } else {
+            "-1.4E-45".to_owned()
+        }
     } else {
-        format!("{}E{}", trimmed, exp) // exp already contains '-'
+        let debug = format!("{:?}", val);
+        if val.abs() >= 1.0e-3f32 && val.abs() < 1.0e7f32 {
+            debug
+        } else {
+            format_scientific_f32(val)
+        }
     }
+}
+
+fn format_scientific_f32(val: f32) -> String {
+    // Format as f32 to get shortest round-trip digits for f32
+    let raw = format!("{:E}", val);
+
+    let e_pos = raw.find('E').unwrap();
+    let mantissa = &raw[..e_pos];
+    let exp: i32 = raw[e_pos + 1..].parse().unwrap();
+
+    let trimmed = if mantissa.find('.').is_some() {
+        let trimmed = mantissa.trim_end_matches('0');
+        if trimmed.ends_with('.') {
+            format!("{}0", trimmed)
+        } else {
+            trimmed.to_owned()
+        }
+    } else {
+        format!("{}.0", mantissa)
+    };
+
+    format!("{}E{}", trimmed, exp)
 }
 
 #[cfg(test)]
@@ -1700,6 +1757,40 @@ mod tests {
 
         for (input, expected) in cases {
             let actual = java_format_double(input);
+            assert_eq!(expected, actual);
+        }
+    }
+
+    #[test]
+    fn float_formatting() {
+        let cases = [
+            (0.0f32, "0.0"),
+            (-0.0f32, "-0.0"),
+            (f32::INFINITY, "Infinity"),
+            (-f32::INFINITY, "-Infinity"),
+            (f32::NAN, "NaN"),
+            (-f32::NAN, "NaN"),
+            (1.4E-45f32, "1.4E-45"),
+            (100000000.0f32, "1.0E8"),
+            (10000000.0f32, "1.0E7"),
+            (9999999.0f32, "9999999.0"),
+            (1000000.0f32, "1000000.0"),
+            (100000.0f32, "100000.0"),
+            (10000.0f32, "10000.0"),
+            (1000.0f32, "1000.0"),
+            (100.0f32, "100.0"),
+            (10.0f32, "10.0"),
+            (1.0f32, "1.0"),
+            (0.1f32, "0.1"),
+            (0.01f32, "0.01"),
+            (0.001f32, "0.001"),
+            (0.0009999999f32, "9.999999E-4"),
+            (0.0001f32, "1.0E-4"),
+            (0.00001f32, "1.0E-5"),
+        ];
+
+        for (input, expected) in cases {
+            let actual = java_format_float(input);
             assert_eq!(expected, actual);
         }
     }
