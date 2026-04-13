@@ -92,7 +92,8 @@ pub(crate) fn print_class_file(filename: String) {
     print_header(&mut lw, &cf);
     print_constant_pool(&mut lw, &cf.constant_pool);
     lw.println("{");
-    print_fields(&cf.constant_pool, &cf.fields);
+    lw.indent(1);
+    print_fields(&mut lw, &cf.constant_pool, &cf.fields);
     print_methods(
         &cf.constant_pool,
         cf.this_class,
@@ -100,6 +101,7 @@ pub(crate) fn print_class_file(filename: String) {
             .contains(&access_flags::ClassAccessFlag::Enum),
         &cf.methods,
     );
+    lw.indent(-1);
     lw.println("}");
     print_class_attributes(&cf.constant_pool, &cf.attributes);
 }
@@ -249,7 +251,7 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
                 lw.println(&(*bytes as i32).to_string());
             }
             ConstantPoolInfo::Float { bytes } => {
-                lw.println(&java_format_float(f32::from_bits(*bytes)));
+                lw.println(&format!("{}f", java_format_float(f32::from_bits(*bytes))));
             }
             ConstantPoolInfo::Long {
                 high_bytes,
@@ -369,13 +371,13 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
     lw.indent(-1);
 }
 
-fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
+fn print_fields(lw: &mut LineWriter, cp: &ConstantPool, fields: &[FieldInfo]) {
     for field in fields.iter() {
         let descriptor: String = cp.get_utf8_content(field.descriptor_index);
         let signature: Option<&AttributeInfo> =
             find_attribute(&field.attributes, AttributeKind::Signature);
-        println!(
-            "  {} {} {};",
+        lw.println(&format!(
+            "{} {} {};",
             access_flags::modifier_repr_vec(&field.access_flags),
             match signature {
                 Some(AttributeInfo::Signature { signature_index }) =>
@@ -384,34 +386,39 @@ fn print_fields(cp: &ConstantPool, fields: &[FieldInfo]) {
                 None => descriptor::parse_field_descriptor(&descriptor),
             },
             cp.get_utf8_content(field.name_index)
-        );
-        println!("    descriptor: {}", descriptor);
-        println!(
-            "    flags: (0x{:04x}) {}",
+        ));
+
+        lw.indent(1);
+
+        lw.println(&format!("descriptor: {}", descriptor));
+        lw.println(&format!(
+            "flags: (0x{:04x}) {}",
             access_flags::to_u16(&field.access_flags),
             access_flags::java_repr_vec(&field.access_flags)
-        );
-        print_field_attributes(cp, field);
-        println!();
+        ));
+        print_field_attributes(lw, cp, field);
+
+        lw.indent(-1);
+
+        lw.println("");
     }
 }
 
-fn print_field_attributes(cp: &ConstantPool, field: &FieldInfo) {
-    let comment_index: usize = get_constant_pool_comment_start_index(cp);
+fn print_field_attributes(lw: &mut LineWriter, cp: &ConstantPool, field: &FieldInfo) {
     for attribute in field.attributes.iter() {
         match attribute {
             AttributeInfo::Signature { signature_index } => {
-                println!(
-                    "{:<width$}// {}",
-                    format!("    Signature: #{}", signature_index),
-                    cp.get_utf8_content(*signature_index),
-                    width = comment_index + 2 // why?
-                );
+                lw.print(&format!("Signature: #{}", signature_index))
+                    .tab()
+                    .println(&format!("// {}", cp.get_utf8_content(*signature_index)));
             }
             AttributeInfo::ConstantValue {
                 constant_value_index,
             } => {
-                println!("ConstantValue: #{}", constant_value_index);
+                lw.println(&format!(
+                    "ConstantValue: {}",
+                    get_constant_string(cp, *constant_value_index)
+                ));
             }
             _ => unreachable!("Unknown field attribute {}.", attribute.kind()),
         }
