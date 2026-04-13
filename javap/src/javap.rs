@@ -103,7 +103,7 @@ pub(crate) fn print_class_file(filename: String) {
     );
     lw.indent(-1);
     lw.println("}");
-    print_class_attributes(&cf.constant_pool, &cf.attributes);
+    print_class_attributes(&mut lw, &cf.constant_pool, &cf.attributes);
 }
 
 /**
@@ -1510,102 +1510,103 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
     }
 }
 
-fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
-    let comment_index: usize = get_constant_pool_comment_start_index(cp);
+fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[AttributeInfo]) {
     for attribute in attributes.iter() {
         match attribute {
             AttributeInfo::SourceFile { source_file_index } => {
-                println!(
+                lw.println(&format!(
                     "SourceFile: \"{}\"",
                     cp.get_utf8_content(*source_file_index)
-                )
+                ));
             }
             AttributeInfo::InnerClasses { classes } => {
-                println!("InnerClasses:");
+                lw.println("InnerClasses:");
                 for class in classes.iter() {
-                    println!(
-                        "{:<comment_index$}// {}=class {} of class {}",
-                        format!(
-                            "  {} #{}= #{} of #{};",
-                            access_flags::modifier_repr_vec(&class.inner_class_access_flags),
-                            class.inner_name_index,
-                            class.inner_class_info_index,
-                            class.outer_class_info_index
-                        ),
+                    lw.print(&format!(
+                        "{} #{}= #{} of #{};",
+                        access_flags::modifier_repr_vec(&class.inner_class_access_flags),
+                        class.inner_name_index,
+                        class.inner_class_info_index,
+                        class.outer_class_info_index
+                    ))
+                    .tab()
+                    .println(&format!(
+                        "// {}=class {} of class {}",
                         cp.get_utf8_content(class.inner_name_index),
                         cp.get_class_name(class.inner_class_info_index),
                         cp.get_class_name(class.outer_class_info_index),
-                    );
+                    ));
                 }
             }
             AttributeInfo::BootstrapMethods { methods } => {
-                println!("BootstrapMethods:");
+                lw.println("BootstrapMethods:");
                 for (i, method) in methods.iter().enumerate() {
-                    print!("  {}: #{} ", i, method.bootstrap_method_ref);
+                    lw.print(&format!("  {}: #{} ", i, method.bootstrap_method_ref));
 
                     // TODO: can we merge this match-case with the one below?
                     match cp[method.bootstrap_method_ref - 1] {
                         ConstantPoolInfo::MethodHandle {
                             reference_kind,
                             reference_index,
-                        } => println!(
-                            "{} {}",
-                            reference_kind::java_repr(reference_kind),
-                            cp.get_method_ref(reference_index)
-                        ),
+                        } => {
+                            lw.println(&format!(
+                                "{} {}",
+                                reference_kind::java_repr(reference_kind),
+                                cp.get_method_ref(reference_index)
+                            ));
+                        }
                         _ => unreachable!(),
                     }
-                    println!("    Method arguments:");
+                    lw.println("    Method arguments:");
                     for arg in method.bootstrap_arguments.iter() {
-                        print!("      #{} ", arg);
+                        lw.print(&format!("      #{} ", arg));
                         match cp[arg - 1] {
                             ConstantPoolInfo::String { string_index } => {
-                                println!("{}", cp.get_utf8_content(string_index))
+                                lw.println(&cp.get_utf8_content(string_index));
                             }
                             ConstantPoolInfo::Class { name_index } => {
-                                println!("{}", cp.get_utf8_content(name_index));
+                                lw.println(&cp.get_utf8_content(name_index));
                             }
                             ConstantPoolInfo::MethodType { descriptor_index } => {
-                                println!("{}", cp.get_utf8_content(descriptor_index))
+                                lw.println(&cp.get_utf8_content(descriptor_index));
                             }
                             ConstantPoolInfo::MethodHandle {
                                 reference_kind,
                                 reference_index,
-                            } => println!(
-                                "{} {}",
-                                reference_kind::java_repr(reference_kind),
-                                cp.get_method_ref(reference_index)
-                            ),
+                            } => {
+                                lw.println(&format!(
+                                    "{} {}",
+                                    reference_kind::java_repr(reference_kind),
+                                    cp.get_method_ref(reference_index)
+                                ));
+                            }
                             _ => unreachable!(),
                         }
                     }
                 }
             }
             AttributeInfo::Record { components } => {
-                println!("Record:");
+                lw.println("Record:");
                 for component in components.iter() {
                     let descriptor = cp.get_utf8_content(component.descriptor_index);
-                    println!(
+                    lw.println(&format!(
                         "  {} {};",
                         descriptor::parse_field_descriptor(&descriptor),
                         cp.get_utf8_content(component.name_index)
-                    );
-                    println!("    descriptor: {}", descriptor);
-                    println!();
+                    ));
+                    lw.println(&format!("    descriptor: {}", descriptor));
+                    lw.println("");
                 }
             }
             AttributeInfo::Signature { signature_index } => {
-                println!(
-                    "{:<width$}// {}",
-                    format!("Signature: #{}", signature_index),
-                    cp.get_utf8_content(*signature_index),
-                    width = 40 // why is this 40 used only here?
-                );
+                lw.print(&format!("Signature: #{}", signature_index))
+                    .tab()
+                    .println(&format!("// {}", cp.get_utf8_content(*signature_index)));
             }
             AttributeInfo::NestMembers { classes } => {
-                println!("NestMembers:");
+                lw.println("NestMembers:");
                 for class_index in classes {
-                    println!("  {}", cp.get_class_name(*class_index));
+                    lw.println(&format!("  {}", cp.get_class_name(*class_index)));
                 }
             }
             _ => unreachable!(),
