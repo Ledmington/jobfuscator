@@ -262,8 +262,8 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
                 low_bytes,
             } => {
                 lw.println(&format!(
-                    "{:.1}d",
-                    get_double_value(*high_bytes, *low_bytes)
+                    "{}d",
+                    java_format_double(get_double_value(*high_bytes, *low_bytes))
                 ));
             }
             ConstantPoolInfo::String { string_index } => {
@@ -903,7 +903,10 @@ fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
             high_bytes,
             low_bytes,
         } => {
-            format!("double {:.1E}d", &get_double_value(*high_bytes, *low_bytes))
+            format!(
+                "double {}d",
+                java_format_double(get_double_value(*high_bytes, *low_bytes))
+            )
         }
         ConstantPoolInfo::Class { name_index } => {
             "class ".to_owned() + &cp.get_utf8_content(*name_index)
@@ -1597,6 +1600,107 @@ fn print_class_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                 }
             }
             _ => unreachable!(),
+        }
+    }
+}
+
+/**
+ * Formats the given f64 as Java's default format.
+ */
+fn java_format_double(val: f64) -> String {
+    if val.is_nan() {
+        "NaN".to_owned()
+    } else if val.is_infinite() {
+        if val > 0.0 {
+            "Infinity".to_owned()
+        } else {
+            "-Infinity".to_owned()
+        }
+    } else if val == 0.0 {
+        // both +0.0 and -0.0 compare equal to 0.0, so check the sign bit
+        if val.is_sign_negative() {
+            "-0.0".to_owned()
+        } else {
+            "0.0".to_owned()
+        }
+    } else if val.abs() < f64::MIN_POSITIVE {
+        // Denormals
+        if val > 0.0 {
+            "4.9E-324".to_owned()
+        } else {
+            "-4.9E-324".to_owned()
+        }
+    } else if val.abs() >= 1.0e-3 && val.abs() < 1.0e7 {
+        format!("{:?}", val)
+    } else {
+        format_scientific(val)
+    }
+}
+
+fn format_scientific(val: f64) -> String {
+    // Use 17 significant digits, then trim
+    let raw = format!("{:.17E}", val);
+
+    // Find the exponent
+    let e_pos = raw.find('E').unwrap();
+    let mantissa = &raw[..e_pos];
+    let exp: i32 = raw[e_pos + 1..].parse().unwrap();
+
+    // Trim trailing zeros from mantissa, keep at least one decimal digit
+    let trimmed = mantissa.trim_end_matches('0');
+    let trimmed = if trimmed.ends_with('.') {
+        format!("{}0", trimmed)
+    } else {
+        trimmed.to_owned()
+    };
+
+    // Java exponent: no leading zeros, no + sign padding (but keeps the sign)
+    // E-4, E7, E307, E-308
+    if exp >= 0 {
+        format!("{}E{}", trimmed, exp)
+    } else {
+        format!("{}E{}", trimmed, exp) // exp already contains '-'
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn double_formatting() {
+        let cases = [
+            (0.0, "0.0"),
+            (-0.0, "-0.0"),
+            (f64::INFINITY, "Infinity"),
+            (-f64::INFINITY, "-Infinity"),
+            (f64::NAN, "NaN"),
+            (-f64::NAN, "NaN"),
+            (0.017453292519943295, "0.017453292519943295"),
+            (4.9E-324, "4.9E-324"),
+            (8.98846567431158E307, "8.98846567431158E307"),
+            (1.1125369292536007E-308, "1.1125369292536007E-308"),
+            (100000000.0, "1.0E8"),
+            (10000000.0, "1.0E7"),
+            (9999999.999999999, "9999999.999999998"),
+            (1000000.0, "1000000.0"),
+            (100000.0, "100000.0"),
+            (10000.0, "10000.0"),
+            (1000.0, "1000.0"),
+            (100.0, "100.0"),
+            (10.0, "10.0"),
+            (1.0, "1.0"),
+            (0.1, "0.1"),
+            (0.01, "0.01"),
+            (0.001, "0.001"),
+            (0.0009999999999999999, "9.999999999999998E-4"),
+            (0.0001, "1.0E-4"),
+            (0.00001, "1.0E-5"),
+        ];
+
+        for (input, expected) in cases {
+            let actual = java_format_double(input);
+            assert_eq!(expected, actual);
         }
     }
 }
