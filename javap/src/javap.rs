@@ -30,7 +30,7 @@ const BYTECODE_COMMENT_START_INDEX: usize = 46;
 /**
  * The maximum length (in characters) of the index of a single bytecode instruction.
  */
-const BYTECODE_INDEX_LENGTH: usize = 5;
+const BYTECODE_INDEX_LENGTH: usize = 4;
 
 pub(crate) fn print_class_file(filename: String) {
     let mut lw: LineWriter = LineWriter::new();
@@ -95,6 +95,7 @@ pub(crate) fn print_class_file(filename: String) {
     lw.indent(1);
     print_fields(&mut lw, &cf.constant_pool, &cf.fields);
     print_methods(
+        &mut lw,
         &cf.constant_pool,
         cf.this_class,
         cf.access_flags
@@ -425,23 +426,29 @@ fn print_field_attributes(lw: &mut LineWriter, cp: &ConstantPool, field: &FieldI
     }
 }
 
-fn print_methods(cp: &ConstantPool, this_class: u16, is_enum: bool, methods: &[MethodInfo]) {
+fn print_methods(
+    lw: &mut LineWriter,
+    cp: &ConstantPool,
+    this_class: u16,
+    is_enum: bool,
+    methods: &[MethodInfo],
+) {
     for (i, method) in methods.iter().enumerate() {
         let method_name: String = cp.get_utf8_content(method.name_index);
         let raw_descriptor: String = cp.get_utf8_content(method.descriptor_index);
         let parsed_descriptor: MethodDescriptor =
             descriptor::parse_method_descriptor(&raw_descriptor);
         if i > 0 {
-            println!();
+            lw.println("");
         }
-        print!(
-            "  {} ",
+        lw.print(&format!(
+            "{} ",
             access_flags::modifier_repr_vec(&method.access_flags)
-        );
+        ));
 
         if method_name == "<clinit>" {
             // this is the 'static {}' block of the class
-            println!("{{}};");
+            lw.println("{};");
         } else if method_name == "<init>" {
             // this is a constructor of the class
 
@@ -462,11 +469,11 @@ fn print_methods(cp: &ConstantPool, this_class: u16, is_enum: bool, methods: &[M
                     .join(", ")
             };
 
-            println!(
+            lw.println(&format!(
                 "{}({});",
                 cp.get_class_name(this_class).replace("/", "."),
                 param_types
-            );
+            ));
         } else {
             let mut param_types = parsed_descriptor
                 .parameter_types
@@ -479,19 +486,24 @@ fn print_methods(cp: &ConstantPool, this_class: u16, is_enum: bool, methods: &[M
                 param_types = param_types[..(param_types.len() - 2)].to_owned() + "...";
             }
 
-            println!(
+            lw.println(&format!(
                 "{} {}({});",
                 parsed_descriptor.return_type, method_name, param_types
-            );
+            ));
         }
-        println!("    descriptor: {}", raw_descriptor);
-        println!(
-            "    flags: (0x{:04x}) {}",
+
+        lw.indent(1);
+
+        lw.println(&format!("descriptor: {}", raw_descriptor));
+        lw.println(&format!(
+            "flags: (0x{:04x}) {}",
             access_flags::to_u16(&method.access_flags),
             access_flags::java_repr_vec(&method.access_flags)
-        );
+        ));
 
-        print_method_attributes(cp, this_class, method);
+        print_method_attributes(lw, cp, this_class, method);
+
+        lw.indent(-1);
     }
 }
 
@@ -1263,7 +1275,12 @@ fn get_number_of_arguments(cp: &ConstantPool, method: &MethodInfo) -> u8 {
     num_arguments
 }
 
-fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodInfo) {
+fn print_method_attributes(
+    lw: &mut LineWriter,
+    cp: &ConstantPool,
+    this_class: u16,
+    method: &MethodInfo,
+) {
     let comment_index: usize = get_constant_pool_comment_start_index(cp);
     for attribute in method.attributes.iter() {
         match attribute {
@@ -1274,47 +1291,50 @@ fn print_method_attributes(cp: &ConstantPool, this_class: u16, method: &MethodIn
                 exception_table,
                 attributes,
             } => {
-                println!("    Code:");
+                lw.println("Code:");
+                lw.indent(1);
                 let args_size = get_number_of_arguments(cp, method);
-                println!(
-                    "      stack={}, locals={}, args_size={}",
+                lw.println(&format!(
+                    "stack={}, locals={}, args_size={}",
                     max_stack, max_locals, args_size
-                );
+                ));
                 for (position, instruction) in code.iter() {
                     let opcode_and_arguments: String =
                         get_opcode_and_arguments_string(position, instruction);
                     let comment: Option<String> = get_comment(cp, this_class, instruction);
                     match comment {
                         Some(content) => {
-                            println!(
-                                "{:<BYTECODE_COMMENT_START_INDEX$}// {}",
-                                format!(
-                                    "     {:>BYTECODE_INDEX_LENGTH$}: {}",
-                                    position, opcode_and_arguments,
-                                ),
-                                content,
-                            )
+                            lw.print(&format!(
+                                "{:>BYTECODE_INDEX_LENGTH$}: {}",
+                                position, opcode_and_arguments
+                            ))
+                            .tab()
+                            .println(&format!("// {}", content));
                         }
-                        None => println!(
-                            "     {:>BYTECODE_INDEX_LENGTH$}: {}",
-                            position, opcode_and_arguments,
-                        ),
+                        None => {
+                            lw.println(&format!(
+                                "{:>BYTECODE_INDEX_LENGTH$}: {}",
+                                position, opcode_and_arguments,
+                            ));
+                        }
                     }
                 }
                 if !exception_table.is_empty() {
-                    println!("      Exception table:");
-                    println!("         from    to  target type");
+                    lw.println("Exception table:");
+                    lw.println("   from    to  target type");
                     for exception in exception_table.iter() {
-                        println!(
-                            "          {}  {}  {}   Class {}",
+                        lw.println(&format!(
+                            "    {}  {}  {}   Class {}",
                             exception.start_pc,
                             exception.end_pc,
                             exception.handler_pc,
                             cp.get_class_name(exception.catch_type)
-                        );
+                        ));
                     }
                 }
                 print_code_attributes(cp, attributes);
+
+                lw.indent(-1);
             }
             AttributeInfo::MethodParameters { parameters } => {
                 println!("    MethodParameters:");
