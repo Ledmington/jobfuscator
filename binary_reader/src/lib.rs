@@ -99,3 +99,54 @@ impl<'a> BinaryReader<'a> {
         self.buf.is_empty()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reading_be_bytes() {
+        let buffer: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+        let mut reader: BinaryReader = BinaryReader::new(&buffer, Endianness::Big);
+        for i in 0..buffer.len() {
+            assert_eq!(buffer[i], reader.read_u8().unwrap());
+        }
+    }
+
+    #[test]
+    fn reading_le_bytes() {
+        let buffer: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+        let mut reader: BinaryReader = BinaryReader::new(&buffer, Endianness::Little);
+        for i in 0..buffer.len() {
+            assert_eq!(buffer[i], reader.read_u8().unwrap());
+        }
+    }
+
+    #[test]
+    fn reading_be_u16() {
+        let buffer: [u8; 2] = [1, 2];
+        let mut reader: BinaryReader = BinaryReader::new(&buffer, Endianness::Big);
+        assert_eq!(0x0102u16, reader.read_u16().unwrap());
+    }
+
+    #[test]
+    fn reading_le_u16() {
+        let buffer: [u8; 2] = [1, 2];
+        let mut reader: BinaryReader = BinaryReader::new(&buffer, Endianness::Little);
+        assert_eq!(0x0201u16, reader.read_u16().unwrap());
+    }
+
+    #[test]
+    fn reading_be_u32() {
+        let buffer: [u8; 4] = [1, 2, 3, 4];
+        let mut reader: BinaryReader = BinaryReader::new(&buffer, Endianness::Big);
+        assert_eq!(0x01020304u32, reader.read_u32().unwrap());
+    }
+
+    #[test]
+    fn reading_le_u32() {
+        let buffer: [u8; 4] = [1, 2, 3, 4];
+        let mut reader: BinaryReader = BinaryReader::new(&buffer, Endianness::Little);
+        assert_eq!(0x04030201u32, reader.read_u32().unwrap());
+    }
+}
