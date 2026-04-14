@@ -30,6 +30,10 @@ name = "binary_reader"
 version = "0.1.0"
 
 [[package]]
+name = "binary_writer"
+version = "0.1.0"
+
+[[package]]
 name = "bitflags"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
