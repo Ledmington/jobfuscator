@@ -25,6 +25,13 @@ impl BinaryWriter {
         self.pos += 1;
     }
 
+    pub fn write_u8_vec(&mut self, x: &Vec<u8>) {
+        for v in x.iter() {
+            self.buf.push(*v);
+        }
+        self.pos += x.len();
+    }
+
     pub fn write_u16(&mut self, x: u16) {
         for v in match self.endianness {
             Endianness::Big => u16::to_be_bytes(x),
@@ -33,6 +40,12 @@ impl BinaryWriter {
             self.buf.push(v);
         }
         self.pos += 2;
+    }
+
+    pub fn write_u16_vec(&mut self, x: &Vec<u16>) {
+        for v in x {
+            self.write_u16(*v);
+        }
     }
 
     pub fn write_u32(&mut self, x: u32) {

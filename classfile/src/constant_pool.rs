@@ -274,27 +274,56 @@ pub enum ConstantPoolTag {
     Package,
 }
 
-impl From<u8> for ConstantPoolTag {
-    fn from(value: u8) -> Self {
-        match value {
-            1 => ConstantPoolTag::Utf8,
-            3 => ConstantPoolTag::Integer,
-            4 => ConstantPoolTag::Float,
-            5 => ConstantPoolTag::Long,
-            6 => ConstantPoolTag::Double,
-            8 => ConstantPoolTag::String,
-            7 => ConstantPoolTag::Class,
-            9 => ConstantPoolTag::Fieldref,
-            10 => ConstantPoolTag::Methodref,
-            11 => ConstantPoolTag::InterfaceMethodref,
-            12 => ConstantPoolTag::NameAndType,
-            15 => ConstantPoolTag::MethodHandle,
-            16 => ConstantPoolTag::MethodType,
-            17 => ConstantPoolTag::Dynamic,
-            18 => ConstantPoolTag::InvokeDynamic,
-            19 => ConstantPoolTag::Module,
-            20 => ConstantPoolTag::Package,
-            _ => panic!("Unknown constant pool tag value {}.", value),
+#[derive(Debug)]
+pub struct UnknownConstantPoolTag(pub u8);
+
+impl TryFrom<u8> for ConstantPoolTag {
+    type Error = UnknownConstantPoolTag;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            1 => Self::Utf8,
+            3 => Self::Integer,
+            4 => Self::Float,
+            5 => Self::Long,
+            6 => Self::Double,
+            8 => Self::String,
+            7 => Self::Class,
+            9 => Self::Fieldref,
+            10 => Self::Methodref,
+            11 => Self::InterfaceMethodref,
+            12 => Self::NameAndType,
+            15 => Self::MethodHandle,
+            16 => Self::MethodType,
+            17 => Self::Dynamic,
+            18 => Self::InvokeDynamic,
+            19 => Self::Module,
+            20 => Self::Package,
+            v => return Err(UnknownConstantPoolTag(v)),
+        })
+    }
+}
+
+impl From<ConstantPoolTag> for u8 {
+    fn from(tag: ConstantPoolTag) -> Self {
+        match tag {
+            ConstantPoolTag::Utf8 => 1,
+            ConstantPoolTag::Integer => 3,
+            ConstantPoolTag::Float => 4,
+            ConstantPoolTag::Long => 5,
+            ConstantPoolTag::Double => 6,
+            ConstantPoolTag::String => 8,
+            ConstantPoolTag::Class => 7,
+            ConstantPoolTag::Fieldref => 9,
+            ConstantPoolTag::Methodref => 10,
+            ConstantPoolTag::InterfaceMethodref => 11,
+            ConstantPoolTag::NameAndType => 12,
+            ConstantPoolTag::MethodHandle => 15,
+            ConstantPoolTag::MethodType => 16,
+            ConstantPoolTag::Dynamic => 17,
+            ConstantPoolTag::InvokeDynamic => 18,
+            ConstantPoolTag::Module => 19,
+            ConstantPoolTag::Package => 20,
         }
     }
 }
@@ -309,7 +338,7 @@ pub fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> Consta
     let mut entries: Vec<ConstantPoolInfo> = Vec::with_capacity(cp_count);
     let mut i = 0;
     while i < cp_count {
-        let tag = ConstantPoolTag::from(reader.read_u8().unwrap());
+        let tag = ConstantPoolTag::try_from(reader.read_u8().unwrap()).unwrap();
         entries.push(parse_constant_pool_entry(reader, tag.clone()));
 
         if matches!(tag, ConstantPoolTag::Long) || matches!(tag, ConstantPoolTag::Double) {
