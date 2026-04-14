@@ -118,8 +118,24 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
     }
 }
 
-fn write_fields(w: &mut BinaryWriter, fields: &Vec<FieldInfo>) {}
+fn write_fields(w: &mut BinaryWriter, fields: &[FieldInfo]) {
+    for field in fields.iter() {
+        w.write_u16(access_flags::to_u16(&field.access_flags));
+        w.write_u16(field.name_index);
+        w.write_u16(field.descriptor_index);
+        w.write_u16(field.attributes.len().try_into().unwrap());
+        write_attributes(w, &field.attributes);
+    }
+}
 
-fn write_methods(w: &mut BinaryWriter, methods: &Vec<MethodInfo>) {}
+fn write_methods(w: &mut BinaryWriter, methods: &[MethodInfo]) {
+    for method in methods.iter() {
+        w.write_u16(access_flags::to_u16(&method.access_flags));
+        w.write_u16(method.name_index);
+        w.write_u16(method.descriptor_index);
+        w.write_u16(method.attributes.len().try_into().unwrap());
+        write_attributes(w, &method.attributes);
+    }
+}
 
 fn write_attributes(w: &mut BinaryWriter, attributes: &Vec<AttributeInfo>) {}
