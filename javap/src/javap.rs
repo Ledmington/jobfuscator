@@ -797,13 +797,13 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                     .iter()
                     .enumerate()
                     .map(|(i, offset)| {
-                        format!("             {:>11}: {}", i, add_offset(*position, *offset))
+                        format!("       {:>11}: {}", i, add_offset(*position, *offset))
                     })
                     .collect::<Vec<String>>()
                     .join("\n")
-                + "\n                 default: "
+                + "\n           default: "
                 + &add_offset(*position, *default).to_string()
-                + "\n            }"
+                + "\n      }"
         }
         BytecodeInstruction::LookupSwitch { default, pairs } => {
             "lookupswitch  { // ".to_owned()
@@ -813,16 +813,16 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                     .iter()
                     .map(|p| {
                         format!(
-                            "             {:>11}: {}",
+                            "       {:>11}: {}",
                             p.match_value,
                             add_offset(*position, p.offset)
                         )
                     })
                     .collect::<Vec<String>>()
                     .join("\n")
-                + "\n                 default: "
+                + "\n           default: "
                 + &add_offset(*position, *default).to_string()
-                + "\n            }"
+                + "\n      }"
         }
 
         // Arithmetic instructions
