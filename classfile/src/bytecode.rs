@@ -891,21 +891,15 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
 
 pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
     match instruction {
-        BytecodeInstruction::Dup {} => todo!(),
-        BytecodeInstruction::AConstNull {} => todo!(),
-        BytecodeInstruction::IConst { constant } => todo!(),
-        BytecodeInstruction::LConst { constant } => todo!(),
-        BytecodeInstruction::FConst { constant } => todo!(),
-        BytecodeInstruction::DConst { constant } => todo!(),
-        BytecodeInstruction::Ldc {
-            constant_pool_index,
-        } => todo!(),
-        BytecodeInstruction::LdcW {
-            constant_pool_index,
-        } => todo!(),
-        BytecodeInstruction::Ldc2W {
-            constant_pool_index,
-        } => todo!(),
+        BytecodeInstruction::Dup {} => 1,
+        BytecodeInstruction::AConstNull {} => 1,
+        BytecodeInstruction::IConst { .. } => 5,
+        BytecodeInstruction::LConst { .. } => 9,
+        BytecodeInstruction::FConst { .. } => 5,
+        BytecodeInstruction::DConst { .. } => 9,
+        BytecodeInstruction::Ldc { .. } => 2,
+        BytecodeInstruction::LdcW { .. } => 3,
+        BytecodeInstruction::Ldc2W { .. } => 3,
         BytecodeInstruction::ALoad { .. } => 2,
         BytecodeInstruction::AStore { .. } => 2,
         BytecodeInstruction::ILoad {
@@ -959,8 +953,8 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         BytecodeInstruction::GetField { .. } => 3,
         BytecodeInstruction::PutField { .. } => 3,
         BytecodeInstruction::InvokeSpecial { .. } => 3,
-        BytecodeInstruction::InvokeStatic { method_ref_index } => todo!(),
-        BytecodeInstruction::InvokeVirtual { method_ref_index } => todo!(),
+        BytecodeInstruction::InvokeStatic { .. } => 3,
+        BytecodeInstruction::InvokeVirtual { .. } => 3,
         BytecodeInstruction::InvokeDynamic {
             constant_pool_index,
         } => todo!(),
