@@ -10,3 +10,4 @@ pub mod fields;
 pub mod methods;
 pub mod reference_kind;
 pub mod utils;
+pub mod writer;
