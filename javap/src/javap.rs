@@ -23,11 +23,6 @@ use time::OffsetDateTime;
 use crate::line_writer::LineWriter;
 
 /**
- * The index of the column (on the terminal) where the comments (the '//') start for the bytecode printing.
- */
-const BYTECODE_COMMENT_START_INDEX: usize = 46;
-
-/**
  * The maximum length (in characters) of the index of a single bytecode instruction.
  */
 const BYTECODE_INDEX_LENGTH: usize = 4;
@@ -1364,15 +1359,18 @@ fn print_method_attributes(
                 );
             }
             AttributeInfo::RuntimeVisibleAnnotations { annotations } => {
-                println!("RuntimeVisibleAnnotations:");
-                for annotation in annotations {
-                    let annotation_type = cp.get_utf8_content(annotation.type_index);
-                    println!(
-                        "{} {}",
-                        annotation_type,
-                        annotation.element_value_pairs.len()
-                    );
+                lw.println("RuntimeVisibleAnnotations:");
+                lw.indent(1);
+                for (i, annotation) in annotations.iter().enumerate() {
+                    let mut annotation_type = cp.get_utf8_content(annotation.type_index);
+                    annotation_type =
+                        annotation_type[1..annotation_type.len() - 1].replace('/', ".");
+                    lw.println(&format!("{}: #{}()", i, annotation.type_index))
+                        .indent(1)
+                        .println(&annotation_type)
+                        .indent(-1);
                 }
+                lw.indent(-1);
             }
             _ => unreachable!("Unknown method attribute {}.", attribute.kind()),
         }

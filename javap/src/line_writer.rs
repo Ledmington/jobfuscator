@@ -71,7 +71,8 @@ impl LineWriter {
         self.pending_spaces += self.indent_count * INDENT_WIDTH;
     }
 
-    pub(crate) fn indent(&mut self, delta: isize) {
+    pub(crate) fn indent(&mut self, delta: isize) -> &mut Self {
         self.indent_count += delta;
+        self
     }
 }
