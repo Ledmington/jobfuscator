@@ -3,7 +3,13 @@
 use binary_writer::{BinaryWriter, Endianness};
 
 use crate::{
-    access_flags, attributes::AttributeInfo, bytecode::write_instruction, classfile::ClassFile, constant_pool::{ConstantPool, ConstantPoolInfo}, fields::FieldInfo, methods::MethodInfo
+    access_flags,
+    attributes::AttributeInfo,
+    bytecode::write_instruction,
+    classfile::ClassFile,
+    constant_pool::{ConstantPool, ConstantPoolInfo},
+    fields::FieldInfo,
+    methods::MethodInfo,
 };
 
 pub fn write_class_file(cf: &ClassFile) -> Vec<u8> {
@@ -159,7 +165,13 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u16(attributes.len().try_into().unwrap());
                 write_attributes(w, attributes);
             }
-            AttributeInfo::LineNumberTable { line_number_table } => todo!(),
+            AttributeInfo::LineNumberTable { line_number_table } => {
+                w.write_u16(line_number_table.len().try_into().unwrap());
+                for entry in line_number_table.iter() {
+                    w.write_u16(entry.start_pc);
+                    w.write_u16(entry.line_number);
+                }
+            }
             AttributeInfo::LocalVariableTable {
                 local_variable_table,
             } => todo!(),
@@ -167,7 +179,9 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 local_variable_type_table,
             } => todo!(),
             AttributeInfo::StackMapTable { stack_map_table } => todo!(),
-            AttributeInfo::SourceFile { source_file_index } => todo!(),
+            AttributeInfo::SourceFile { source_file_index } => {
+                w.write_u16(*source_file_index);
+            },
             AttributeInfo::BootstrapMethods { methods } => todo!(),
             AttributeInfo::InnerClasses { classes } => todo!(),
             AttributeInfo::MethodParameters { parameters } => todo!(),

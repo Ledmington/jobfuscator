@@ -258,192 +258,6 @@ pub enum BytecodeInstruction {
     DSub {},
 }
 
-impl BytecodeInstruction {
-    pub fn opcode(&self) -> u8 {
-        match self {
-            BytecodeInstruction::AConstNull {} => 0x01,
-            BytecodeInstruction::IConst { constant } => match constant {
-                -1 => 0x02,
-                0 => 0x03,
-                1 => 0x04,
-                2 => 0x05,
-                3 => 0x06,
-                4 => 0x07,
-                5 => 0x08,
-                _ => panic!("invalid IConst value"),
-            },
-            BytecodeInstruction::LConst { constant } => todo!(),
-            BytecodeInstruction::FConst { constant } => todo!(),
-            BytecodeInstruction::DConst { constant } => todo!(),
-            BytecodeInstruction::Ldc {
-                constant_pool_index,
-            } => todo!(),
-            BytecodeInstruction::LdcW {
-                constant_pool_index,
-            } => todo!(),
-            BytecodeInstruction::Ldc2W {
-                constant_pool_index,
-            } => todo!(),
-            BytecodeInstruction::ALoad {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::AStore {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::ILoad {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::IStore {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::LLoad {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::LStore {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::FLoad {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::FStore {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::DLoad {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::DStore {
-                local_variable_index,
-            } => todo!(),
-            BytecodeInstruction::AaLoad {} => todo!(),
-            BytecodeInstruction::BaLoad {} => todo!(),
-            BytecodeInstruction::AaStore {} => todo!(),
-            BytecodeInstruction::BaStore {} => todo!(),
-            BytecodeInstruction::CaStore {} => todo!(),
-            BytecodeInstruction::SaStore {} => todo!(),
-            BytecodeInstruction::NewArray { atype } => todo!(),
-            BytecodeInstruction::ANewArray {
-                constant_pool_index,
-            } => todo!(),
-            BytecodeInstruction::AThrow {} => todo!(),
-            BytecodeInstruction::New {
-                constant_pool_index,
-            } => todo!(),
-            BytecodeInstruction::BiPush { immediate } => todo!(),
-            BytecodeInstruction::SiPush { immediate } => todo!(),
-            BytecodeInstruction::Pop {} => todo!(),
-            BytecodeInstruction::Pop2 {} => todo!(),
-            BytecodeInstruction::Return {} => todo!(),
-            BytecodeInstruction::IReturn {} => todo!(),
-            BytecodeInstruction::LReturn {} => todo!(),
-            BytecodeInstruction::FReturn {} => todo!(),
-            BytecodeInstruction::DReturn {} => todo!(),
-            BytecodeInstruction::AReturn {} => todo!(),
-            BytecodeInstruction::GetStatic { field_ref_index } => todo!(),
-            BytecodeInstruction::PutStatic { field_ref_index } => todo!(),
-            BytecodeInstruction::Dup {} => todo!(),
-            BytecodeInstruction::GetField { field_ref_index } => todo!(),
-            BytecodeInstruction::PutField { field_ref_index } => todo!(),
-            BytecodeInstruction::InvokeSpecial { method_ref_index } => todo!(),
-            BytecodeInstruction::InvokeStatic { method_ref_index } => todo!(),
-            BytecodeInstruction::InvokeVirtual { method_ref_index } => todo!(),
-            BytecodeInstruction::InvokeDynamic {
-                constant_pool_index,
-            } => todo!(),
-            BytecodeInstruction::InvokeInterface {
-                constant_pool_index,
-                count,
-            } => todo!(),
-            BytecodeInstruction::ArrayLength {} => todo!(),
-            BytecodeInstruction::LCmp {} => todo!(),
-            BytecodeInstruction::FCmpL {} => todo!(),
-            BytecodeInstruction::FCmpG {} => todo!(),
-            BytecodeInstruction::DCmpL {} => todo!(),
-            BytecodeInstruction::DCmpG {} => todo!(),
-            BytecodeInstruction::IfAcmpEq { offset } => todo!(),
-            BytecodeInstruction::IfAcmpNe { offset } => todo!(),
-            BytecodeInstruction::IfIcmpEq { offset } => todo!(),
-            BytecodeInstruction::IfIcmpNe { offset } => todo!(),
-            BytecodeInstruction::IfIcmpLt { offset } => todo!(),
-            BytecodeInstruction::IfIcmpGe { offset } => todo!(),
-            BytecodeInstruction::IfIcmpGt { offset } => todo!(),
-            BytecodeInstruction::IfIcmpLe { offset } => todo!(),
-            BytecodeInstruction::IfEq { offset } => todo!(),
-            BytecodeInstruction::IfNe { offset } => todo!(),
-            BytecodeInstruction::IfLt { offset } => todo!(),
-            BytecodeInstruction::IfGe { offset } => todo!(),
-            BytecodeInstruction::IfGt { offset } => todo!(),
-            BytecodeInstruction::IfLe { offset } => todo!(),
-            BytecodeInstruction::IfNull { offset } => todo!(),
-            BytecodeInstruction::IfNonNull { offset } => todo!(),
-            BytecodeInstruction::GoTo { offset } => todo!(),
-            BytecodeInstruction::TableSwitch {
-                default,
-                low,
-                offsets,
-            } => todo!(),
-            BytecodeInstruction::LookupSwitch { default, pairs } => todo!(),
-            BytecodeInstruction::CheckCast {
-                constant_pool_index,
-            } => todo!(),
-            BytecodeInstruction::Instanceof {
-                constant_pool_index,
-            } => todo!(),
-            BytecodeInstruction::IInc { index, constant } => todo!(),
-            BytecodeInstruction::I2L {} => todo!(),
-            BytecodeInstruction::I2F {} => todo!(),
-            BytecodeInstruction::I2D {} => todo!(),
-            BytecodeInstruction::L2I {} => todo!(),
-            BytecodeInstruction::L2F {} => todo!(),
-            BytecodeInstruction::L2D {} => todo!(),
-            BytecodeInstruction::F2I {} => todo!(),
-            BytecodeInstruction::F2L {} => todo!(),
-            BytecodeInstruction::F2D {} => todo!(),
-            BytecodeInstruction::D2I {} => todo!(),
-            BytecodeInstruction::D2L {} => todo!(),
-            BytecodeInstruction::D2F {} => todo!(),
-            BytecodeInstruction::I2B {} => todo!(),
-            BytecodeInstruction::I2C {} => todo!(),
-            BytecodeInstruction::I2S {} => todo!(),
-            BytecodeInstruction::IAdd {} => todo!(),
-            BytecodeInstruction::ISub {} => todo!(),
-            BytecodeInstruction::IMul {} => todo!(),
-            BytecodeInstruction::IDiv {} => todo!(),
-            BytecodeInstruction::IRem {} => todo!(),
-            BytecodeInstruction::IAnd {} => todo!(),
-            BytecodeInstruction::IShl {} => todo!(),
-            BytecodeInstruction::IShr {} => todo!(),
-            BytecodeInstruction::IUshr {} => todo!(),
-            BytecodeInstruction::IOr {} => todo!(),
-            BytecodeInstruction::IXor {} => todo!(),
-            BytecodeInstruction::INeg {} => todo!(),
-            BytecodeInstruction::LAdd {} => todo!(),
-            BytecodeInstruction::LSub {} => todo!(),
-            BytecodeInstruction::LMul {} => todo!(),
-            BytecodeInstruction::LDiv {} => todo!(),
-            BytecodeInstruction::LRem {} => todo!(),
-            BytecodeInstruction::LAnd {} => todo!(),
-            BytecodeInstruction::LOr {} => todo!(),
-            BytecodeInstruction::LXor {} => todo!(),
-            BytecodeInstruction::LShl {} => todo!(),
-            BytecodeInstruction::LShr {} => todo!(),
-            BytecodeInstruction::LUshr {} => todo!(),
-            BytecodeInstruction::LNeg {} => todo!(),
-            BytecodeInstruction::FAdd {} => todo!(),
-            BytecodeInstruction::FMul {} => todo!(),
-            BytecodeInstruction::FNeg {} => todo!(),
-            BytecodeInstruction::FDiv {} => todo!(),
-            BytecodeInstruction::FRem {} => todo!(),
-            BytecodeInstruction::FSub {} => todo!(),
-            BytecodeInstruction::DAdd {} => todo!(),
-            BytecodeInstruction::DMul {} => todo!(),
-            BytecodeInstruction::DNeg {} => todo!(),
-            BytecodeInstruction::DDiv {} => todo!(),
-            BytecodeInstruction::DRem {} => todo!(),
-            BytecodeInstruction::DSub {} => todo!(),
-        }
-    }
-}
-
 pub struct LookupSwitchPair {
     pub match_value: i32,
     pub offset: i32,
@@ -888,8 +702,6 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
 }
 
 pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction) {
-    w.write_u8(instruction.opcode());
-
     match instruction {
         BytecodeInstruction::Dup {} => todo!(),
         BytecodeInstruction::AConstNull {} => todo!(),
@@ -899,7 +711,10 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         BytecodeInstruction::DConst { constant } => todo!(),
         BytecodeInstruction::Ldc {
             constant_pool_index,
-        } => todo!(),
+        } => {
+            w.write_u8(0x12);
+            w.write_u8(*constant_pool_index);
+        }
         BytecodeInstruction::LdcW {
             constant_pool_index,
         } => todo!(),
@@ -908,7 +723,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         } => todo!(),
         BytecodeInstruction::ALoad {
             local_variable_index,
-        } => todo!(),
+        } => w.write_u8(*local_variable_index),
         BytecodeInstruction::AStore {
             local_variable_index,
         } => todo!(),
@@ -954,19 +769,29 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         BytecodeInstruction::SiPush { immediate } => todo!(),
         BytecodeInstruction::Pop {} => todo!(),
         BytecodeInstruction::Pop2 {} => todo!(),
-        BytecodeInstruction::Return {} => todo!(),
+        BytecodeInstruction::Return {} => w.write_u8(0xb1),
         BytecodeInstruction::IReturn {} => todo!(),
         BytecodeInstruction::LReturn {} => todo!(),
         BytecodeInstruction::FReturn {} => todo!(),
         BytecodeInstruction::DReturn {} => todo!(),
         BytecodeInstruction::AReturn {} => todo!(),
-        BytecodeInstruction::GetStatic { field_ref_index } => todo!(),
+        BytecodeInstruction::GetStatic { field_ref_index } => {
+            w.write_u8(0xb2);
+            w.write_u16(*field_ref_index);
+        }
         BytecodeInstruction::PutStatic { field_ref_index } => todo!(),
         BytecodeInstruction::GetField { field_ref_index } => todo!(),
         BytecodeInstruction::PutField { field_ref_index } => todo!(),
-        BytecodeInstruction::InvokeSpecial { method_ref_index } => todo!(),
+        BytecodeInstruction::InvokeSpecial { method_ref_index } => {
+            w.write_u8(0xb7);
+            w.write_u16(*method_ref_index);
+        }
+
         BytecodeInstruction::InvokeStatic { method_ref_index } => todo!(),
-        BytecodeInstruction::InvokeVirtual { method_ref_index } => todo!(),
+        BytecodeInstruction::InvokeVirtual { method_ref_index } => {
+            w.write_u8(0xb6);
+            w.write_u16(*method_ref_index);
+        }
         BytecodeInstruction::InvokeDynamic {
             constant_pool_index,
         } => todo!(),
