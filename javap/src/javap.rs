@@ -1539,6 +1539,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
             }
             AttributeInfo::InnerClasses { classes } => {
                 lw.println("InnerClasses:");
+                lw.indent(1);
                 for class in classes.iter() {
                     lw.print(&format!(
                         "{} #{}= #{} of #{};",
@@ -1555,6 +1556,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                         cp.get_class_name(class.outer_class_info_index),
                     ));
                 }
+                lw.indent(-1);
             }
             AttributeInfo::BootstrapMethods { methods } => {
                 lw.println("BootstrapMethods:");
