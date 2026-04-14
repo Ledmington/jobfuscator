@@ -13,6 +13,7 @@ use crate::constant_pool::{ConstantPool, ConstantPoolTag, assert_valid_and_type}
 
 pub enum AttributeInfo {
     Code {
+        name_index: u16,
         max_stack: u16,
         max_locals: u16,
         code: BTreeMap<u32, BytecodeInstruction>,
@@ -20,42 +21,55 @@ pub enum AttributeInfo {
         attributes: Vec<AttributeInfo>,
     },
     LineNumberTable {
+        name_index: u16,
         line_number_table: Vec<LineNumberTableEntry>,
     },
     LocalVariableTable {
+        name_index: u16,
         local_variable_table: Vec<LocalVariableTableEntry>,
     },
     LocalVariableTypeTable {
+        name_index: u16,
         local_variable_type_table: Vec<LocalVariableTypeTableEntry>,
     },
     StackMapTable {
+        name_index: u16,
         stack_map_table: Vec<StackMapFrame>,
     },
     SourceFile {
+        name_index: u16,
         source_file_index: u16,
     },
     BootstrapMethods {
+        name_index: u16,
         methods: Vec<BootstrapMethod>,
     },
     InnerClasses {
+        name_index: u16,
         classes: Vec<Class>,
     },
     MethodParameters {
+        name_index: u16,
         parameters: Vec<MethodParameter>,
     },
     Record {
+        name_index: u16,
         components: Vec<RecordComponentInfo>,
     },
     Signature {
+        name_index: u16,
         signature_index: u16,
     },
     NestMembers {
+        name_index: u16,
         classes: Vec<u16>,
     },
     RuntimeVisibleAnnotations {
+        name_index: u16,
         annotations: Vec<Annotation>,
     },
     ConstantValue {
+        name_index: u16,
         constant_value_index: u16,
     },
 }
@@ -283,6 +297,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
     let _attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
         "SourceFile" => AttributeInfo::SourceFile {
+            name_index: attribute_name_index,
             source_file_index: reader.read_u16().unwrap(),
         },
         "BootstrapMethods" => {
@@ -299,7 +314,10 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                     bootstrap_arguments,
                 });
             }
-            AttributeInfo::BootstrapMethods { methods }
+            AttributeInfo::BootstrapMethods {
+                name_index: attribute_name_index,
+                methods,
+            }
         }
         "InnerClasses" => {
             let number_of_classes: u16 = reader.read_u16().unwrap();
@@ -314,7 +332,10 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                     ),
                 });
             }
-            AttributeInfo::InnerClasses { classes }
+            AttributeInfo::InnerClasses {
+                name_index: attribute_name_index,
+                classes,
+            }
         }
         "Record" => {
             let components_count: u16 = reader.read_u16().unwrap();
@@ -332,16 +353,25 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                     attributes,
                 });
             }
-            AttributeInfo::Record { components }
+            AttributeInfo::Record {
+                name_index: attribute_name_index,
+                components,
+            }
         }
         "Signature" => {
             let signature_index: u16 = reader.read_u16().unwrap();
-            AttributeInfo::Signature { signature_index }
+            AttributeInfo::Signature {
+                name_index: attribute_name_index,
+                signature_index,
+            }
         }
         "NestMembers" => {
             let number_of_classes: u16 = reader.read_u16().unwrap();
             let classes: Vec<u16> = reader.read_u16_vec(number_of_classes.into()).unwrap();
-            AttributeInfo::NestMembers { classes }
+            AttributeInfo::NestMembers {
+                name_index: attribute_name_index,
+                classes,
+            }
         }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a class attribute.",
@@ -393,12 +423,16 @@ fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attrib
         "Signature" => {
             let signature_index: u16 = reader.read_u16().unwrap();
             check_attribute_length(attribute_length, 2, attribute_name);
-            AttributeInfo::Signature { signature_index }
+            AttributeInfo::Signature {
+                name_index: attribute_name_index,
+                signature_index,
+            }
         }
         "ConstantValue" => {
             let constant_value_index: u16 = reader.read_u16().unwrap();
             check_attribute_length(attribute_length, 2, attribute_name);
             AttributeInfo::ConstantValue {
+                name_index: attribute_name_index,
                 constant_value_index,
             }
         }
@@ -463,6 +497,7 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
             let attributes: Vec<AttributeInfo> =
                 parse_code_attributes(reader, cp, attribute_count.into());
             AttributeInfo::Code {
+                name_index: attribute_name_index,
                 max_stack,
                 max_locals,
                 code,
@@ -483,11 +518,17 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
                     access_flags,
                 });
             }
-            AttributeInfo::MethodParameters { parameters }
+            AttributeInfo::MethodParameters {
+                name_index: attribute_name_index,
+                parameters,
+            }
         }
         "Signature" => {
             let signature_index: u16 = reader.read_u16().unwrap();
-            AttributeInfo::Signature { signature_index }
+            AttributeInfo::Signature {
+                name_index: attribute_name_index,
+                signature_index,
+            }
         }
         "RuntimeVisibleAnnotations" => {
             let num_annotations: u16 = reader.read_u16().unwrap();
@@ -495,7 +536,10 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
             for _ in 0..num_annotations {
                 annotations.push(parse_annotation(cp, reader));
             }
-            AttributeInfo::RuntimeVisibleAnnotations { annotations }
+            AttributeInfo::RuntimeVisibleAnnotations {
+                name_index: attribute_name_index,
+                annotations,
+            }
         }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a method attribute.",
@@ -615,7 +659,10 @@ fn parse_code_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attribu
                     line_number,
                 });
             }
-            AttributeInfo::LineNumberTable { line_number_table }
+            AttributeInfo::LineNumberTable {
+                name_index: attribute_name_index,
+                line_number_table,
+            }
         }
         "LocalVariableTable" => {
             let local_variable_table_length: u16 = reader.read_u16().unwrap();
@@ -636,6 +683,7 @@ fn parse_code_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attribu
                 });
             }
             AttributeInfo::LocalVariableTable {
+                name_index: attribute_name_index,
                 local_variable_table,
             }
         }
@@ -658,6 +706,7 @@ fn parse_code_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attribu
                 });
             }
             AttributeInfo::LocalVariableTypeTable {
+                name_index: attribute_name_index,
                 local_variable_type_table,
             }
         }
@@ -668,7 +717,10 @@ fn parse_code_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attribu
             for _ in 0..number_of_entries {
                 stack_map_table.push(parse_stack_map_entry(reader));
             }
-            AttributeInfo::StackMapTable { stack_map_table }
+            AttributeInfo::StackMapTable {
+                name_index: attribute_name_index,
+                stack_map_table,
+            }
         }
         _ => panic!(
             "The name '{}' is either not of an attribute or not a code attribute.",

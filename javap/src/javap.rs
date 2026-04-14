@@ -133,9 +133,9 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         .iter()
         .filter(|attr| matches!(attr, AttributeInfo::SourceFile { .. }))
         .map(|attr| match attr {
-            AttributeInfo::SourceFile { source_file_index } => {
-                cf.constant_pool.get_utf8_content(*source_file_index)
-            }
+            AttributeInfo::SourceFile {
+                source_file_index, ..
+            } => cf.constant_pool.get_utf8_content(*source_file_index),
             _ => unreachable!(),
         })
         .next()
@@ -376,8 +376,9 @@ fn print_fields(lw: &mut LineWriter, cp: &ConstantPool, fields: &[FieldInfo]) {
             "{} {} {};",
             access_flags::modifier_repr_vec(&field.access_flags),
             match signature {
-                Some(AttributeInfo::Signature { signature_index }) =>
-                    descriptor::parse_field_descriptor(&cp.get_utf8_content(*signature_index)),
+                Some(AttributeInfo::Signature {
+                    signature_index, ..
+                }) => descriptor::parse_field_descriptor(&cp.get_utf8_content(*signature_index)),
                 Some(_) => unreachable!(),
                 None => descriptor::parse_field_descriptor(&descriptor),
             },
@@ -403,13 +404,16 @@ fn print_fields(lw: &mut LineWriter, cp: &ConstantPool, fields: &[FieldInfo]) {
 fn print_field_attributes(lw: &mut LineWriter, cp: &ConstantPool, field: &FieldInfo) {
     for attribute in field.attributes.iter() {
         match attribute {
-            AttributeInfo::Signature { signature_index } => {
+            AttributeInfo::Signature {
+                signature_index, ..
+            } => {
                 lw.print(&format!("Signature: #{}", signature_index))
                     .tab()
                     .println(&format!("// {}", cp.get_utf8_content(*signature_index)));
             }
             AttributeInfo::ConstantValue {
                 constant_value_index,
+                ..
             } => {
                 lw.println(&format!(
                     "ConstantValue: {}",
@@ -1285,6 +1289,7 @@ fn print_method_attributes(
                 code,
                 exception_table,
                 attributes,
+                ..
             } => {
                 lw.println("Code:");
                 lw.indent(1);
@@ -1331,7 +1336,7 @@ fn print_method_attributes(
 
                 lw.indent(-1);
             }
-            AttributeInfo::MethodParameters { parameters } => {
+            AttributeInfo::MethodParameters { parameters, .. } => {
                 println!("    MethodParameters:");
                 println!("      Name                           Flags");
                 for param in parameters.iter() {
@@ -1350,7 +1355,9 @@ fn print_method_attributes(
                     println!();
                 }
             }
-            AttributeInfo::Signature { signature_index } => {
+            AttributeInfo::Signature {
+                signature_index, ..
+            } => {
                 println!(
                     "{:<width$}// {}",
                     format!("    Signature: #{}", signature_index),
@@ -1358,7 +1365,7 @@ fn print_method_attributes(
                     width = comment_index + 2 // why?
                 );
             }
-            AttributeInfo::RuntimeVisibleAnnotations { annotations } => {
+            AttributeInfo::RuntimeVisibleAnnotations { annotations, .. } => {
                 lw.println("RuntimeVisibleAnnotations:");
                 lw.indent(1);
                 for (i, annotation) in annotations.iter().enumerate() {
@@ -1380,7 +1387,9 @@ fn print_method_attributes(
 fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
     for attribute in attributes.iter() {
         match attribute {
-            AttributeInfo::LineNumberTable { line_number_table } => {
+            AttributeInfo::LineNumberTable {
+                line_number_table, ..
+            } => {
                 println!("      LineNumberTable:");
                 for entry in line_number_table.iter() {
                     println!("        line {}: {}", entry.line_number, entry.start_pc);
@@ -1388,6 +1397,7 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
             }
             AttributeInfo::LocalVariableTable {
                 local_variable_table,
+                ..
             } => {
                 println!("      LocalVariableTable:");
                 println!("        Start  Length  Slot  Name   Signature");
@@ -1404,6 +1414,7 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
             }
             AttributeInfo::LocalVariableTypeTable {
                 local_variable_type_table,
+                ..
             } => {
                 println!("      LocalVariableTypeTable:");
                 println!("        Start  Length  Slot  Name   Signature");
@@ -1418,7 +1429,9 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                     );
                 }
             }
-            AttributeInfo::StackMapTable { stack_map_table } => {
+            AttributeInfo::StackMapTable {
+                stack_map_table, ..
+            } => {
                 println!(
                     "      StackMapTable: number_of_entries = {}",
                     stack_map_table.len()
@@ -1531,13 +1544,15 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
 fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[AttributeInfo]) {
     for attribute in attributes.iter() {
         match attribute {
-            AttributeInfo::SourceFile { source_file_index } => {
+            AttributeInfo::SourceFile {
+                source_file_index, ..
+            } => {
                 lw.println(&format!(
                     "SourceFile: \"{}\"",
                     cp.get_utf8_content(*source_file_index)
                 ));
             }
-            AttributeInfo::InnerClasses { classes } => {
+            AttributeInfo::InnerClasses { classes, .. } => {
                 lw.println("InnerClasses:");
                 lw.indent(1);
                 for class in classes.iter() {
@@ -1558,7 +1573,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                 }
                 lw.indent(-1);
             }
-            AttributeInfo::BootstrapMethods { methods } => {
+            AttributeInfo::BootstrapMethods { methods, .. } => {
                 lw.println("BootstrapMethods:");
                 for (i, method) in methods.iter().enumerate() {
                     lw.print(&format!("  {}: #{} ", i, method.bootstrap_method_ref));
@@ -1605,7 +1620,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                     }
                 }
             }
-            AttributeInfo::Record { components } => {
+            AttributeInfo::Record { components, .. } => {
                 lw.println("Record:");
                 for component in components.iter() {
                     let descriptor = cp.get_utf8_content(component.descriptor_index);
@@ -1618,12 +1633,14 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                     lw.println("");
                 }
             }
-            AttributeInfo::Signature { signature_index } => {
+            AttributeInfo::Signature {
+                signature_index, ..
+            } => {
                 lw.print(&format!("Signature: #{}", signature_index))
                     .tab()
                     .println(&format!("// {}", cp.get_utf8_content(*signature_index)));
             }
-            AttributeInfo::NestMembers { classes } => {
+            AttributeInfo::NestMembers { classes, .. } => {
                 lw.println("NestMembers:");
                 for class_index in classes {
                     lw.println(&format!("  {}", cp.get_class_name(*class_index)));

@@ -5,7 +5,7 @@ use binary_writer::{BinaryWriter, Endianness};
 use crate::{
     access_flags,
     attributes::AttributeInfo,
-    bytecode::write_instruction,
+    bytecode::{get_instruction_length, write_instruction},
     classfile::ClassFile,
     constant_pool::{ConstantPool, ConstantPoolInfo},
     fields::FieldInfo,
@@ -139,20 +139,106 @@ fn write_methods(w: &mut BinaryWriter, methods: &[MethodInfo]) {
     }
 }
 
+/**
+ * Computes the total number of bytes required to write the given attribute, excluding the initial six bytes for the name_index field and the attribute_length field.
+ */
+fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
+    match attribute {
+        AttributeInfo::Code {
+            code,
+            exception_table,
+            attributes,
+            ..
+        } => {
+            2 + 2
+                + 4
+                + code
+                    .values()
+                    .map(|inst| get_instruction_length(&inst))
+                    .sum::<u32>()
+                + 2
+                + (2 * 4) * (exception_table.len() as u32)
+                + 2
+                + attributes
+                    .iter()
+                    .map(|attr| get_attribute_length(attr))
+                    .sum::<u32>()
+        }
+        AttributeInfo::LineNumberTable {
+            line_number_table, ..
+        } => 2 + (2 * 2) * (line_number_table.len() as u32),
+        AttributeInfo::LocalVariableTable {
+            name_index,
+            local_variable_table,
+        } => todo!(),
+        AttributeInfo::LocalVariableTypeTable {
+            name_index,
+            local_variable_type_table,
+        } => todo!(),
+        AttributeInfo::StackMapTable {
+            name_index,
+            stack_map_table,
+        } => todo!(),
+        AttributeInfo::SourceFile {
+            name_index,
+            source_file_index,
+        } => todo!(),
+        AttributeInfo::BootstrapMethods {
+            name_index,
+            methods,
+        } => todo!(),
+        AttributeInfo::InnerClasses {
+            name_index,
+            classes,
+        } => todo!(),
+        AttributeInfo::MethodParameters {
+            name_index,
+            parameters,
+        } => todo!(),
+        AttributeInfo::Record {
+            name_index,
+            components,
+        } => todo!(),
+        AttributeInfo::Signature {
+            name_index,
+            signature_index,
+        } => todo!(),
+        AttributeInfo::NestMembers {
+            name_index,
+            classes,
+        } => todo!(),
+        AttributeInfo::RuntimeVisibleAnnotations {
+            name_index,
+            annotations,
+        } => todo!(),
+        AttributeInfo::ConstantValue {
+            name_index,
+            constant_value_index,
+        } => todo!(),
+    }
+}
+
 fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
     for attribute in attributes.iter() {
         match attribute {
             AttributeInfo::Code {
+                name_index,
                 max_stack,
                 max_locals,
                 code,
                 exception_table,
                 attributes,
             } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
                 w.write_u16(*max_stack);
                 w.write_u16(*max_locals);
-                w.write_u32(code.len().try_into().unwrap());
-                for (index, instruction) in code.iter() {
+                w.write_u32(
+                    code.values()
+                        .map(|attr| get_instruction_length(&attr))
+                        .sum(),
+                );
+                for (_, instruction) in code.iter() {
                     write_instruction(w, instruction);
                 }
                 w.write_u16(exception_table.len().try_into().unwrap());
@@ -165,7 +251,10 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u16(attributes.len().try_into().unwrap());
                 write_attributes(w, attributes);
             }
-            AttributeInfo::LineNumberTable { line_number_table } => {
+            AttributeInfo::LineNumberTable {
+                name_index,
+                line_number_table,
+            } => {
                 w.write_u16(line_number_table.len().try_into().unwrap());
                 for entry in line_number_table.iter() {
                     w.write_u16(entry.start_pc);
@@ -173,23 +262,53 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 }
             }
             AttributeInfo::LocalVariableTable {
+                name_index,
                 local_variable_table,
             } => todo!(),
             AttributeInfo::LocalVariableTypeTable {
+                name_index,
                 local_variable_type_table,
             } => todo!(),
-            AttributeInfo::StackMapTable { stack_map_table } => todo!(),
-            AttributeInfo::SourceFile { source_file_index } => {
+            AttributeInfo::StackMapTable {
+                name_index,
+                stack_map_table,
+            } => todo!(),
+            AttributeInfo::SourceFile {
+                name_index,
+                source_file_index,
+            } => {
                 w.write_u16(*source_file_index);
-            },
-            AttributeInfo::BootstrapMethods { methods } => todo!(),
-            AttributeInfo::InnerClasses { classes } => todo!(),
-            AttributeInfo::MethodParameters { parameters } => todo!(),
-            AttributeInfo::Record { components } => todo!(),
-            AttributeInfo::Signature { signature_index } => todo!(),
-            AttributeInfo::NestMembers { classes } => todo!(),
-            AttributeInfo::RuntimeVisibleAnnotations { annotations } => todo!(),
+            }
+            AttributeInfo::BootstrapMethods {
+                name_index,
+                methods,
+            } => todo!(),
+            AttributeInfo::InnerClasses {
+                name_index,
+                classes,
+            } => todo!(),
+            AttributeInfo::MethodParameters {
+                name_index,
+                parameters,
+            } => todo!(),
+            AttributeInfo::Record {
+                name_index,
+                components,
+            } => todo!(),
+            AttributeInfo::Signature {
+                name_index,
+                signature_index,
+            } => todo!(),
+            AttributeInfo::NestMembers {
+                name_index,
+                classes,
+            } => todo!(),
+            AttributeInfo::RuntimeVisibleAnnotations {
+                name_index,
+                annotations,
+            } => todo!(),
             AttributeInfo::ConstantValue {
+                name_index,
                 constant_value_index,
             } => todo!(),
         }

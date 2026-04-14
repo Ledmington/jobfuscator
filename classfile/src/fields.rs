@@ -35,6 +35,7 @@ pub fn parse_fields(
         let constant_value = find_attribute(&attributes, AttributeKind::ConstantValue);
         if let Some(AttributeInfo::ConstantValue {
             constant_value_index,
+            ..
         }) = constant_value
         {
             let field_descriptor = parse_field_descriptor(&cp.get_utf8_content(descriptor_index));
