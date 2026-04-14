@@ -43,7 +43,7 @@ jobs:
         run: cargo test
 
       - name: Integration tests
-        run: ${GITHUB_WORKSPACE}/test/run_tests.sh debug
+        run: ${GITHUB_WORKSPACE}/test/run_e2e_tests.sh debug
 
       - name: Docs
         run: cargo doc --no-deps
@@ -70,7 +70,7 @@ jobs:
         run: cargo test --release
 
       - name: Integration tests
-        run: ${GITHUB_WORKSPACE}/test/run_tests.sh release
+        run: ${GITHUB_WORKSPACE}/test/run_e2e_tests.sh release
 
       - name: Docs
         run: cargo doc --release --no-deps
