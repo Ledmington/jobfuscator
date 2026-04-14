@@ -3,12 +3,7 @@
 use binary_writer::{BinaryWriter, Endianness};
 
 use crate::{
-    access_flags,
-    attributes::AttributeInfo,
-    classfile::ClassFile,
-    constant_pool::{ConstantPool, ConstantPoolInfo},
-    fields::FieldInfo,
-    methods::MethodInfo,
+    access_flags, attributes::AttributeInfo, bytecode::write_instruction, classfile::ClassFile, constant_pool::{ConstantPool, ConstantPoolInfo}, fields::FieldInfo, methods::MethodInfo
 };
 
 pub fn write_class_file(cf: &ClassFile) -> Vec<u8> {
@@ -138,4 +133,51 @@ fn write_methods(w: &mut BinaryWriter, methods: &[MethodInfo]) {
     }
 }
 
-fn write_attributes(w: &mut BinaryWriter, attributes: &Vec<AttributeInfo>) {}
+fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
+    for attribute in attributes.iter() {
+        match attribute {
+            AttributeInfo::Code {
+                max_stack,
+                max_locals,
+                code,
+                exception_table,
+                attributes,
+            } => {
+                w.write_u16(*max_stack);
+                w.write_u16(*max_locals);
+                w.write_u32(code.len().try_into().unwrap());
+                for (index, instruction) in code.iter() {
+                    write_instruction(w, instruction);
+                }
+                w.write_u16(exception_table.len().try_into().unwrap());
+                for exception in exception_table.iter() {
+                    w.write_u16(exception.start_pc);
+                    w.write_u16(exception.end_pc);
+                    w.write_u16(exception.handler_pc);
+                    w.write_u16(exception.catch_type);
+                }
+                w.write_u16(attributes.len().try_into().unwrap());
+                write_attributes(w, attributes);
+            }
+            AttributeInfo::LineNumberTable { line_number_table } => todo!(),
+            AttributeInfo::LocalVariableTable {
+                local_variable_table,
+            } => todo!(),
+            AttributeInfo::LocalVariableTypeTable {
+                local_variable_type_table,
+            } => todo!(),
+            AttributeInfo::StackMapTable { stack_map_table } => todo!(),
+            AttributeInfo::SourceFile { source_file_index } => todo!(),
+            AttributeInfo::BootstrapMethods { methods } => todo!(),
+            AttributeInfo::InnerClasses { classes } => todo!(),
+            AttributeInfo::MethodParameters { parameters } => todo!(),
+            AttributeInfo::Record { components } => todo!(),
+            AttributeInfo::Signature { signature_index } => todo!(),
+            AttributeInfo::NestMembers { classes } => todo!(),
+            AttributeInfo::RuntimeVisibleAnnotations { annotations } => todo!(),
+            AttributeInfo::ConstantValue {
+                constant_value_index,
+            } => todo!(),
+        }
+    }
+}
