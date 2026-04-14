@@ -152,17 +152,11 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
         } => {
             2 + 2
                 + 4
-                + code
-                    .values()
-                    .map(|inst| get_instruction_length(&inst))
-                    .sum::<u32>()
+                + code.values().map(get_instruction_length).sum::<u32>()
                 + 2
                 + (2 * 4) * (exception_table.len() as u32)
                 + 2
-                + attributes
-                    .iter()
-                    .map(|attr| get_attribute_length(attr))
-                    .sum::<u32>()
+                + attributes.iter().map(get_attribute_length).sum::<u32>()
         }
         AttributeInfo::LineNumberTable {
             line_number_table, ..
@@ -233,11 +227,7 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u32(get_attribute_length(attribute));
                 w.write_u16(*max_stack);
                 w.write_u16(*max_locals);
-                w.write_u32(
-                    code.values()
-                        .map(|attr| get_instruction_length(&attr))
-                        .sum(),
-                );
+                w.write_u32(code.values().map(get_instruction_length).sum());
                 for (_, instruction) in code.iter() {
                     write_instruction(w, instruction);
                 }

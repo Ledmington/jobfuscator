@@ -25,7 +25,7 @@ impl BinaryWriter {
         self.pos += 1;
     }
 
-    pub fn write_u8_vec(&mut self, x: &Vec<u8>) {
+    pub fn write_u8_vec(&mut self, x: &[u8]) {
         for v in x.iter() {
             self.buf.push(*v);
         }
