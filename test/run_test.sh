@@ -23,7 +23,7 @@ echo ""
 
 run_test() {
     local TEST_NAME="$1"
-    local TEST_FILE="${TEST_DIR}/${TEST_NAME}.class"
+    local TEST_FILE="${TEST_DIR}/data/${TEST_NAME}.class"
     local EXPECTED_OUTPUT
     local ACTUAL_OUTPUT
     local DIFF_OUTPUT
