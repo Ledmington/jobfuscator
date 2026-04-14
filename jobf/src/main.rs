@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
+use clap::Parser;
 use std::{
-    env::args,
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
 };
@@ -32,11 +32,21 @@ fn parse_and_rewrite(reader: &mut BinaryReader) -> Vec<u8> {
     write_class_file(out_cf)
 }
 
+#[derive(Parser, Debug)]
+#[command(name = "jobf")]
+struct Args {
+    /// Input file
+    input: String,
+
+    /// Output file
+    output: String,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let input_filename: String = args()
-        .nth(1)
-        .expect("Usage: jobf <input_file> [output_file]");
-    let output_filename: String = args().nth(2).unwrap_or(input_filename.clone() + ".out");
+    let args = Args::parse();
+
+    let input_filename = args.input;
+    let output_filename = args.output;
 
     let mut file = File::open(&input_filename)?;
 
