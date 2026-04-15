@@ -313,13 +313,23 @@ pub fn parse_class_attributes(
 
 fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
+    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
-    let _attribute_length: u32 = reader.read_u32().unwrap();
+    let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
-        "SourceFile" => AttributeInfo::SourceFile {
-            name_index: attribute_name_index,
-            source_file_index: reader.read_u16().unwrap(),
-        },
+        "SourceFile" => {
+            assert!(
+                attribute_length == 2,
+                "The attribute_length field of SourceFile must be 2 but was {}.",
+                attribute_length
+            );
+            let source_file_index: u16 = reader.read_u16().unwrap();
+            assert_valid_and_type(cp, source_file_index, ConstantPoolTag::Utf8);
+            AttributeInfo::SourceFile {
+                name_index: attribute_name_index,
+                source_file_index,
+            }
+        }
         "BootstrapMethods" => {
             let num_bootstrap_methods: u16 = reader.read_u16().unwrap();
             let mut methods: Vec<BootstrapMethod> =
@@ -437,6 +447,7 @@ fn check_attribute_length(
 
 fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
+    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -488,7 +499,7 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
-    let _attribute_length: u32 = reader.read_u32().unwrap();
+    let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
         "Code" => {
             let max_stack: u16 = reader.read_u16().unwrap();
@@ -500,10 +511,10 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
                 code_length
             );
             let code_bytes: Vec<u8> = reader.read_u8_vec(code_length.try_into().unwrap()).unwrap();
-            let code: BTreeMap<u32, BytecodeInstruction> = parse_bytecode(&mut BinaryReader::new(
-                &code_bytes,
-                binary_reader::Endianness::Big,
-            ));
+            let code: BTreeMap<u32, BytecodeInstruction> = parse_bytecode(
+                &mut BinaryReader::new(&code_bytes, binary_reader::Endianness::Big),
+                cp,
+            );
             let exception_table_length: u16 = reader.read_u16().unwrap();
             let mut exception_table: Vec<ExceptionTableEntry> =
                 Vec::with_capacity(exception_table_length.into());
@@ -519,7 +530,7 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
                 );
                 assert!(
                     code.contains_key(&(start_pc as u32)),
-                    "Exception {} has start_pc ({}) which does not correspond to an instruction.",
+                    "Exception {} has start_pc ({}) which does not correspond to a valid instruction.",
                     i,
                     start_pc
                 );
@@ -532,7 +543,7 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
                 let handler_pc: u16 = reader.read_u16().unwrap();
                 assert!(
                     code.contains_key(&(handler_pc as u32)),
-                    "Exception {} has handler_pc ({}) which does not correspond to an instruction.",
+                    "Exception {} has handler_pc ({}) which does not correspond to a valid instruction.",
                     i,
                     handler_pc
                 );
@@ -549,7 +560,7 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
             }
             let attribute_count: u16 = reader.read_u16().unwrap();
             let attributes: Vec<AttributeInfo> =
-                parse_code_attributes(reader, cp, attribute_count.into());
+                parse_code_attributes(reader, cp, attribute_count.into(), &code);
             AttributeInfo::Code {
                 name_index: attribute_name_index,
                 max_stack,
@@ -578,7 +589,13 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
             }
         }
         "Signature" => {
+            assert!(
+                attribute_length == 2,
+                "The attribute_length field of Signature must be 2 but was {}.",
+                attribute_length
+            );
             let signature_index: u16 = reader.read_u16().unwrap();
+            assert_valid_and_type(cp, signature_index, ConstantPoolTag::Utf8);
             AttributeInfo::Signature {
                 name_index: attribute_name_index,
                 signature_index,
@@ -679,10 +696,11 @@ fn parse_code_attributes(
     reader: &mut BinaryReader,
     cp: &ConstantPool,
     num_attributes: usize,
+    code: &BTreeMap<u32, BytecodeInstruction>,
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for i in 0..num_attributes {
-        attributes.push(parse_code_attribute(cp, reader));
+        attributes.push(parse_code_attribute(cp, reader, code));
         for j in 0..i {
             assert!(
                 attributes[i].kind() != attributes[j].kind(),
@@ -696,17 +714,36 @@ fn parse_code_attributes(
     attributes
 }
 
-fn parse_code_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> AttributeInfo {
+fn parse_code_attribute(
+    cp: &ConstantPool,
+    reader: &mut BinaryReader,
+    code: &BTreeMap<u32, BytecodeInstruction>,
+) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
+    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
-    let _attribute_length: u32 = reader.read_u32().unwrap();
+    let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
         "LineNumberTable" => {
             let line_number_table_length: u16 = reader.read_u16().unwrap();
+            let expected_attribute_length: u32 = 2 + (2 * 2) * (line_number_table_length as u32);
+            assert!(
+                attribute_length == expected_attribute_length,
+                "The field attribute_length for LineNumberTable (with {} entries) must be {} but was {}.",
+                line_number_table_length,
+                expected_attribute_length,
+                attribute_length
+            );
             let mut line_number_table: Vec<LineNumberTableEntry> =
                 Vec::with_capacity(line_number_table_length.into());
-            for _ in 0..line_number_table_length {
+            for i in 0..line_number_table_length {
                 let start_pc: u16 = reader.read_u16().unwrap();
+                assert!(
+                    code.contains_key(&(start_pc as u32)),
+                    "LineNumberTable entry {} has start_pc ({}) which does not correspond to a valid instruction.",
+                    i,
+                    start_pc
+                );
                 let line_number: u16 = reader.read_u16().unwrap();
                 line_number_table.push(LineNumberTableEntry {
                     start_pc,

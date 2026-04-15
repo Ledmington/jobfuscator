@@ -470,8 +470,9 @@ pub(crate) fn assert_valid_and_type(
     expected_tag: ConstantPoolTag,
 ) {
     assert!(
-        cp_index >= 1 && cp_index < (cp.len() as u16),
-        "Expected a valid CP index but was {} ({:04x}).",
+        cp_index >= 1 && cp_index <= (cp.len() as u16),
+        "Constant pool index must be >= 1 and <= {} but was {} (0x{:04x}).",
+        cp.len(),
         cp_index,
         cp_index
     );

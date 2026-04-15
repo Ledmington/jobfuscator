@@ -9,6 +9,8 @@ use std::{
 use binary_reader::BinaryReader;
 use binary_writer::BinaryWriter;
 
+use crate::constant_pool::{ConstantPool, ConstantPoolTag, assert_valid_and_type};
+
 /**
  * Reference available at <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-6.html#jvms-6.5>
  */
@@ -306,7 +308,10 @@ impl Display for ArrayType {
     }
 }
 
-pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstruction> {
+pub fn parse_bytecode(
+    reader: &mut BinaryReader,
+    cp: &ConstantPool,
+) -> BTreeMap<u32, BytecodeInstruction> {
     let mut instructions: BTreeMap<u32, BytecodeInstruction> = BTreeMap::new();
     while reader.position() < reader.len() {
         let position: u32 = reader.position().try_into().unwrap();
@@ -631,9 +636,11 @@ pub fn parse_bytecode(reader: &mut BinaryReader) -> BTreeMap<u32, BytecodeInstru
                 0xaf => BytecodeInstruction::DReturn {},
                 0xb0 => BytecodeInstruction::AReturn {},
                 0xb1 => BytecodeInstruction::Return {},
-                0xb2 => BytecodeInstruction::GetStatic {
-                    field_ref_index: reader.read_u16().unwrap(),
-                },
+                0xb2 => {
+                    let field_ref_index: u16 = reader.read_u16().unwrap();
+                    assert_valid_and_type(cp, field_ref_index, ConstantPoolTag::Fieldref);
+                    BytecodeInstruction::GetStatic { field_ref_index }
+                }
                 0xb3 => BytecodeInstruction::PutStatic {
                     field_ref_index: reader.read_u16().unwrap(),
                 },
