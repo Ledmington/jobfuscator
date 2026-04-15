@@ -37,7 +37,7 @@ jobs:
         run: cargo build
 
       - name: Lint
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --no-deps --all-targets --all-features -- -D warnings
 
       - name: Unit Tests
         run: cargo test
@@ -64,7 +64,7 @@ jobs:
         run: cargo build --release
 
       - name: Lint
-        run: cargo clippy --all-targets --all-features --release -- -D warnings
+        run: cargo clippy --no-deps --all-targets --all-features --release -- -D warnings
 
       - name: Unit Tests
         run: cargo test --release
