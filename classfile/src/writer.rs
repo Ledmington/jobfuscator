@@ -112,14 +112,8 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
             ConstantPoolInfo::MethodType { descriptor_index } => {
                 w.write_u16(*descriptor_index);
             }
-            ConstantPoolInfo::MethodHandle {
-                reference_kind,
-                reference_index,
-            } => todo!(),
-            ConstantPoolInfo::InvokeDynamic {
-                bootstrap_method_attr_index,
-                name_and_type_index,
-            } => todo!(),
+            ConstantPoolInfo::MethodHandle { .. } => todo!(),
+            ConstantPoolInfo::InvokeDynamic { .. } => todo!(),
         }
     }
 }
@@ -170,31 +164,13 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
             local_variable_table,
             ..
         } => 2 + (2 * 5) * (local_variable_table.len() as u32),
-        AttributeInfo::LocalVariableTypeTable {
-            name_index,
-            local_variable_type_table,
-        } => todo!(),
-        AttributeInfo::StackMapTable {
-            name_index,
-            stack_map_table,
-        } => todo!(),
+        AttributeInfo::LocalVariableTypeTable { .. } => todo!(),
+        AttributeInfo::StackMapTable { .. } => todo!(),
         AttributeInfo::SourceFile { .. } => 2,
-        AttributeInfo::BootstrapMethods {
-            name_index,
-            methods,
-        } => todo!(),
-        AttributeInfo::InnerClasses {
-            name_index,
-            classes,
-        } => todo!(),
-        AttributeInfo::MethodParameters {
-            name_index,
-            parameters,
-        } => todo!(),
-        AttributeInfo::Record {
-            name_index,
-            components,
-        } => todo!(),
+        AttributeInfo::BootstrapMethods { .. } => todo!(),
+        AttributeInfo::InnerClasses { .. } => todo!(),
+        AttributeInfo::MethodParameters { .. } => todo!(),
+        AttributeInfo::Record { .. } => todo!(),
         AttributeInfo::Signature { .. } => 2,
         AttributeInfo::NestMembers { classes, .. } => 2 + 2 * (classes.len() as u32),
         AttributeInfo::RuntimeVisibleAnnotations { annotations, .. } => {
@@ -289,14 +265,8 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                     w.write_u16(entry.index);
                 }
             }
-            AttributeInfo::LocalVariableTypeTable {
-                name_index,
-                local_variable_type_table,
-            } => todo!(),
-            AttributeInfo::StackMapTable {
-                name_index,
-                stack_map_table,
-            } => todo!(),
+            AttributeInfo::LocalVariableTypeTable { .. } => todo!(),
+            AttributeInfo::StackMapTable { .. } => todo!(),
             AttributeInfo::SourceFile {
                 name_index,
                 source_file_index,
@@ -305,22 +275,10 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u32(get_attribute_length(attribute));
                 w.write_u16(*source_file_index);
             }
-            AttributeInfo::BootstrapMethods {
-                name_index,
-                methods,
-            } => todo!(),
-            AttributeInfo::InnerClasses {
-                name_index,
-                classes,
-            } => todo!(),
-            AttributeInfo::MethodParameters {
-                name_index,
-                parameters,
-            } => todo!(),
-            AttributeInfo::Record {
-                name_index,
-                components,
-            } => todo!(),
+            AttributeInfo::BootstrapMethods { .. } => todo!(),
+            AttributeInfo::InnerClasses { .. } => todo!(),
+            AttributeInfo::MethodParameters { .. } => todo!(),
+            AttributeInfo::Record { .. } => todo!(),
             AttributeInfo::Signature {
                 name_index,
                 signature_index,
