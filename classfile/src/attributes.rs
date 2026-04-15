@@ -481,7 +481,7 @@ pub fn parse_method_attributes(
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for i in 0..num_attributes {
-        attributes.push(parse_method_attribute(cp, reader));
+        attributes.push(parse_method_attribute(reader, cp));
         for j in 0..i {
             assert!(
                 attributes[i].kind() != attributes[j].kind(),
@@ -495,7 +495,7 @@ pub fn parse_method_attributes(
     attributes
 }
 
-fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> AttributeInfo {
+fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
