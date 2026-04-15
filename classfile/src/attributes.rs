@@ -486,6 +486,7 @@ pub fn parse_method_attributes(
 
 fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
+    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let _attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -493,6 +494,11 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
             let max_stack: u16 = reader.read_u16().unwrap();
             let max_locals: u16 = reader.read_u16().unwrap();
             let code_length: u32 = reader.read_u32().unwrap();
+            assert!(
+                code_length > 0 && code_length < 65_536,
+                "Invalid code length: must be > 0 and < 65536 but was {}.",
+                code_length
+            );
             let code_bytes: Vec<u8> = reader.read_u8_vec(code_length.try_into().unwrap()).unwrap();
             let code: BTreeMap<u32, BytecodeInstruction> = parse_bytecode(&mut BinaryReader::new(
                 &code_bytes,
@@ -501,11 +507,39 @@ fn parse_method_attribute(cp: &ConstantPool, reader: &mut BinaryReader) -> Attri
             let exception_table_length: u16 = reader.read_u16().unwrap();
             let mut exception_table: Vec<ExceptionTableEntry> =
                 Vec::with_capacity(exception_table_length.into());
-            for _ in 0..exception_table_length {
+            for i in 0..exception_table_length {
                 let start_pc: u16 = reader.read_u16().unwrap();
                 let end_pc: u16 = reader.read_u16().unwrap();
+                assert!(
+                    start_pc < end_pc,
+                    "Exception {} has start_pc ({}) >= end_pc ({}).",
+                    i,
+                    start_pc,
+                    end_pc
+                );
+                assert!(
+                    code.contains_key(&(start_pc as u32)),
+                    "Exception {} has start_pc ({}) which does not correspond to an instruction.",
+                    i,
+                    start_pc
+                );
+                assert!(
+                    code.contains_key(&(end_pc as u32)) || (end_pc as u32) == code_length,
+                    "Exception {} has end_pc ({}) which does not correspond to a valid instruction.",
+                    i,
+                    end_pc
+                );
                 let handler_pc: u16 = reader.read_u16().unwrap();
+                assert!(
+                    code.contains_key(&(handler_pc as u32)),
+                    "Exception {} has handler_pc ({}) which does not correspond to an instruction.",
+                    i,
+                    handler_pc
+                );
                 let catch_type: u16 = reader.read_u16().unwrap();
+                if catch_type != 0 {
+                    assert_valid_and_type(cp, catch_type, ConstantPoolTag::Class);
+                }
                 exception_table.push(ExceptionTableEntry {
                     start_pc,
                     end_pc,

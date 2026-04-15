@@ -169,7 +169,7 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
         AttributeInfo::LocalVariableTable {
             local_variable_table,
             ..
-        } => 2 * (2 * 5) * (local_variable_table.len() as u32),
+        } => 2 + (2 * 5) * (local_variable_table.len() as u32),
         AttributeInfo::LocalVariableTypeTable {
             name_index,
             local_variable_type_table,
@@ -197,11 +197,39 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
         } => todo!(),
         AttributeInfo::Signature { .. } => 2,
         AttributeInfo::NestMembers { classes, .. } => 2 + 2 * (classes.len() as u32),
-        AttributeInfo::RuntimeVisibleAnnotations {
-            name_index,
-            annotations,
-        } => todo!(),
+        AttributeInfo::RuntimeVisibleAnnotations { annotations, .. } => {
+            2 + annotations.iter().map(get_annotation_length).sum::<u32>()
+        }
         AttributeInfo::ConstantValue { .. } => 2,
+    }
+}
+
+fn get_annotation_length(annotation: &Annotation) -> u32 {
+    2 + 2
+        + annotation
+            .element_value_pairs
+            .iter()
+            .map(|evp| 2 + get_element_value_length(&evp.value))
+            .sum::<u32>()
+}
+
+fn get_element_value_length(value: &ElementValue) -> u32 {
+    1 + match value {
+        ElementValue::Byte { .. } => 2,
+        ElementValue::Char { .. } => 2,
+        ElementValue::Double { .. } => 2,
+        ElementValue::Float { .. } => 2,
+        ElementValue::Int { .. } => 2,
+        ElementValue::Long { .. } => 2,
+        ElementValue::Short { .. } => 2,
+        ElementValue::Boolean { .. } => 2,
+        ElementValue::String { .. } => 2,
+        ElementValue::Enum { .. } => 4,
+        ElementValue::Class { .. } => 2,
+        ElementValue::Annotation { value } => get_annotation_length(value),
+        ElementValue::Array { values } => {
+            2 + values.iter().map(get_element_value_length).sum::<u32>()
+        }
     }
 }
 

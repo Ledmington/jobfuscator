@@ -720,13 +720,34 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         } => todo!(),
         BytecodeInstruction::Ldc2W {
             constant_pool_index,
-        } => todo!(),
+        } => {
+            w.write_u8(0x14);
+            w.write_u16(*constant_pool_index);
+        }
         BytecodeInstruction::ALoad {
             local_variable_index,
-        } => w.write_u8(*local_variable_index),
+        } => match local_variable_index {
+            0 => w.write_u8(0x2a),
+            1 => w.write_u8(0x2b),
+            2 => w.write_u8(0x2c),
+            3 => w.write_u8(0x2d),
+            _ => {
+                w.write_u8(0x19);
+                w.write_u8(*local_variable_index);
+            }
+        },
         BytecodeInstruction::AStore {
             local_variable_index,
-        } => todo!(),
+        } => match local_variable_index {
+            0 => w.write_u8(0x4b),
+            1 => w.write_u8(0x4c),
+            2 => w.write_u8(0x4d),
+            3 => w.write_u8(0x4e),
+            _ => {
+                w.write_u8(0x3a);
+                w.write_u8(*local_variable_index);
+            }
+        },
         BytecodeInstruction::ILoad {
             local_variable_index,
         } => todo!(),
@@ -901,6 +922,9 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
     }
 }
 
+/**
+ * Returns the number of bytes required to fully encode (opcode included, padding excluded) the given instruction.
+ */
 pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
     match instruction {
         BytecodeInstruction::Dup {} => 1,
@@ -912,8 +936,18 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         BytecodeInstruction::Ldc { .. } => 2,
         BytecodeInstruction::LdcW { .. } => 3,
         BytecodeInstruction::Ldc2W { .. } => 3,
-        BytecodeInstruction::ALoad { .. } => 2,
-        BytecodeInstruction::AStore { .. } => 2,
+        BytecodeInstruction::ALoad {
+            local_variable_index,
+        } => match local_variable_index {
+            0 | 1 | 2 | 3 => 1,
+            _ => 2,
+        },
+        BytecodeInstruction::AStore {
+            local_variable_index,
+        } => match local_variable_index {
+            0 | 1 | 2 | 3 => 1,
+            _ => 2,
+        },
         BytecodeInstruction::ILoad {
             local_variable_index,
         } => todo!(),
@@ -1013,56 +1047,56 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
             constant_pool_index,
         } => todo!(),
         BytecodeInstruction::IInc { index, constant } => todo!(),
-        BytecodeInstruction::I2L {} => todo!(),
-        BytecodeInstruction::I2F {} => todo!(),
-        BytecodeInstruction::I2D {} => todo!(),
-        BytecodeInstruction::L2I {} => todo!(),
-        BytecodeInstruction::L2F {} => todo!(),
-        BytecodeInstruction::L2D {} => todo!(),
-        BytecodeInstruction::F2I {} => todo!(),
-        BytecodeInstruction::F2L {} => todo!(),
-        BytecodeInstruction::F2D {} => todo!(),
-        BytecodeInstruction::D2I {} => todo!(),
-        BytecodeInstruction::D2L {} => todo!(),
-        BytecodeInstruction::D2F {} => todo!(),
-        BytecodeInstruction::I2B {} => todo!(),
-        BytecodeInstruction::I2C {} => todo!(),
-        BytecodeInstruction::I2S {} => todo!(),
-        BytecodeInstruction::IAdd {} => todo!(),
-        BytecodeInstruction::ISub {} => todo!(),
-        BytecodeInstruction::IMul {} => todo!(),
-        BytecodeInstruction::IDiv {} => todo!(),
-        BytecodeInstruction::IRem {} => todo!(),
-        BytecodeInstruction::IAnd {} => todo!(),
-        BytecodeInstruction::IShl {} => todo!(),
-        BytecodeInstruction::IShr {} => todo!(),
-        BytecodeInstruction::IUshr {} => todo!(),
-        BytecodeInstruction::IOr {} => todo!(),
-        BytecodeInstruction::IXor {} => todo!(),
-        BytecodeInstruction::INeg {} => todo!(),
-        BytecodeInstruction::LAdd {} => todo!(),
-        BytecodeInstruction::LSub {} => todo!(),
-        BytecodeInstruction::LMul {} => todo!(),
-        BytecodeInstruction::LDiv {} => todo!(),
-        BytecodeInstruction::LRem {} => todo!(),
-        BytecodeInstruction::LAnd {} => todo!(),
-        BytecodeInstruction::LOr {} => todo!(),
-        BytecodeInstruction::LXor {} => todo!(),
-        BytecodeInstruction::LShl {} => todo!(),
-        BytecodeInstruction::LShr {} => todo!(),
-        BytecodeInstruction::LUshr {} => todo!(),
-        BytecodeInstruction::LNeg {} => todo!(),
-        BytecodeInstruction::FAdd {} => todo!(),
-        BytecodeInstruction::FMul {} => todo!(),
-        BytecodeInstruction::FNeg {} => todo!(),
-        BytecodeInstruction::FDiv {} => todo!(),
-        BytecodeInstruction::FRem {} => todo!(),
-        BytecodeInstruction::FSub {} => todo!(),
-        BytecodeInstruction::DAdd {} => todo!(),
-        BytecodeInstruction::DMul {} => todo!(),
-        BytecodeInstruction::DNeg {} => todo!(),
-        BytecodeInstruction::DDiv {} => todo!(),
-        BytecodeInstruction::DRem {} => todo!(),
-        BytecodeInstruction::DSub {} => todo!(),
+        BytecodeInstruction::I2L {} => 1,
+        BytecodeInstruction::I2F {} => 1,
+        BytecodeInstruction::I2D {} => 1,
+        BytecodeInstruction::L2I {} => 1,
+        BytecodeInstruction::L2F {} => 1,
+        BytecodeInstruction::L2D {} => 1,
+        BytecodeInstruction::F2I {} => 1,
+        BytecodeInstruction::F2L {} => 1,
+        BytecodeInstruction::F2D {} => 1,
+        BytecodeInstruction::D2I {} => 1,
+        BytecodeInstruction::D2L {} => 1,
+        BytecodeInstruction::D2F {} => 1,
+        BytecodeInstruction::I2B {} => 1,
+        BytecodeInstruction::I2C {} => 1,
+        BytecodeInstruction::I2S {} => 1,
+        BytecodeInstruction::IAdd {} => 1,
+        BytecodeInstruction::ISub {} => 1,
+        BytecodeInstruction::IMul {} => 1,
+        BytecodeInstruction::IDiv {} => 1,
+        BytecodeInstruction::IRem {} => 1,
+        BytecodeInstruction::IAnd {} => 1,
+        BytecodeInstruction::IShl {} => 1,
+        BytecodeInstruction::IShr {} => 1,
+        BytecodeInstruction::IUshr {} => 1,
+        BytecodeInstruction::IOr {} => 1,
+        BytecodeInstruction::IXor {} => 1,
+        BytecodeInstruction::INeg {} => 1,
+        BytecodeInstruction::LAdd {} => 1,
+        BytecodeInstruction::LSub {} => 1,
+        BytecodeInstruction::LMul {} => 1,
+        BytecodeInstruction::LDiv {} => 1,
+        BytecodeInstruction::LRem {} => 1,
+        BytecodeInstruction::LAnd {} => 1,
+        BytecodeInstruction::LOr {} => 1,
+        BytecodeInstruction::LXor {} => 1,
+        BytecodeInstruction::LShl {} => 1,
+        BytecodeInstruction::LShr {} => 1,
+        BytecodeInstruction::LUshr {} => 1,
+        BytecodeInstruction::LNeg {} => 1,
+        BytecodeInstruction::FAdd {} => 1,
+        BytecodeInstruction::FMul {} => 1,
+        BytecodeInstruction::FNeg {} => 1,
+        BytecodeInstruction::FDiv {} => 1,
+        BytecodeInstruction::FRem {} => 1,
+        BytecodeInstruction::FSub {} => 1,
+        BytecodeInstruction::DAdd {} => 1,
+        BytecodeInstruction::DMul {} => 1,
+        BytecodeInstruction::DNeg {} => 1,
+        BytecodeInstruction::DDiv {} => 1,
+        BytecodeInstruction::DRem {} => 1,
+        BytecodeInstruction::DSub {} => 1,
     }
 }
