@@ -4,7 +4,7 @@ use binary_writer::{BinaryWriter, Endianness};
 
 use crate::{
     access_flags,
-    attributes::AttributeInfo,
+    attributes::{Annotation, AttributeInfo, ElementValue},
     bytecode::{get_instruction_length, write_instruction},
     classfile::ClassFile,
     constant_pool::{ConstantPool, ConstantPoolInfo},
@@ -98,7 +98,10 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
             ConstantPoolInfo::InterfaceMethodRef {
                 class_index,
                 name_and_type_index,
-            } => todo!(),
+            } => {
+                w.write_u16(*class_index);
+                w.write_u16(*name_and_type_index);
+            }
             ConstantPoolInfo::NameAndType {
                 name_index,
                 descriptor_index,
@@ -106,7 +109,9 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
                 w.write_u16(*name_index);
                 w.write_u16(*descriptor_index);
             }
-            ConstantPoolInfo::MethodType { descriptor_index } => todo!(),
+            ConstantPoolInfo::MethodType { descriptor_index } => {
+                w.write_u16(*descriptor_index);
+            }
             ConstantPoolInfo::MethodHandle {
                 reference_kind,
                 reference_index,
@@ -162,9 +167,9 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
             line_number_table, ..
         } => 2 + (2 * 2) * (line_number_table.len() as u32),
         AttributeInfo::LocalVariableTable {
-            name_index,
             local_variable_table,
-        } => todo!(),
+            ..
+        } => 2 * (2 * 5) * (local_variable_table.len() as u32),
         AttributeInfo::LocalVariableTypeTable {
             name_index,
             local_variable_type_table,
@@ -173,10 +178,7 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
             name_index,
             stack_map_table,
         } => todo!(),
-        AttributeInfo::SourceFile {
-            name_index,
-            source_file_index,
-        } => todo!(),
+        AttributeInfo::SourceFile { .. } => 2,
         AttributeInfo::BootstrapMethods {
             name_index,
             methods,
@@ -193,22 +195,13 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
             name_index,
             components,
         } => todo!(),
-        AttributeInfo::Signature {
-            name_index,
-            signature_index,
-        } => todo!(),
-        AttributeInfo::NestMembers {
-            name_index,
-            classes,
-        } => todo!(),
+        AttributeInfo::Signature { .. } => 2,
+        AttributeInfo::NestMembers { classes, .. } => 2 + 2 * (classes.len() as u32),
         AttributeInfo::RuntimeVisibleAnnotations {
             name_index,
             annotations,
         } => todo!(),
-        AttributeInfo::ConstantValue {
-            name_index,
-            constant_value_index,
-        } => todo!(),
+        AttributeInfo::ConstantValue { .. } => 2,
     }
 }
 
@@ -245,6 +238,8 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 name_index,
                 line_number_table,
             } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
                 w.write_u16(line_number_table.len().try_into().unwrap());
                 for entry in line_number_table.iter() {
                     w.write_u16(entry.start_pc);
@@ -254,7 +249,18 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
             AttributeInfo::LocalVariableTable {
                 name_index,
                 local_variable_table,
-            } => todo!(),
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(local_variable_table.len().try_into().unwrap());
+                for entry in local_variable_table.iter() {
+                    w.write_u16(entry.start_pc);
+                    w.write_u16(entry.length);
+                    w.write_u16(entry.name_index);
+                    w.write_u16(entry.descriptor_index);
+                    w.write_u16(entry.index);
+                }
+            }
             AttributeInfo::LocalVariableTypeTable {
                 name_index,
                 local_variable_type_table,
@@ -267,6 +273,8 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 name_index,
                 source_file_index,
             } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
                 w.write_u16(*source_file_index);
             }
             AttributeInfo::BootstrapMethods {
@@ -288,19 +296,102 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
             AttributeInfo::Signature {
                 name_index,
                 signature_index,
-            } => todo!(),
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(*signature_index);
+            }
             AttributeInfo::NestMembers {
                 name_index,
                 classes,
-            } => todo!(),
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(classes.len().try_into().unwrap());
+                w.write_u16_vec(classes);
+            }
             AttributeInfo::RuntimeVisibleAnnotations {
                 name_index,
                 annotations,
-            } => todo!(),
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                write_annotations(w, annotations);
+            }
             AttributeInfo::ConstantValue {
                 name_index,
                 constant_value_index,
-            } => todo!(),
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(*constant_value_index);
+            }
+        }
+    }
+}
+
+fn write_annotations(w: &mut BinaryWriter, annotations: &[Annotation]) {
+    w.write_u16(annotations.len().try_into().unwrap());
+    for annotation in annotations.iter() {
+        write_annotation(w, annotation);
+    }
+}
+
+fn write_annotation(w: &mut BinaryWriter, annotation: &Annotation) {
+    w.write_u16(annotation.type_index);
+    w.write_u16(annotation.element_value_pairs.len().try_into().unwrap());
+    for evp in annotation.element_value_pairs.iter() {
+        w.write_u16(evp.element_name_index);
+        write_element_value(w, &evp.value);
+    }
+}
+
+fn write_element_value(w: &mut BinaryWriter, value: &ElementValue) {
+    w.write_u8(value.tag() as u8);
+    match &value {
+        crate::attributes::ElementValue::Byte { const_value_index } => {
+            w.write_u16(*const_value_index)
+        }
+        crate::attributes::ElementValue::Char { const_value_index } => {
+            w.write_u16(*const_value_index)
+        }
+        crate::attributes::ElementValue::Double { const_value_index } => {
+            w.write_u16(*const_value_index)
+        }
+        crate::attributes::ElementValue::Float { const_value_index } => {
+            w.write_u16(*const_value_index)
+        }
+        crate::attributes::ElementValue::Int { const_value_index } => {
+            w.write_u16(*const_value_index)
+        }
+        crate::attributes::ElementValue::Long { const_value_index } => {
+            w.write_u16(*const_value_index)
+        }
+        crate::attributes::ElementValue::Short { const_value_index } => {
+            w.write_u16(*const_value_index)
+        }
+        crate::attributes::ElementValue::Boolean { const_value_index } => {
+            w.write_u16(*const_value_index)
+        }
+        crate::attributes::ElementValue::String { const_value_index } => {
+            w.write_u16(*const_value_index)
+        }
+        crate::attributes::ElementValue::Enum {
+            type_name_index,
+            const_name_index,
+        } => {
+            w.write_u16(*type_name_index);
+            w.write_u16(*const_name_index);
+        }
+        crate::attributes::ElementValue::Class { class_info_index } => {
+            w.write_u16(*class_info_index)
+        }
+        crate::attributes::ElementValue::Annotation { value } => write_annotation(w, value),
+        crate::attributes::ElementValue::Array { values } => {
+            w.write_u16(values.len().try_into().unwrap());
+            for ev in values.iter() {
+                write_element_value(w, ev);
+            }
         }
     }
 }

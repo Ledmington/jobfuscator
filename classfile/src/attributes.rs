@@ -127,8 +127,8 @@ pub struct Annotation {
 }
 
 pub struct ElementValuePair {
-    element_name_index: u16,
-    value: ElementValue,
+    pub element_name_index: u16,
+    pub value: ElementValue,
 }
 
 pub enum ElementValue {
@@ -172,6 +172,26 @@ pub enum ElementValue {
     Array {
         values: Vec<ElementValue>,
     },
+}
+
+impl ElementValue {
+    pub fn tag(&self) -> char {
+        match self {
+            ElementValue::Byte { .. } => 'B',
+            ElementValue::Char { .. } => 'C',
+            ElementValue::Double { .. } => 'D',
+            ElementValue::Float { .. } => 'F',
+            ElementValue::Int { .. } => 'I',
+            ElementValue::Long { .. } => 'J',
+            ElementValue::Short { .. } => 'S',
+            ElementValue::Boolean { .. } => 'Z',
+            ElementValue::String { .. } => 's',
+            ElementValue::Enum { .. } => 'e',
+            ElementValue::Class { .. } => 'c',
+            ElementValue::Annotation { .. } => '@',
+            ElementValue::Array { .. } => '[',
+        }
+    }
 }
 
 pub struct RecordComponentInfo {

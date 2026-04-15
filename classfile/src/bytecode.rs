@@ -747,7 +747,16 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         } => todo!(),
         BytecodeInstruction::DLoad {
             local_variable_index,
-        } => todo!(),
+        } => match local_variable_index {
+            0 => w.write_u8(0x26),
+            1 => w.write_u8(0x27),
+            2 => w.write_u8(0x28),
+            3 => w.write_u8(0x29),
+            _ => {
+                w.write_u8(0x18);
+                w.write_u8(*local_variable_index);
+            }
+        },
         BytecodeInstruction::DStore {
             local_variable_index,
         } => todo!(),
@@ -773,7 +782,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         BytecodeInstruction::IReturn {} => todo!(),
         BytecodeInstruction::LReturn {} => todo!(),
         BytecodeInstruction::FReturn {} => todo!(),
-        BytecodeInstruction::DReturn {} => todo!(),
+        BytecodeInstruction::DReturn {} => w.write_u8(0xaf),
         BytecodeInstruction::AReturn {} => todo!(),
         BytecodeInstruction::GetStatic { field_ref_index } => {
             w.write_u8(0xb2);
@@ -787,7 +796,10 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u16(*method_ref_index);
         }
 
-        BytecodeInstruction::InvokeStatic { method_ref_index } => todo!(),
+        BytecodeInstruction::InvokeStatic { method_ref_index } => {
+            w.write_u8(0xb8);
+            w.write_u16(*method_ref_index);
+        }
         BytecodeInstruction::InvokeVirtual { method_ref_index } => {
             w.write_u8(0xb6);
             w.write_u16(*method_ref_index);
@@ -922,16 +934,19 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         } => todo!(),
         BytecodeInstruction::DLoad {
             local_variable_index,
-        } => todo!(),
+        } => match local_variable_index {
+            0 | 1 | 2 | 3 => 1,
+            _ => 2,
+        },
         BytecodeInstruction::DStore {
             local_variable_index,
         } => todo!(),
-        BytecodeInstruction::AaLoad {} => todo!(),
-        BytecodeInstruction::BaLoad {} => todo!(),
-        BytecodeInstruction::AaStore {} => todo!(),
-        BytecodeInstruction::BaStore {} => todo!(),
-        BytecodeInstruction::CaStore {} => todo!(),
-        BytecodeInstruction::SaStore {} => todo!(),
+        BytecodeInstruction::AaLoad {} => 1,
+        BytecodeInstruction::BaLoad {} => 1,
+        BytecodeInstruction::AaStore {} => 1,
+        BytecodeInstruction::BaStore {} => 1,
+        BytecodeInstruction::CaStore {} => 1,
+        BytecodeInstruction::SaStore {} => 1,
         BytecodeInstruction::NewArray { atype } => todo!(),
         BytecodeInstruction::ANewArray {
             constant_pool_index,
