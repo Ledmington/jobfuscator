@@ -108,8 +108,8 @@ mod tests {
     fn reading_be_bytes() {
         let buffer: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
         let mut reader: BinaryReader = BinaryReader::new(&buffer, Endianness::Big);
-        for i in 0..buffer.len() {
-            assert_eq!(buffer[i], reader.read_u8().unwrap());
+        for x in buffer {
+            assert_eq!(x, reader.read_u8().unwrap());
         }
     }
 
@@ -117,8 +117,8 @@ mod tests {
     fn reading_le_bytes() {
         let buffer: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
         let mut reader: BinaryReader = BinaryReader::new(&buffer, Endianness::Little);
-        for i in 0..buffer.len() {
-            assert_eq!(buffer[i], reader.read_u8().unwrap());
+        for x in buffer {
+            assert_eq!(x, reader.read_u8().unwrap());
         }
     }
 
