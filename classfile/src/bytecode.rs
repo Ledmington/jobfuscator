@@ -611,7 +611,7 @@ pub fn parse_bytecode(
             0xab => {
                 // skip padding
                 let current_position = reader.position();
-                let next_multiple_of_4 = ((current_position + 3) / 4) * 4;
+                let next_multiple_of_4 = current_position.div_ceil(4) * 4;
                 let num_padding_bytes: u8 = (next_multiple_of_4 - current_position) as u8;
                 for _ in 0..num_padding_bytes {
                     let pad = reader.read_u8().unwrap();
