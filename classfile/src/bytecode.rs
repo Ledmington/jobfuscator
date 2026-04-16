@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
 use std::{
-    collections::BTreeMap,
     fmt::{Display, Formatter},
     io::Result,
 };
@@ -311,8 +310,8 @@ impl Display for ArrayType {
 pub fn parse_bytecode(
     reader: &mut BinaryReader,
     cp: &ConstantPool,
-) -> BTreeMap<u32, BytecodeInstruction> {
-    let mut instructions: BTreeMap<u32, BytecodeInstruction> = BTreeMap::new();
+) -> Vec<(u32, BytecodeInstruction)> {
+    let mut instructions: Vec<(u32, BytecodeInstruction)> = Vec::new();
     while reader.position() < reader.len() {
         let position: u32 = reader.position().try_into().unwrap();
         let tmp: Result<u8> = reader.read_u8();
@@ -320,390 +319,388 @@ pub fn parse_bytecode(
             break;
         }
         let opcode: u8 = tmp.unwrap();
-        instructions.insert(
-            position,
-            match opcode {
-                0x01 => BytecodeInstruction::AConstNull {},
-                0x02 => BytecodeInstruction::IConst { constant: -1 },
-                0x03 => BytecodeInstruction::IConst { constant: 0 },
-                0x04 => BytecodeInstruction::IConst { constant: 1 },
-                0x05 => BytecodeInstruction::IConst { constant: 2 },
-                0x06 => BytecodeInstruction::IConst { constant: 3 },
-                0x07 => BytecodeInstruction::IConst { constant: 4 },
-                0x08 => BytecodeInstruction::IConst { constant: 5 },
-                0x09 => BytecodeInstruction::LConst { constant: 0 },
-                0x0a => BytecodeInstruction::LConst { constant: 1 },
-                0x0b => BytecodeInstruction::FConst { constant: 0.0f32 },
-                0x0c => BytecodeInstruction::FConst { constant: 1.0f32 },
-                0x0d => BytecodeInstruction::FConst { constant: 2.0f32 },
-                0x0e => BytecodeInstruction::DConst { constant: 0.0 },
-                0x0f => BytecodeInstruction::DConst { constant: 1.0 },
-                0x10 => BytecodeInstruction::BiPush {
-                    immediate: reader.read_u8().unwrap(),
-                },
-                0x11 => BytecodeInstruction::SiPush {
-                    immediate: reader.read_u16().unwrap(),
-                },
-                0x12 => BytecodeInstruction::Ldc {
-                    constant_pool_index: reader.read_u8().unwrap(),
-                },
-                0x13 => BytecodeInstruction::LdcW {
-                    constant_pool_index: reader.read_u16().unwrap(),
-                },
-                0x14 => BytecodeInstruction::Ldc2W {
-                    constant_pool_index: reader.read_u16().unwrap(),
-                },
-                0x15 => BytecodeInstruction::ILoad {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x16 => BytecodeInstruction::LLoad {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x17 => BytecodeInstruction::FLoad {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x18 => BytecodeInstruction::DLoad {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x19 => BytecodeInstruction::ALoad {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x1a => BytecodeInstruction::ILoad {
-                    local_variable_index: 0,
-                },
-                0x1b => BytecodeInstruction::ILoad {
-                    local_variable_index: 1,
-                },
-                0x1c => BytecodeInstruction::ILoad {
-                    local_variable_index: 2,
-                },
-                0x1d => BytecodeInstruction::ILoad {
-                    local_variable_index: 3,
-                },
-                0x1e => BytecodeInstruction::LLoad {
-                    local_variable_index: 0,
-                },
-                0x1f => BytecodeInstruction::LLoad {
-                    local_variable_index: 1,
-                },
-                0x20 => BytecodeInstruction::LLoad {
-                    local_variable_index: 2,
-                },
-                0x21 => BytecodeInstruction::LLoad {
-                    local_variable_index: 3,
-                },
-                0x22 => BytecodeInstruction::FLoad {
-                    local_variable_index: 0,
-                },
-                0x23 => BytecodeInstruction::FLoad {
-                    local_variable_index: 1,
-                },
-                0x24 => BytecodeInstruction::FLoad {
-                    local_variable_index: 2,
-                },
-                0x25 => BytecodeInstruction::FLoad {
-                    local_variable_index: 3,
-                },
-                0x26 => BytecodeInstruction::DLoad {
-                    local_variable_index: 0,
-                },
-                0x27 => BytecodeInstruction::DLoad {
-                    local_variable_index: 1,
-                },
-                0x28 => BytecodeInstruction::DLoad {
-                    local_variable_index: 2,
-                },
-                0x29 => BytecodeInstruction::DLoad {
-                    local_variable_index: 3,
-                },
-                0x2a => BytecodeInstruction::ALoad {
-                    local_variable_index: 0,
-                },
-                0x2b => BytecodeInstruction::ALoad {
-                    local_variable_index: 1,
-                },
-                0x2c => BytecodeInstruction::ALoad {
-                    local_variable_index: 2,
-                },
-                0x2d => BytecodeInstruction::ALoad {
-                    local_variable_index: 3,
-                },
-                0x32 => BytecodeInstruction::AaLoad {},
-                0x33 => BytecodeInstruction::BaLoad {},
-                0x36 => BytecodeInstruction::IStore {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x37 => BytecodeInstruction::LStore {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x38 => BytecodeInstruction::FStore {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x39 => BytecodeInstruction::DStore {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x3a => BytecodeInstruction::AStore {
-                    local_variable_index: reader.read_u8().unwrap(),
-                },
-                0x3b => BytecodeInstruction::IStore {
-                    local_variable_index: 0,
-                },
-                0x3c => BytecodeInstruction::IStore {
-                    local_variable_index: 1,
-                },
-                0x3d => BytecodeInstruction::IStore {
-                    local_variable_index: 2,
-                },
-                0x3e => BytecodeInstruction::IStore {
-                    local_variable_index: 3,
-                },
-                0x3f => BytecodeInstruction::LStore {
-                    local_variable_index: 0,
-                },
-                0x40 => BytecodeInstruction::LStore {
-                    local_variable_index: 1,
-                },
-                0x41 => BytecodeInstruction::LStore {
-                    local_variable_index: 2,
-                },
-                0x42 => BytecodeInstruction::LStore {
-                    local_variable_index: 3,
-                },
-                0x4b => BytecodeInstruction::AStore {
-                    local_variable_index: 0,
-                },
-                0x4c => BytecodeInstruction::AStore {
-                    local_variable_index: 1,
-                },
-                0x4d => BytecodeInstruction::AStore {
-                    local_variable_index: 2,
-                },
-                0x4e => BytecodeInstruction::AStore {
-                    local_variable_index: 3,
-                },
-                0x53 => BytecodeInstruction::AaStore {},
-                0x54 => BytecodeInstruction::BaStore {},
-                0x55 => BytecodeInstruction::CaStore {},
-                0x56 => BytecodeInstruction::SaStore {},
-                0x57 => BytecodeInstruction::Pop {},
-                0x58 => BytecodeInstruction::Pop2 {},
-                0x59 => BytecodeInstruction::Dup {},
-                0x60 => BytecodeInstruction::IAdd {},
-                0x61 => BytecodeInstruction::LAdd {},
-                0x62 => BytecodeInstruction::FAdd {},
-                0x63 => BytecodeInstruction::DAdd {},
-                0x64 => BytecodeInstruction::ISub {},
-                0x65 => BytecodeInstruction::LSub {},
-                0x66 => BytecodeInstruction::FSub {},
-                0x67 => BytecodeInstruction::DSub {},
-                0x68 => BytecodeInstruction::IMul {},
-                0x69 => BytecodeInstruction::LMul {},
-                0x6a => BytecodeInstruction::FMul {},
-                0x6b => BytecodeInstruction::DMul {},
-                0x6c => BytecodeInstruction::IDiv {},
-                0x6d => BytecodeInstruction::LDiv {},
-                0x6e => BytecodeInstruction::FDiv {},
-                0x6f => BytecodeInstruction::DDiv {},
-                0x70 => BytecodeInstruction::IRem {},
-                0x71 => BytecodeInstruction::LRem {},
-                0x72 => BytecodeInstruction::FRem {},
-                0x73 => BytecodeInstruction::DRem {},
-                0x74 => BytecodeInstruction::INeg {},
-                0x75 => BytecodeInstruction::LNeg {},
-                0x76 => BytecodeInstruction::FNeg {},
-                0x77 => BytecodeInstruction::DNeg {},
-                0x78 => BytecodeInstruction::IShl {},
-                0x79 => BytecodeInstruction::LShl {},
-                0x7a => BytecodeInstruction::IShr {},
-                0x7b => BytecodeInstruction::LShr {},
-                0x7c => BytecodeInstruction::IUshr {},
-                0x7d => BytecodeInstruction::LUshr {},
-                0x7e => BytecodeInstruction::IAnd {},
-                0x7f => BytecodeInstruction::LAnd {},
-                0x80 => BytecodeInstruction::IOr {},
-                0x81 => BytecodeInstruction::LOr {},
-                0x82 => BytecodeInstruction::IXor {},
-                0x83 => BytecodeInstruction::LXor {},
-                0x84 => BytecodeInstruction::IInc {
-                    index: reader.read_u8().unwrap(),
-                    constant: reader.read_i8().unwrap(),
-                },
-                0x85 => BytecodeInstruction::I2L {},
-                0x86 => BytecodeInstruction::I2F {},
-                0x87 => BytecodeInstruction::I2D {},
-                0x88 => BytecodeInstruction::L2I {},
-                0x89 => BytecodeInstruction::L2F {},
-                0x8a => BytecodeInstruction::L2D {},
-                0x8b => BytecodeInstruction::F2I {},
-                0x8c => BytecodeInstruction::F2L {},
-                0x8d => BytecodeInstruction::F2D {},
-                0x8e => BytecodeInstruction::D2I {},
-                0x8f => BytecodeInstruction::D2L {},
-                0x90 => BytecodeInstruction::D2F {},
-                0x91 => BytecodeInstruction::I2B {},
-                0x92 => BytecodeInstruction::I2C {},
-                0x93 => BytecodeInstruction::I2S {},
-                0x94 => BytecodeInstruction::LCmp {},
-                0x95 => BytecodeInstruction::FCmpL {},
-                0x96 => BytecodeInstruction::FCmpG {},
-                0x97 => BytecodeInstruction::DCmpL {},
-                0x98 => BytecodeInstruction::DCmpG {},
-                0x99 => BytecodeInstruction::IfEq {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0x9a => BytecodeInstruction::IfNe {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0x9b => BytecodeInstruction::IfLt {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0x9c => BytecodeInstruction::IfGe {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0x9d => BytecodeInstruction::IfGt {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0x9e => BytecodeInstruction::IfLe {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0x9f => BytecodeInstruction::IfIcmpEq {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xa0 => BytecodeInstruction::IfIcmpNe {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xa1 => BytecodeInstruction::IfIcmpLt {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xa2 => BytecodeInstruction::IfIcmpGe {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xa3 => BytecodeInstruction::IfIcmpGt {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xa4 => BytecodeInstruction::IfIcmpLe {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xa5 => BytecodeInstruction::IfAcmpEq {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xa6 => BytecodeInstruction::IfAcmpNe {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xa7 => BytecodeInstruction::GoTo {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xaa => {
-                    // skip padding
-                    while !reader.position().is_multiple_of(4) {
-                        _ = reader.read_u8();
-                    }
-                    let default: i32 = reader.read_i32().unwrap();
-                    let low: i32 = reader.read_i32().unwrap();
-                    let high: i32 = reader.read_i32().unwrap();
-                    let offsets: Vec<i32> = reader
-                        .read_i32_vec((high - low + 1).try_into().unwrap())
-                        .unwrap();
-                    BytecodeInstruction::TableSwitch {
-                        default,
-                        low,
-                        offsets,
-                    }
-                }
-                0xab => {
-                    // skip padding
-                    while !reader.position().is_multiple_of(4) {
-                        _ = reader.read_u8();
-                    }
-                    let default: i32 = reader.read_i32().unwrap();
-                    let npairs: i32 = reader.read_i32().unwrap();
-                    debug_assert!(npairs >= 0);
-                    let mut pairs: Vec<LookupSwitchPair> =
-                        Vec::with_capacity(npairs.try_into().unwrap());
-                    for _ in 0..npairs {
-                        let match_value: i32 = reader.read_i32().unwrap();
-                        let offset: i32 = reader.read_i32().unwrap();
-                        pairs.push(LookupSwitchPair {
-                            match_value,
-                            offset,
-                        });
-                    }
-                    BytecodeInstruction::LookupSwitch { default, pairs }
-                }
-                0xac => BytecodeInstruction::IReturn {},
-                0xad => BytecodeInstruction::LReturn {},
-                0xae => BytecodeInstruction::FReturn {},
-                0xaf => BytecodeInstruction::DReturn {},
-                0xb0 => BytecodeInstruction::AReturn {},
-                0xb1 => BytecodeInstruction::Return {},
-                0xb2 => {
-                    let field_ref_index: u16 = reader.read_u16().unwrap();
-                    assert_valid_and_type(cp, field_ref_index, ConstantPoolTag::Fieldref);
-                    BytecodeInstruction::GetStatic { field_ref_index }
-                }
-                0xb3 => BytecodeInstruction::PutStatic {
-                    field_ref_index: reader.read_u16().unwrap(),
-                },
-                0xb4 => BytecodeInstruction::GetField {
-                    field_ref_index: reader.read_u16().unwrap(),
-                },
-                0xb5 => BytecodeInstruction::PutField {
-                    field_ref_index: reader.read_u16().unwrap(),
-                },
-                0xb6 => BytecodeInstruction::InvokeVirtual {
-                    method_ref_index: reader.read_u16().unwrap(),
-                },
-                0xb7 => BytecodeInstruction::InvokeSpecial {
-                    method_ref_index: reader.read_u16().unwrap(),
-                },
-                0xb8 => BytecodeInstruction::InvokeStatic {
-                    method_ref_index: reader.read_u16().unwrap(),
-                },
-                0xb9 => {
-                    let constant_pool_index: u16 = reader.read_u16().unwrap();
-                    let count: u8 = reader.read_u8().unwrap();
-                    // skip one zero byte
-                    _ = reader.read_u8().unwrap();
-                    BytecodeInstruction::InvokeInterface {
-                        constant_pool_index,
-                        count,
-                    }
-                }
-                0xba => {
-                    let constant_pool_index: u16 = reader.read_u16().unwrap();
-                    // skip two zero bytes
-                    _ = reader.read_u8();
-                    _ = reader.read_u8();
-                    BytecodeInstruction::InvokeDynamic {
-                        constant_pool_index,
-                    }
-                }
-                0xbb => BytecodeInstruction::New {
-                    constant_pool_index: reader.read_u16().unwrap(),
-                },
-                0xbc => BytecodeInstruction::NewArray {
-                    atype: ArrayType::from(reader.read_u8().unwrap()),
-                },
-                0xbd => BytecodeInstruction::ANewArray {
-                    constant_pool_index: reader.read_u16().unwrap(),
-                },
-                0xbe => BytecodeInstruction::ArrayLength {},
-                0xbf => BytecodeInstruction::AThrow {},
-                0xc0 => BytecodeInstruction::CheckCast {
-                    constant_pool_index: reader.read_u16().unwrap(),
-                },
-                0xc1 => BytecodeInstruction::Instanceof {
-                    constant_pool_index: reader.read_u16().unwrap(),
-                },
-                0xc6 => BytecodeInstruction::IfNull {
-                    offset: reader.read_i16().unwrap(),
-                },
-                0xc7 => BytecodeInstruction::IfNonNull {
-                    offset: reader.read_i16().unwrap(),
-                },
-                _ => panic!("Unknown bytecode instruction 0x{:02x}", opcode),
+        let instruction = match opcode {
+            0x01 => BytecodeInstruction::AConstNull {},
+            0x02 => BytecodeInstruction::IConst { constant: -1 },
+            0x03 => BytecodeInstruction::IConst { constant: 0 },
+            0x04 => BytecodeInstruction::IConst { constant: 1 },
+            0x05 => BytecodeInstruction::IConst { constant: 2 },
+            0x06 => BytecodeInstruction::IConst { constant: 3 },
+            0x07 => BytecodeInstruction::IConst { constant: 4 },
+            0x08 => BytecodeInstruction::IConst { constant: 5 },
+            0x09 => BytecodeInstruction::LConst { constant: 0 },
+            0x0a => BytecodeInstruction::LConst { constant: 1 },
+            0x0b => BytecodeInstruction::FConst { constant: 0.0f32 },
+            0x0c => BytecodeInstruction::FConst { constant: 1.0f32 },
+            0x0d => BytecodeInstruction::FConst { constant: 2.0f32 },
+            0x0e => BytecodeInstruction::DConst { constant: 0.0 },
+            0x0f => BytecodeInstruction::DConst { constant: 1.0 },
+            0x10 => BytecodeInstruction::BiPush {
+                immediate: reader.read_u8().unwrap(),
             },
-        );
+            0x11 => BytecodeInstruction::SiPush {
+                immediate: reader.read_u16().unwrap(),
+            },
+            0x12 => BytecodeInstruction::Ldc {
+                constant_pool_index: reader.read_u8().unwrap(),
+            },
+            0x13 => BytecodeInstruction::LdcW {
+                constant_pool_index: reader.read_u16().unwrap(),
+            },
+            0x14 => BytecodeInstruction::Ldc2W {
+                constant_pool_index: reader.read_u16().unwrap(),
+            },
+            0x15 => BytecodeInstruction::ILoad {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x16 => BytecodeInstruction::LLoad {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x17 => BytecodeInstruction::FLoad {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x18 => BytecodeInstruction::DLoad {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x19 => BytecodeInstruction::ALoad {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x1a => BytecodeInstruction::ILoad {
+                local_variable_index: 0,
+            },
+            0x1b => BytecodeInstruction::ILoad {
+                local_variable_index: 1,
+            },
+            0x1c => BytecodeInstruction::ILoad {
+                local_variable_index: 2,
+            },
+            0x1d => BytecodeInstruction::ILoad {
+                local_variable_index: 3,
+            },
+            0x1e => BytecodeInstruction::LLoad {
+                local_variable_index: 0,
+            },
+            0x1f => BytecodeInstruction::LLoad {
+                local_variable_index: 1,
+            },
+            0x20 => BytecodeInstruction::LLoad {
+                local_variable_index: 2,
+            },
+            0x21 => BytecodeInstruction::LLoad {
+                local_variable_index: 3,
+            },
+            0x22 => BytecodeInstruction::FLoad {
+                local_variable_index: 0,
+            },
+            0x23 => BytecodeInstruction::FLoad {
+                local_variable_index: 1,
+            },
+            0x24 => BytecodeInstruction::FLoad {
+                local_variable_index: 2,
+            },
+            0x25 => BytecodeInstruction::FLoad {
+                local_variable_index: 3,
+            },
+            0x26 => BytecodeInstruction::DLoad {
+                local_variable_index: 0,
+            },
+            0x27 => BytecodeInstruction::DLoad {
+                local_variable_index: 1,
+            },
+            0x28 => BytecodeInstruction::DLoad {
+                local_variable_index: 2,
+            },
+            0x29 => BytecodeInstruction::DLoad {
+                local_variable_index: 3,
+            },
+            0x2a => BytecodeInstruction::ALoad {
+                local_variable_index: 0,
+            },
+            0x2b => BytecodeInstruction::ALoad {
+                local_variable_index: 1,
+            },
+            0x2c => BytecodeInstruction::ALoad {
+                local_variable_index: 2,
+            },
+            0x2d => BytecodeInstruction::ALoad {
+                local_variable_index: 3,
+            },
+            0x32 => BytecodeInstruction::AaLoad {},
+            0x33 => BytecodeInstruction::BaLoad {},
+            0x36 => BytecodeInstruction::IStore {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x37 => BytecodeInstruction::LStore {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x38 => BytecodeInstruction::FStore {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x39 => BytecodeInstruction::DStore {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x3a => BytecodeInstruction::AStore {
+                local_variable_index: reader.read_u8().unwrap(),
+            },
+            0x3b => BytecodeInstruction::IStore {
+                local_variable_index: 0,
+            },
+            0x3c => BytecodeInstruction::IStore {
+                local_variable_index: 1,
+            },
+            0x3d => BytecodeInstruction::IStore {
+                local_variable_index: 2,
+            },
+            0x3e => BytecodeInstruction::IStore {
+                local_variable_index: 3,
+            },
+            0x3f => BytecodeInstruction::LStore {
+                local_variable_index: 0,
+            },
+            0x40 => BytecodeInstruction::LStore {
+                local_variable_index: 1,
+            },
+            0x41 => BytecodeInstruction::LStore {
+                local_variable_index: 2,
+            },
+            0x42 => BytecodeInstruction::LStore {
+                local_variable_index: 3,
+            },
+            0x4b => BytecodeInstruction::AStore {
+                local_variable_index: 0,
+            },
+            0x4c => BytecodeInstruction::AStore {
+                local_variable_index: 1,
+            },
+            0x4d => BytecodeInstruction::AStore {
+                local_variable_index: 2,
+            },
+            0x4e => BytecodeInstruction::AStore {
+                local_variable_index: 3,
+            },
+            0x53 => BytecodeInstruction::AaStore {},
+            0x54 => BytecodeInstruction::BaStore {},
+            0x55 => BytecodeInstruction::CaStore {},
+            0x56 => BytecodeInstruction::SaStore {},
+            0x57 => BytecodeInstruction::Pop {},
+            0x58 => BytecodeInstruction::Pop2 {},
+            0x59 => BytecodeInstruction::Dup {},
+            0x60 => BytecodeInstruction::IAdd {},
+            0x61 => BytecodeInstruction::LAdd {},
+            0x62 => BytecodeInstruction::FAdd {},
+            0x63 => BytecodeInstruction::DAdd {},
+            0x64 => BytecodeInstruction::ISub {},
+            0x65 => BytecodeInstruction::LSub {},
+            0x66 => BytecodeInstruction::FSub {},
+            0x67 => BytecodeInstruction::DSub {},
+            0x68 => BytecodeInstruction::IMul {},
+            0x69 => BytecodeInstruction::LMul {},
+            0x6a => BytecodeInstruction::FMul {},
+            0x6b => BytecodeInstruction::DMul {},
+            0x6c => BytecodeInstruction::IDiv {},
+            0x6d => BytecodeInstruction::LDiv {},
+            0x6e => BytecodeInstruction::FDiv {},
+            0x6f => BytecodeInstruction::DDiv {},
+            0x70 => BytecodeInstruction::IRem {},
+            0x71 => BytecodeInstruction::LRem {},
+            0x72 => BytecodeInstruction::FRem {},
+            0x73 => BytecodeInstruction::DRem {},
+            0x74 => BytecodeInstruction::INeg {},
+            0x75 => BytecodeInstruction::LNeg {},
+            0x76 => BytecodeInstruction::FNeg {},
+            0x77 => BytecodeInstruction::DNeg {},
+            0x78 => BytecodeInstruction::IShl {},
+            0x79 => BytecodeInstruction::LShl {},
+            0x7a => BytecodeInstruction::IShr {},
+            0x7b => BytecodeInstruction::LShr {},
+            0x7c => BytecodeInstruction::IUshr {},
+            0x7d => BytecodeInstruction::LUshr {},
+            0x7e => BytecodeInstruction::IAnd {},
+            0x7f => BytecodeInstruction::LAnd {},
+            0x80 => BytecodeInstruction::IOr {},
+            0x81 => BytecodeInstruction::LOr {},
+            0x82 => BytecodeInstruction::IXor {},
+            0x83 => BytecodeInstruction::LXor {},
+            0x84 => BytecodeInstruction::IInc {
+                index: reader.read_u8().unwrap(),
+                constant: reader.read_i8().unwrap(),
+            },
+            0x85 => BytecodeInstruction::I2L {},
+            0x86 => BytecodeInstruction::I2F {},
+            0x87 => BytecodeInstruction::I2D {},
+            0x88 => BytecodeInstruction::L2I {},
+            0x89 => BytecodeInstruction::L2F {},
+            0x8a => BytecodeInstruction::L2D {},
+            0x8b => BytecodeInstruction::F2I {},
+            0x8c => BytecodeInstruction::F2L {},
+            0x8d => BytecodeInstruction::F2D {},
+            0x8e => BytecodeInstruction::D2I {},
+            0x8f => BytecodeInstruction::D2L {},
+            0x90 => BytecodeInstruction::D2F {},
+            0x91 => BytecodeInstruction::I2B {},
+            0x92 => BytecodeInstruction::I2C {},
+            0x93 => BytecodeInstruction::I2S {},
+            0x94 => BytecodeInstruction::LCmp {},
+            0x95 => BytecodeInstruction::FCmpL {},
+            0x96 => BytecodeInstruction::FCmpG {},
+            0x97 => BytecodeInstruction::DCmpL {},
+            0x98 => BytecodeInstruction::DCmpG {},
+            0x99 => BytecodeInstruction::IfEq {
+                offset: reader.read_i16().unwrap(),
+            },
+            0x9a => BytecodeInstruction::IfNe {
+                offset: reader.read_i16().unwrap(),
+            },
+            0x9b => BytecodeInstruction::IfLt {
+                offset: reader.read_i16().unwrap(),
+            },
+            0x9c => BytecodeInstruction::IfGe {
+                offset: reader.read_i16().unwrap(),
+            },
+            0x9d => BytecodeInstruction::IfGt {
+                offset: reader.read_i16().unwrap(),
+            },
+            0x9e => BytecodeInstruction::IfLe {
+                offset: reader.read_i16().unwrap(),
+            },
+            0x9f => BytecodeInstruction::IfIcmpEq {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xa0 => BytecodeInstruction::IfIcmpNe {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xa1 => BytecodeInstruction::IfIcmpLt {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xa2 => BytecodeInstruction::IfIcmpGe {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xa3 => BytecodeInstruction::IfIcmpGt {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xa4 => BytecodeInstruction::IfIcmpLe {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xa5 => BytecodeInstruction::IfAcmpEq {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xa6 => BytecodeInstruction::IfAcmpNe {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xa7 => BytecodeInstruction::GoTo {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xaa => {
+                // skip padding
+                while !reader.position().is_multiple_of(4) {
+                    _ = reader.read_u8();
+                }
+                let default: i32 = reader.read_i32().unwrap();
+                let low: i32 = reader.read_i32().unwrap();
+                let high: i32 = reader.read_i32().unwrap();
+                let offsets: Vec<i32> = reader
+                    .read_i32_vec((high - low + 1).try_into().unwrap())
+                    .unwrap();
+                BytecodeInstruction::TableSwitch {
+                    default,
+                    low,
+                    offsets,
+                }
+            }
+            0xab => {
+                // skip padding
+                while !reader.position().is_multiple_of(4) {
+                    _ = reader.read_u8();
+                }
+                let default: i32 = reader.read_i32().unwrap();
+                let npairs: i32 = reader.read_i32().unwrap();
+                debug_assert!(npairs >= 0);
+                let mut pairs: Vec<LookupSwitchPair> =
+                    Vec::with_capacity(npairs.try_into().unwrap());
+                for _ in 0..npairs {
+                    let match_value: i32 = reader.read_i32().unwrap();
+                    let offset: i32 = reader.read_i32().unwrap();
+                    pairs.push(LookupSwitchPair {
+                        match_value,
+                        offset,
+                    });
+                }
+                BytecodeInstruction::LookupSwitch { default, pairs }
+            }
+            0xac => BytecodeInstruction::IReturn {},
+            0xad => BytecodeInstruction::LReturn {},
+            0xae => BytecodeInstruction::FReturn {},
+            0xaf => BytecodeInstruction::DReturn {},
+            0xb0 => BytecodeInstruction::AReturn {},
+            0xb1 => BytecodeInstruction::Return {},
+            0xb2 => {
+                let field_ref_index: u16 = reader.read_u16().unwrap();
+                assert_valid_and_type(cp, field_ref_index, ConstantPoolTag::Fieldref);
+                BytecodeInstruction::GetStatic { field_ref_index }
+            }
+            0xb3 => BytecodeInstruction::PutStatic {
+                field_ref_index: reader.read_u16().unwrap(),
+            },
+            0xb4 => BytecodeInstruction::GetField {
+                field_ref_index: reader.read_u16().unwrap(),
+            },
+            0xb5 => BytecodeInstruction::PutField {
+                field_ref_index: reader.read_u16().unwrap(),
+            },
+            0xb6 => BytecodeInstruction::InvokeVirtual {
+                method_ref_index: reader.read_u16().unwrap(),
+            },
+            0xb7 => BytecodeInstruction::InvokeSpecial {
+                method_ref_index: reader.read_u16().unwrap(),
+            },
+            0xb8 => BytecodeInstruction::InvokeStatic {
+                method_ref_index: reader.read_u16().unwrap(),
+            },
+            0xb9 => {
+                let constant_pool_index: u16 = reader.read_u16().unwrap();
+                let count: u8 = reader.read_u8().unwrap();
+                // skip one zero byte
+                _ = reader.read_u8().unwrap();
+                BytecodeInstruction::InvokeInterface {
+                    constant_pool_index,
+                    count,
+                }
+            }
+            0xba => {
+                let constant_pool_index: u16 = reader.read_u16().unwrap();
+                // skip two zero bytes
+                _ = reader.read_u8();
+                _ = reader.read_u8();
+                BytecodeInstruction::InvokeDynamic {
+                    constant_pool_index,
+                }
+            }
+            0xbb => BytecodeInstruction::New {
+                constant_pool_index: reader.read_u16().unwrap(),
+            },
+            0xbc => BytecodeInstruction::NewArray {
+                atype: ArrayType::from(reader.read_u8().unwrap()),
+            },
+            0xbd => BytecodeInstruction::ANewArray {
+                constant_pool_index: reader.read_u16().unwrap(),
+            },
+            0xbe => BytecodeInstruction::ArrayLength {},
+            0xbf => BytecodeInstruction::AThrow {},
+            0xc0 => BytecodeInstruction::CheckCast {
+                constant_pool_index: reader.read_u16().unwrap(),
+            },
+            0xc1 => BytecodeInstruction::Instanceof {
+                constant_pool_index: reader.read_u16().unwrap(),
+            },
+            0xc6 => BytecodeInstruction::IfNull {
+                offset: reader.read_i16().unwrap(),
+            },
+            0xc7 => BytecodeInstruction::IfNonNull {
+                offset: reader.read_i16().unwrap(),
+            },
+            _ => panic!("Unknown bytecode instruction 0x{:02x}", opcode),
+        };
+        instructions.push((position, instruction));
     }
     instructions
 }

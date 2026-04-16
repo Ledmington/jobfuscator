@@ -151,7 +151,10 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
         } => {
             2 + 2
                 + 4
-                + code.values().map(get_instruction_length).sum::<u32>()
+                + code
+                    .iter()
+                    .map(|(_, instruction)| get_instruction_length(instruction))
+                    .sum::<u32>()
                 + 2
                 + (2 * 4) * (exception_table.len() as u32)
                 + 2
@@ -279,7 +282,11 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u32(get_attribute_length(attribute));
                 w.write_u16(*max_stack);
                 w.write_u16(*max_locals);
-                w.write_u32(code.values().map(get_instruction_length).sum());
+                w.write_u32(
+                    code.iter()
+                        .map(|(_, instruction)| get_instruction_length(instruction))
+                        .sum(),
+                );
                 for (_, instruction) in code.iter() {
                     write_instruction(w, instruction);
                 }

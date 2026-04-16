@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-use std::collections::BTreeMap;
-
 use binary_reader::BinaryReader;
 
 use crate::access_flags::{
@@ -16,7 +14,7 @@ pub enum AttributeInfo {
         name_index: u16,
         max_stack: u16,
         max_locals: u16,
-        code: BTreeMap<u32, BytecodeInstruction>,
+        code: Vec<(u32, BytecodeInstruction)>,
         exception_table: Vec<ExceptionTableEntry>,
         attributes: Vec<AttributeInfo>,
     },
@@ -511,7 +509,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
                 code_length
             );
             let code_bytes: Vec<u8> = reader.read_u8_vec(code_length.try_into().unwrap()).unwrap();
-            let code: BTreeMap<u32, BytecodeInstruction> = parse_bytecode(
+            let code: Vec<(u32, BytecodeInstruction)> = parse_bytecode(
                 &mut BinaryReader::new(&code_bytes, binary_reader::Endianness::Big),
                 cp,
             );
@@ -529,20 +527,24 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
                     end_pc
                 );
                 assert!(
-                    code.contains_key(&(start_pc as u32)),
+                    code.iter()
+                        .any(|(position, _)| *position == (start_pc as u32)),
                     "Exception {} has start_pc ({}) which does not correspond to a valid instruction.",
                     i,
                     start_pc
                 );
                 assert!(
-                    code.contains_key(&(end_pc as u32)) || (end_pc as u32) == code_length,
+                    code.iter()
+                        .any(|(position, _)| *position == (end_pc as u32))
+                        || (end_pc as u32) == code_length,
                     "Exception {} has end_pc ({}) which does not correspond to a valid instruction.",
                     i,
                     end_pc
                 );
                 let handler_pc: u16 = reader.read_u16().unwrap();
                 assert!(
-                    code.contains_key(&(handler_pc as u32)),
+                    code.iter()
+                        .any(|(position, _)| *position == (handler_pc as u32)),
                     "Exception {} has handler_pc ({}) which does not correspond to a valid instruction.",
                     i,
                     handler_pc
@@ -696,7 +698,7 @@ fn parse_code_attributes(
     reader: &mut BinaryReader,
     cp: &ConstantPool,
     num_attributes: usize,
-    code: &BTreeMap<u32, BytecodeInstruction>,
+    code: &[(u32, BytecodeInstruction)],
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for i in 0..num_attributes {
@@ -717,7 +719,7 @@ fn parse_code_attributes(
 fn parse_code_attribute(
     cp: &ConstantPool,
     reader: &mut BinaryReader,
-    code: &BTreeMap<u32, BytecodeInstruction>,
+    code: &[(u32, BytecodeInstruction)],
 ) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
@@ -739,7 +741,8 @@ fn parse_code_attribute(
             for i in 0..line_number_table_length {
                 let start_pc: u16 = reader.read_u16().unwrap();
                 assert!(
-                    code.contains_key(&(start_pc as u32)),
+                    code.iter()
+                        .any(|(position, _)| *position == (start_pc as u32)),
                     "LineNumberTable entry {} has start_pc ({}) which does not correspond to a valid instruction.",
                     i,
                     start_pc
