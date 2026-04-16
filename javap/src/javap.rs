@@ -809,7 +809,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                 + &add_offset(*position, *default).to_string()
                 + "\n      }"
         }
-        BytecodeInstruction::LookupSwitch { default, pairs } => {
+        BytecodeInstruction::LookupSwitch { default, pairs, .. } => {
             "lookupswitch  { // ".to_owned()
                 + &pairs.len().to_string()
                 + "\n"

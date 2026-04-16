@@ -68,6 +68,16 @@ impl BinaryWriter {
         self.pos += 4;
     }
 
+    pub fn write_i32(&mut self, x: i32) {
+        for v in match self.endianness {
+            Endianness::Big => i32::to_be_bytes(x),
+            Endianness::Little => i32::to_le_bytes(x),
+        } {
+            self.buf.push(v);
+        }
+        self.pos += 4;
+    }
+
     pub fn array(&self) -> Vec<u8> {
         self.buf.clone()
     }
@@ -136,6 +146,20 @@ mod tests {
     fn write_le_u32() {
         let mut writer: BinaryWriter = BinaryWriter::new(Endianness::Little);
         writer.write_u32(0x01020304u32);
+        assert_eq!(vec![4u8, 3u8, 2u8, 1u8], writer.array());
+    }
+
+    #[test]
+    fn write_be_i32() {
+        let mut writer: BinaryWriter = BinaryWriter::new(Endianness::Big);
+        writer.write_i32(0x01020304i32);
+        assert_eq!(vec![1u8, 2u8, 3u8, 4u8], writer.array());
+    }
+
+    #[test]
+    fn write_le_i32() {
+        let mut writer: BinaryWriter = BinaryWriter::new(Endianness::Little);
+        writer.write_i32(0x01020304i32);
         assert_eq!(vec![4u8, 3u8, 2u8, 1u8], writer.array());
     }
 }

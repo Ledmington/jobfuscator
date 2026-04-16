@@ -181,7 +181,7 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
         }
         AttributeInfo::SourceFile { .. } => 2,
         AttributeInfo::BootstrapMethods { .. } => todo!(),
-        AttributeInfo::InnerClasses { .. } => todo!(),
+        AttributeInfo::InnerClasses { classes, .. } => 2 + (2 * 4) * (classes.len() as u32),
         AttributeInfo::MethodParameters { .. } => todo!(),
         AttributeInfo::Record { .. } => todo!(),
         AttributeInfo::Signature { .. } => 2,
@@ -351,7 +351,20 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u16(*source_file_index);
             }
             AttributeInfo::BootstrapMethods { .. } => todo!(),
-            AttributeInfo::InnerClasses { .. } => todo!(),
+            AttributeInfo::InnerClasses {
+                name_index,
+                classes,
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(classes.len().try_into().unwrap());
+                for inner_class in classes.iter() {
+                    w.write_u16(inner_class.inner_class_info_index);
+                    w.write_u16(inner_class.outer_class_info_index);
+                    w.write_u16(inner_class.inner_name_index);
+                    w.write_u16(access_flags::to_u16(&inner_class.inner_class_access_flags));
+                }
+            }
             AttributeInfo::MethodParameters { .. } => todo!(),
             AttributeInfo::Record { .. } => todo!(),
             AttributeInfo::Signature {

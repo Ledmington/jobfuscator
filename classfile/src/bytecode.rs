@@ -188,6 +188,7 @@ pub enum BytecodeInstruction {
         offsets: Vec<i32>,
     },
     LookupSwitch {
+        num_padding_bytes: u8,
         default: i32,
         pairs: Vec<LookupSwitchPair>,
     },
@@ -609,8 +610,12 @@ pub fn parse_bytecode(
             }
             0xab => {
                 // skip padding
-                while !reader.position().is_multiple_of(4) {
-                    _ = reader.read_u8();
+                let current_position = reader.position();
+                let next_multiple_of_4 = ((current_position + 3) / 4) * 4;
+                let num_padding_bytes: u8 = (next_multiple_of_4 - current_position) as u8;
+                for _ in 0..num_padding_bytes {
+                    let pad = reader.read_u8().unwrap();
+                    assert!(pad == 0x00);
                 }
                 let default: i32 = reader.read_i32().unwrap();
                 let npairs: i32 = reader.read_i32().unwrap();
@@ -625,7 +630,11 @@ pub fn parse_bytecode(
                         offset,
                     });
                 }
-                BytecodeInstruction::LookupSwitch { default, pairs }
+                BytecodeInstruction::LookupSwitch {
+                    num_padding_bytes,
+                    default,
+                    pairs,
+                }
             }
             0xac => BytecodeInstruction::IReturn {},
             0xad => BytecodeInstruction::LReturn {},
@@ -707,7 +716,7 @@ pub fn parse_bytecode(
 
 pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction) {
     match instruction {
-        BytecodeInstruction::Dup {} => todo!(),
+        BytecodeInstruction::Dup {} => w.write_u8(0x59),
         BytecodeInstruction::AConstNull {} => todo!(),
         BytecodeInstruction::IConst { constant } => match constant {
             -1 => w.write_u8(0x02),
@@ -719,16 +728,34 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             5 => w.write_u8(0x08),
             _ => panic!("Invalid iconst instruction."),
         },
-        BytecodeInstruction::LConst { .. } => todo!(),
-        BytecodeInstruction::FConst { .. } => todo!(),
-        BytecodeInstruction::DConst { .. } => todo!(),
+        BytecodeInstruction::LConst { constant } => match constant {
+            0 => w.write_u8(0x09),
+            1 => w.write_u8(0x0a),
+            _ => panic!("Invalid lconst instruction"),
+        },
+        BytecodeInstruction::FConst { constant } => match constant {
+            0.0f32 => w.write_u8(0x0b),
+            1.0f32 => w.write_u8(0x0c),
+            2.0f32 => w.write_u8(0x0d),
+            _ => panic!("Invalid fconst instruction"),
+        },
+        BytecodeInstruction::DConst { constant } => match constant {
+            0.0 => w.write_u8(0x0e),
+            1.0 => w.write_u8(0x0f),
+            _ => panic!("Invalid dconst instruction"),
+        },
         BytecodeInstruction::Ldc {
             constant_pool_index,
         } => {
             w.write_u8(0x12);
             w.write_u8(*constant_pool_index);
         }
-        BytecodeInstruction::LdcW { .. } => todo!(),
+        BytecodeInstruction::LdcW {
+            constant_pool_index,
+        } => {
+            w.write_u8(0x13);
+            w.write_u16(*constant_pool_index);
+        }
         BytecodeInstruction::Ldc2W {
             constant_pool_index,
         } => {
@@ -783,8 +810,30 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
                 w.write_u8(*local_variable_index);
             }
         },
-        BytecodeInstruction::LLoad { .. } => todo!(),
-        BytecodeInstruction::LStore { .. } => todo!(),
+        BytecodeInstruction::LLoad {
+            local_variable_index,
+        } => match local_variable_index {
+            0 => w.write_u8(0x1e),
+            1 => w.write_u8(0x1f),
+            2 => w.write_u8(0x20),
+            3 => w.write_u8(0x21),
+            _ => {
+                w.write_u8(0x16);
+                w.write_u8(*local_variable_index);
+            }
+        },
+        BytecodeInstruction::LStore {
+            local_variable_index,
+        } => match local_variable_index {
+            0 => w.write_u8(0x3f),
+            1 => w.write_u8(0x40),
+            2 => w.write_u8(0x41),
+            3 => w.write_u8(0x42),
+            _ => {
+                w.write_u8(0x37);
+                w.write_u8(*local_variable_index);
+            }
+        },
         BytecodeInstruction::FLoad {
             local_variable_index,
         } => match local_variable_index {
@@ -810,7 +859,12 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
                 w.write_u8(*local_variable_index);
             }
         },
-        BytecodeInstruction::DStore { .. } => todo!(),
+        BytecodeInstruction::DStore {
+            local_variable_index,
+        } => {
+            w.write_u8(0x39);
+            w.write_u8(*local_variable_index);
+        }
         BytecodeInstruction::AaLoad {} => todo!(),
         BytecodeInstruction::BaLoad {} => todo!(),
         BytecodeInstruction::AaStore {} => todo!(),
@@ -819,8 +873,13 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         BytecodeInstruction::SaStore {} => todo!(),
         BytecodeInstruction::NewArray { .. } => todo!(),
         BytecodeInstruction::ANewArray { .. } => todo!(),
-        BytecodeInstruction::AThrow {} => todo!(),
-        BytecodeInstruction::New { .. } => todo!(),
+        BytecodeInstruction::AThrow {} => w.write_u8(0xbf),
+        BytecodeInstruction::New {
+            constant_pool_index,
+        } => {
+            w.write_u8(0xbb);
+            w.write_u16(*constant_pool_index);
+        }
         BytecodeInstruction::BiPush { immediate } => {
             w.write_u8(0x10);
             w.write_u8(*immediate);
@@ -833,15 +892,18 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         BytecodeInstruction::Pop2 {} => todo!(),
         BytecodeInstruction::Return {} => w.write_u8(0xb1),
         BytecodeInstruction::IReturn {} => w.write_u8(0xac),
-        BytecodeInstruction::LReturn {} => todo!(),
-        BytecodeInstruction::FReturn {} => todo!(),
+        BytecodeInstruction::LReturn {} => w.write_u8(0xad),
+        BytecodeInstruction::FReturn {} => w.write_u8(0xae),
         BytecodeInstruction::DReturn {} => w.write_u8(0xaf),
         BytecodeInstruction::AReturn {} => todo!(),
         BytecodeInstruction::GetStatic { field_ref_index } => {
             w.write_u8(0xb2);
             w.write_u16(*field_ref_index);
         }
-        BytecodeInstruction::PutStatic { .. } => todo!(),
+        BytecodeInstruction::PutStatic { field_ref_index } => {
+            w.write_u8(0xb3);
+            w.write_u16(*field_ref_index);
+        }
         BytecodeInstruction::GetField { .. } => todo!(),
         BytecodeInstruction::PutField { .. } => todo!(),
         BytecodeInstruction::InvokeSpecial { method_ref_index } => {
@@ -860,19 +922,37 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         BytecodeInstruction::InvokeDynamic { .. } => todo!(),
         BytecodeInstruction::InvokeInterface { .. } => todo!(),
         BytecodeInstruction::ArrayLength {} => todo!(),
-        BytecodeInstruction::LCmp {} => todo!(),
-        BytecodeInstruction::FCmpL {} => todo!(),
-        BytecodeInstruction::FCmpG {} => todo!(),
-        BytecodeInstruction::DCmpL {} => todo!(),
-        BytecodeInstruction::DCmpG {} => todo!(),
+        BytecodeInstruction::LCmp {} => w.write_u8(0x94),
+        BytecodeInstruction::FCmpL {} => w.write_u8(0x95),
+        BytecodeInstruction::FCmpG {} => w.write_u8(0x96),
+        BytecodeInstruction::DCmpL {} => w.write_u8(0x97),
+        BytecodeInstruction::DCmpG {} => w.write_u8(0x98),
         BytecodeInstruction::IfAcmpEq { .. } => todo!(),
         BytecodeInstruction::IfAcmpNe { .. } => todo!(),
-        BytecodeInstruction::IfIcmpEq { .. } => todo!(),
-        BytecodeInstruction::IfIcmpNe { .. } => todo!(),
-        BytecodeInstruction::IfIcmpLt { .. } => todo!(),
-        BytecodeInstruction::IfIcmpGe { .. } => todo!(),
-        BytecodeInstruction::IfIcmpGt { .. } => todo!(),
-        BytecodeInstruction::IfIcmpLe { .. } => todo!(),
+        BytecodeInstruction::IfIcmpEq { offset } => {
+            w.write_u8(0x9f);
+            w.write_i16(*offset);
+        }
+        BytecodeInstruction::IfIcmpNe { offset } => {
+            w.write_u8(0xa0);
+            w.write_i16(*offset);
+        }
+        BytecodeInstruction::IfIcmpLt { offset } => {
+            w.write_u8(0xa1);
+            w.write_i16(*offset);
+        }
+        BytecodeInstruction::IfIcmpGe { offset } => {
+            w.write_u8(0xa2);
+            w.write_i16(*offset);
+        }
+        BytecodeInstruction::IfIcmpGt { offset } => {
+            w.write_u8(0xae);
+            w.write_i16(*offset);
+        }
+        BytecodeInstruction::IfIcmpLe { offset } => {
+            w.write_u8(0xa4);
+            w.write_i16(*offset);
+        }
         BytecodeInstruction::IfEq { offset } => {
             w.write_u8(0x99);
             w.write_i16(*offset);
@@ -899,58 +979,75 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         }
         BytecodeInstruction::IfNull { .. } => todo!(),
         BytecodeInstruction::IfNonNull { .. } => todo!(),
-        BytecodeInstruction::GoTo { .. } => todo!(),
+        BytecodeInstruction::GoTo { offset } => {
+            w.write_u8(0xa7);
+            w.write_i16(*offset);
+        }
         BytecodeInstruction::TableSwitch { .. } => todo!(),
-        BytecodeInstruction::LookupSwitch { .. } => todo!(),
+        BytecodeInstruction::LookupSwitch {
+            num_padding_bytes,
+            default,
+            pairs,
+        } => {
+            for _ in 0u8..*num_padding_bytes {
+                w.write_u8(0x00);
+            }
+            w.write_i32(*default);
+            w.write_i32(pairs.len().try_into().unwrap());
+            for pair in pairs.iter() {
+                w.write_i32(pair.match_value);
+                w.write_i32(pair.offset);
+            }
+        }
         BytecodeInstruction::CheckCast { .. } => todo!(),
         BytecodeInstruction::Instanceof { .. } => todo!(),
         BytecodeInstruction::IInc { .. } => todo!(),
-        BytecodeInstruction::I2L {} => todo!(),
+        BytecodeInstruction::I2L {} => w.write_u8(0x85),
         BytecodeInstruction::I2F {} => todo!(),
         BytecodeInstruction::I2D {} => todo!(),
-        BytecodeInstruction::L2I {} => todo!(),
+        BytecodeInstruction::L2I {} => w.write_u8(0x88),
         BytecodeInstruction::L2F {} => todo!(),
         BytecodeInstruction::L2D {} => todo!(),
         BytecodeInstruction::F2I {} => w.write_u8(0x8b),
         BytecodeInstruction::F2L {} => todo!(),
-        BytecodeInstruction::F2D {} => todo!(),
+        BytecodeInstruction::F2D {} => w.write_u8(0x8d),
         BytecodeInstruction::D2I {} => todo!(),
-        BytecodeInstruction::D2L {} => todo!(),
-        BytecodeInstruction::D2F {} => todo!(),
+        BytecodeInstruction::D2L {} => w.write_u8(0x8f),
+        BytecodeInstruction::D2F {} => w.write_u8(0x90),
         BytecodeInstruction::I2B {} => todo!(),
         BytecodeInstruction::I2C {} => todo!(),
         BytecodeInstruction::I2S {} => todo!(),
         BytecodeInstruction::IAdd {} => w.write_u8(0x60),
         BytecodeInstruction::ISub {} => w.write_u8(0x64),
-        BytecodeInstruction::IMul {} => todo!(),
-        BytecodeInstruction::IDiv {} => todo!(),
-        BytecodeInstruction::IRem {} => todo!(),
+        BytecodeInstruction::IMul {} => w.write_u8(0x68),
+        BytecodeInstruction::IDiv {} => w.write_u8(0x6c),
+        BytecodeInstruction::IRem {} => w.write_u8(0x70),
         BytecodeInstruction::IAnd {} => w.write_u8(0x7e),
-        BytecodeInstruction::IShl {} => todo!(),
+        BytecodeInstruction::IShl {} => w.write_u8(0x78),
         BytecodeInstruction::IShr {} => w.write_u8(0x7a),
-        BytecodeInstruction::IUshr {} => todo!(),
+        BytecodeInstruction::IUshr {} => w.write_u8(0x7c),
         BytecodeInstruction::IOr {} => w.write_u8(0x80),
-        BytecodeInstruction::IXor {} => todo!(),
+        BytecodeInstruction::IXor {} => w.write_u8(0x82),
         BytecodeInstruction::INeg {} => w.write_u8(0x74),
-        BytecodeInstruction::LAdd {} => todo!(),
-        BytecodeInstruction::LSub {} => todo!(),
-        BytecodeInstruction::LMul {} => todo!(),
-        BytecodeInstruction::LDiv {} => todo!(),
-        BytecodeInstruction::LRem {} => todo!(),
-        BytecodeInstruction::LAnd {} => todo!(),
-        BytecodeInstruction::LOr {} => todo!(),
-        BytecodeInstruction::LXor {} => todo!(),
-        BytecodeInstruction::LShl {} => todo!(),
-        BytecodeInstruction::LShr {} => todo!(),
-        BytecodeInstruction::LUshr {} => todo!(),
-        BytecodeInstruction::LNeg {} => todo!(),
-        BytecodeInstruction::FAdd {} => todo!(),
-        BytecodeInstruction::FMul {} => todo!(),
+        BytecodeInstruction::LAdd {} => w.write_u8(0x61),
+        BytecodeInstruction::LSub {} => w.write_u8(0x65),
+        BytecodeInstruction::LMul {} => w.write_u8(0x69),
+        BytecodeInstruction::LDiv {} => w.write_u8(0x6d),
+        BytecodeInstruction::LRem {} => w.write_u8(0x71),
+        BytecodeInstruction::LAnd {} => w.write_u8(0x7f),
+        BytecodeInstruction::LOr {} => w.write_u8(0x81),
+        BytecodeInstruction::LXor {} => w.write_u8(0x83),
+        BytecodeInstruction::LShl {} => w.write_u8(0x79),
+        BytecodeInstruction::LShr {} => w.write_u8(0x7b),
+        BytecodeInstruction::LUshr {} => w.write_u8(0x7d),
+        BytecodeInstruction::LNeg {} => w.write_u8(0x75),
+        BytecodeInstruction::FAdd {} => w.write_u8(0x62),
+        BytecodeInstruction::FMul {} => w.write_u8(0x6a),
         BytecodeInstruction::FNeg {} => todo!(),
         BytecodeInstruction::FDiv {} => todo!(),
         BytecodeInstruction::FRem {} => todo!(),
         BytecodeInstruction::FSub {} => todo!(),
-        BytecodeInstruction::DAdd {} => todo!(),
+        BytecodeInstruction::DAdd {} => w.write_u8(0x63),
         BytecodeInstruction::DMul {} => w.write_u8(0x6b),
         BytecodeInstruction::DNeg {} => todo!(),
         BytecodeInstruction::DDiv {} => todo!(),
@@ -966,10 +1063,10 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
     match instruction {
         BytecodeInstruction::Dup {} => 1,
         BytecodeInstruction::AConstNull {} => 1,
-        BytecodeInstruction::IConst { .. } => 5,
-        BytecodeInstruction::LConst { .. } => 9,
-        BytecodeInstruction::FConst { .. } => 5,
-        BytecodeInstruction::DConst { .. } => 9,
+        BytecodeInstruction::IConst { .. } => 1,
+        BytecodeInstruction::LConst { .. } => 1,
+        BytecodeInstruction::FConst { .. } => 1,
+        BytecodeInstruction::DConst { .. } => 1,
         BytecodeInstruction::Ldc { .. } => 2,
         BytecodeInstruction::LdcW { .. } => 3,
         BytecodeInstruction::Ldc2W { .. } => 3,
@@ -997,8 +1094,18 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
             0..=3 => 1,
             _ => 2,
         },
-        BytecodeInstruction::LLoad { .. } => todo!(),
-        BytecodeInstruction::LStore { .. } => todo!(),
+        BytecodeInstruction::LLoad {
+            local_variable_index,
+        } => match local_variable_index {
+            0..=3 => 1,
+            _ => 2,
+        },
+        BytecodeInstruction::LStore {
+            local_variable_index,
+        } => match local_variable_index {
+            0..=3 => 1,
+            _ => 2,
+        },
         BytecodeInstruction::FLoad {
             local_variable_index,
         } => match local_variable_index {
@@ -1012,7 +1119,7 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
             0..=3 => 1,
             _ => 2,
         },
-        BytecodeInstruction::DStore { .. } => todo!(),
+        BytecodeInstruction::DStore { .. } => 2,
         BytecodeInstruction::AaLoad {} => 1,
         BytecodeInstruction::BaLoad {} => 1,
         BytecodeInstruction::AaStore {} => 1,
@@ -1043,19 +1150,19 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         BytecodeInstruction::InvokeDynamic { .. } => todo!(),
         BytecodeInstruction::InvokeInterface { .. } => todo!(),
         BytecodeInstruction::ArrayLength {} => todo!(),
-        BytecodeInstruction::LCmp {} => todo!(),
-        BytecodeInstruction::FCmpL {} => todo!(),
-        BytecodeInstruction::FCmpG {} => todo!(),
-        BytecodeInstruction::DCmpL {} => todo!(),
-        BytecodeInstruction::DCmpG {} => todo!(),
-        BytecodeInstruction::IfAcmpEq { .. } => todo!(),
-        BytecodeInstruction::IfAcmpNe { .. } => todo!(),
-        BytecodeInstruction::IfIcmpEq { .. } => todo!(),
-        BytecodeInstruction::IfIcmpNe { .. } => todo!(),
-        BytecodeInstruction::IfIcmpLt { .. } => todo!(),
-        BytecodeInstruction::IfIcmpGe { .. } => todo!(),
-        BytecodeInstruction::IfIcmpGt { .. } => todo!(),
-        BytecodeInstruction::IfIcmpLe { .. } => todo!(),
+        BytecodeInstruction::LCmp {} => 1,
+        BytecodeInstruction::FCmpL {} => 1,
+        BytecodeInstruction::FCmpG {} => 1,
+        BytecodeInstruction::DCmpL {} => 1,
+        BytecodeInstruction::DCmpG {} => 1,
+        BytecodeInstruction::IfAcmpEq { .. } => 3,
+        BytecodeInstruction::IfAcmpNe { .. } => 3,
+        BytecodeInstruction::IfIcmpEq { .. } => 3,
+        BytecodeInstruction::IfIcmpNe { .. } => 3,
+        BytecodeInstruction::IfIcmpLt { .. } => 3,
+        BytecodeInstruction::IfIcmpGe { .. } => 3,
+        BytecodeInstruction::IfIcmpGt { .. } => 3,
+        BytecodeInstruction::IfIcmpLe { .. } => 3,
         BytecodeInstruction::IfEq { .. } => 3,
         BytecodeInstruction::IfNe { .. } => 3,
         BytecodeInstruction::IfLt { .. } => 3,
@@ -1064,9 +1171,13 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         BytecodeInstruction::IfLe { .. } => 3,
         BytecodeInstruction::IfNull { .. } => todo!(),
         BytecodeInstruction::IfNonNull { .. } => todo!(),
-        BytecodeInstruction::GoTo { .. } => todo!(),
+        BytecodeInstruction::GoTo { .. } => 3,
         BytecodeInstruction::TableSwitch { .. } => todo!(),
-        BytecodeInstruction::LookupSwitch { .. } => todo!(),
+        BytecodeInstruction::LookupSwitch {
+            num_padding_bytes,
+            pairs,
+            ..
+        } => (*num_padding_bytes as u32) + 4 + 4 + (2 * 4) * (pairs.len() as u32),
         BytecodeInstruction::CheckCast { .. } => todo!(),
         BytecodeInstruction::Instanceof { .. } => todo!(),
         BytecodeInstruction::IInc { .. } => todo!(),
