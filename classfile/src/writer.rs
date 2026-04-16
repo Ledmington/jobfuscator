@@ -4,7 +4,7 @@ use binary_writer::{BinaryWriter, Endianness};
 
 use crate::{
     access_flags,
-    attributes::{Annotation, AttributeInfo, ElementValue},
+    attributes::{Annotation, AttributeInfo, ElementValue, StackMapFrame, VerificationTypeInfo},
     bytecode::{get_instruction_length, write_instruction},
     classfile::ClassFile,
     constant_pool::{ConstantPool, ConstantPoolInfo},
@@ -165,7 +165,14 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
             ..
         } => 2 + (2 * 5) * (local_variable_table.len() as u32),
         AttributeInfo::LocalVariableTypeTable { .. } => todo!(),
-        AttributeInfo::StackMapTable { .. } => todo!(),
+        AttributeInfo::StackMapTable {
+            stack_map_table, ..
+        } => {
+            2 + stack_map_table
+                .iter()
+                .map(get_stack_map_entry_length)
+                .sum::<u32>()
+        }
         AttributeInfo::SourceFile { .. } => 2,
         AttributeInfo::BootstrapMethods { .. } => todo!(),
         AttributeInfo::InnerClasses { .. } => todo!(),
@@ -177,6 +184,54 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
             2 + annotations.iter().map(get_annotation_length).sum::<u32>()
         }
         AttributeInfo::ConstantValue { .. } => 2,
+    }
+}
+
+fn get_stack_map_entry_length(entry: &StackMapFrame) -> u32 {
+    match entry {
+        StackMapFrame::SameFrame { .. } => 1,
+        StackMapFrame::SameLocals1StackItemFrame { stack, .. } => {
+            1 + get_verification_type_info_length(stack)
+        }
+        StackMapFrame::SameLocals1StackItemFrameExtended { stack, .. } => {
+            1 + 2 + get_verification_type_info_length(stack)
+        }
+        StackMapFrame::ChopFrame { .. } => 1 + 2,
+        StackMapFrame::SameFrameExtended { .. } => 1 + 2,
+        StackMapFrame::AppendFrame { locals, .. } => {
+            1 + 2
+                + locals
+                    .iter()
+                    .map(get_verification_type_info_length)
+                    .sum::<u32>()
+        }
+        StackMapFrame::FullFrame { locals, stack, .. } => {
+            1 + 2
+                + 2
+                + locals
+                    .iter()
+                    .map(get_verification_type_info_length)
+                    .sum::<u32>()
+                + 2
+                + stack
+                    .iter()
+                    .map(get_verification_type_info_length)
+                    .sum::<u32>()
+        }
+    }
+}
+
+fn get_verification_type_info_length(type_info: &VerificationTypeInfo) -> u32 {
+    match type_info {
+        VerificationTypeInfo::TopVariable
+        | VerificationTypeInfo::IntegerVariable
+        | VerificationTypeInfo::FloatVariable
+        | VerificationTypeInfo::LongVariable
+        | VerificationTypeInfo::DoubleVariable
+        | VerificationTypeInfo::NullVariable
+        | VerificationTypeInfo::UninitializedThisVariable => 1,
+        VerificationTypeInfo::ObjectVariable { .. }
+        | VerificationTypeInfo::UninitializedVariable { .. } => 1 + 2,
     }
 }
 
@@ -266,7 +321,17 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 }
             }
             AttributeInfo::LocalVariableTypeTable { .. } => todo!(),
-            AttributeInfo::StackMapTable { .. } => todo!(),
+            AttributeInfo::StackMapTable {
+                name_index,
+                stack_map_table,
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(stack_map_table.len().try_into().unwrap());
+                for entry in stack_map_table {
+                    write_stack_map_entry(w, entry);
+                }
+            }
             AttributeInfo::SourceFile {
                 name_index,
                 source_file_index,
@@ -312,6 +377,84 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u32(get_attribute_length(attribute));
                 w.write_u16(*constant_value_index);
             }
+        }
+    }
+}
+
+fn write_stack_map_entry(w: &mut BinaryWriter, entry: &StackMapFrame) {
+    match entry {
+        StackMapFrame::SameFrame { frame_type } => w.write_u8(*frame_type),
+        StackMapFrame::SameLocals1StackItemFrame { frame_type, stack } => {
+            w.write_u8(*frame_type);
+            write_verification_type_info(w, stack);
+        }
+        StackMapFrame::SameLocals1StackItemFrameExtended {
+            offset_delta,
+            stack,
+        } => {
+            w.write_u8(247);
+            w.write_u16(*offset_delta);
+            write_verification_type_info(w, stack);
+        }
+        StackMapFrame::ChopFrame {
+            frame_type,
+            offset_delta,
+        } => {
+            w.write_u8(*frame_type);
+            w.write_u16(*offset_delta);
+        }
+        StackMapFrame::SameFrameExtended { offset_delta } => {
+            w.write_u8(251);
+            w.write_u16(*offset_delta);
+        }
+        StackMapFrame::AppendFrame {
+            frame_type,
+            offset_delta,
+            locals,
+        } => {
+            w.write_u8(*frame_type);
+            w.write_u16(*offset_delta);
+            for entry in locals {
+                write_verification_type_info(w, entry);
+            }
+        }
+        StackMapFrame::FullFrame {
+            offset_delta,
+            locals,
+            stack,
+        } => {
+            w.write_u8(255);
+            w.write_u16(*offset_delta);
+            w.write_u16(locals.len().try_into().unwrap());
+            for entry in locals {
+                write_verification_type_info(w, entry);
+            }
+            w.write_u16(stack.len().try_into().unwrap());
+            for entry in stack {
+                write_verification_type_info(w, entry);
+            }
+        }
+    }
+}
+
+fn write_verification_type_info(w: &mut BinaryWriter, type_info: &VerificationTypeInfo) {
+    match type_info {
+        VerificationTypeInfo::TopVariable => w.write_u8(0),
+        VerificationTypeInfo::IntegerVariable => w.write_u8(1),
+        VerificationTypeInfo::FloatVariable => w.write_u8(2),
+        VerificationTypeInfo::DoubleVariable => w.write_u8(3),
+        VerificationTypeInfo::LongVariable => w.write_u8(4),
+        VerificationTypeInfo::NullVariable => w.write_u8(5),
+        VerificationTypeInfo::UninitializedThisVariable => w.write_u8(6),
+        VerificationTypeInfo::ObjectVariable {
+            constant_pool_index,
+        } => {
+            w.write_u8(7);
+            w.write_u16(*constant_pool_index);
+        }
+        VerificationTypeInfo::UninitializedVariable { offset } => {
+            w.write_u8(8);
+            w.write_u16(*offset);
         }
     }
 }

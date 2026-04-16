@@ -42,6 +42,16 @@ impl BinaryWriter {
         self.pos += 2;
     }
 
+    pub fn write_i16(&mut self, x: i16) {
+        for v in match self.endianness {
+            Endianness::Big => i16::to_be_bytes(x),
+            Endianness::Little => i16::to_le_bytes(x),
+        } {
+            self.buf.push(v);
+        }
+        self.pos += 2;
+    }
+
     pub fn write_u16_vec(&mut self, x: &Vec<u16>) {
         for v in x {
             self.write_u16(*v);
@@ -98,6 +108,20 @@ mod tests {
     fn write_le_u16() {
         let mut writer: BinaryWriter = BinaryWriter::new(Endianness::Little);
         writer.write_u16(0x0102u16);
+        assert_eq!(vec![2u8, 1u8], writer.array());
+    }
+
+    #[test]
+    fn write_be_i16() {
+        let mut writer: BinaryWriter = BinaryWriter::new(Endianness::Big);
+        writer.write_i16(0x0102i16);
+        assert_eq!(vec![1u8, 2u8], writer.array());
+    }
+
+    #[test]
+    fn write_le_i16() {
+        let mut writer: BinaryWriter = BinaryWriter::new(Endianness::Little);
+        writer.write_i16(0x0102i16);
         assert_eq!(vec![2u8, 1u8], writer.array());
     }
 
