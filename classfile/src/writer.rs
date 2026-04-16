@@ -158,7 +158,10 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
                 + 2
                 + (2 * 4) * (exception_table.len() as u32)
                 + 2
-                + attributes.iter().map(get_attribute_length).sum::<u32>()
+                + attributes
+                    .iter()
+                    .map(|attr| 2 + 4 + get_attribute_length(attr))
+                    .sum::<u32>()
         }
         AttributeInfo::LineNumberTable {
             line_number_table, ..
