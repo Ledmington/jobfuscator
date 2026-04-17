@@ -387,6 +387,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
             }
         }
         "Signature" => {
+            check_attribute_length(attribute_length, 2, attribute_name);
             let signature_index: u16 = reader.read_u16().unwrap();
             AttributeInfo::Signature {
                 name_index: attribute_name_index,
@@ -450,8 +451,8 @@ fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attrib
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
         "Signature" => {
-            let signature_index: u16 = reader.read_u16().unwrap();
             check_attribute_length(attribute_length, 2, attribute_name);
+            let signature_index: u16 = reader.read_u16().unwrap();
             AttributeInfo::Signature {
                 name_index: attribute_name_index,
                 signature_index,
@@ -591,11 +592,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             }
         }
         "Signature" => {
-            assert!(
-                attribute_length == 2,
-                "The attribute_length field of Signature must be 2 but was {}.",
-                attribute_length
-            );
+            check_attribute_length(attribute_length, 2, attribute_name);
             let signature_index: u16 = reader.read_u16().unwrap();
             assert_valid_and_type(cp, signature_index, ConstantPoolTag::Utf8);
             AttributeInfo::Signature {

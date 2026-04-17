@@ -619,7 +619,7 @@ pub fn parse_bytecode(
                 }
                 let default: i32 = reader.read_i32().unwrap();
                 let npairs: i32 = reader.read_i32().unwrap();
-                debug_assert!(npairs >= 0);
+                assert!(npairs >= 0);
                 let mut pairs: Vec<LookupSwitchPair> =
                     Vec::with_capacity(npairs.try_into().unwrap());
                 for _ in 0..npairs {
@@ -946,7 +946,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_i16(*offset);
         }
         BytecodeInstruction::IfIcmpGt { offset } => {
-            w.write_u8(0xae);
+            w.write_u8(0xa3);
             w.write_i16(*offset);
         }
         BytecodeInstruction::IfIcmpLe { offset } => {
@@ -989,6 +989,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             default,
             pairs,
         } => {
+            w.write_u8(0xab);
             for _ in 0u8..*num_padding_bytes {
                 w.write_u8(0x00);
             }
@@ -1057,7 +1058,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
 }
 
 /**
- * Returns the number of bytes required to fully encode (opcode included, padding excluded) the given instruction.
+ * Returns the number of bytes required to fully encode (opcode and padding included) the given instruction.
  */
 pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
     match instruction {
@@ -1177,7 +1178,7 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
             num_padding_bytes,
             pairs,
             ..
-        } => (*num_padding_bytes as u32) + 4 + 4 + (2 * 4) * (pairs.len() as u32),
+        } => 1 + (*num_padding_bytes as u32) + 4 + 4 + (2 * 4) * (pairs.len() as u32),
         BytecodeInstruction::CheckCast { .. } => todo!(),
         BytecodeInstruction::Instanceof { .. } => todo!(),
         BytecodeInstruction::IInc { .. } => todo!(),
