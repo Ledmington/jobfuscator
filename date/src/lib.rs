@@ -2,7 +2,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub struct DateTime {
+pub struct Date {
     day: u8,
     month: u8,
     year: u16,
@@ -32,7 +32,7 @@ fn get_max_days_in_month(month: u8, year: u16) -> u8 {
     }
 }
 
-impl From<SystemTime> for DateTime {
+impl From<SystemTime> for Date {
     fn from(st: SystemTime) -> Self {
         let seconds: u64 = st.duration_since(UNIX_EPOCH).unwrap().as_secs();
         let days: u64 = seconds / 60 / 60 / 24;
@@ -58,11 +58,11 @@ impl From<SystemTime> for DateTime {
             }
         }
 
-        DateTime { day, month, year }
+        Date { day, month, year }
     }
 }
 
-impl DateTime {
+impl Date {
     pub fn day(self: &Self) -> String {
         self.day.to_string()
     }
@@ -109,7 +109,7 @@ mod tests {
             ),
         ];
         for (input, expected) in cases {
-            let actual = DateTime::from(input);
+            let actual = Date::from(input);
             let actual_string = format!("{} {}, {}", actual.month(), actual.day(), actual.year());
             assert_eq!(expected, actual_string);
         }

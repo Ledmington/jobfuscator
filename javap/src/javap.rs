@@ -18,7 +18,7 @@ use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
 use classfile::utils::absolute_no_symlinks;
 use classfile::{access_flags, descriptor, reference_kind};
-use time::DateTime;
+use date::Date;
 
 use crate::line_writer::LineWriter;
 
@@ -46,7 +46,7 @@ pub(crate) fn print_class_file(filename: String) {
 
     let digest = sha::sha256(&file_bytes);
 
-    let date: DateTime = DateTime::from(modified_time);
+    let date: Date = Date::from(modified_time);
 
     lw.print("  Last modified ")
         .print(&date.month())

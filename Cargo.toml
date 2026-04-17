@@ -2,6 +2,7 @@
 members = [
     "binary_reader",
     "binary_writer",
+    "date",
     "classfile",
     "sha",
     "javap",
