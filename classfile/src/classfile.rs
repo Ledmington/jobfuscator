@@ -3,9 +3,10 @@
 use binary_reader::BinaryReader;
 
 use crate::access_flags::{ClassAccessFlag, parse_class_access_flags};
+use crate::assert_valid_and_type;
 use crate::attributes::{AttributeInfo, parse_class_attributes};
 use crate::constant_pool::{
-    ConstantPool, ConstantPoolTag, assert_valid_and_type, check_constant_pool, parse_constant_pool,
+    ConstantPool, ConstantPoolTag, check_constant_pool, parse_constant_pool,
 };
 use crate::fields::{FieldInfo, parse_fields};
 use crate::methods::{MethodInfo, parse_methods};
@@ -54,20 +55,19 @@ pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
 
     let cp_count: u16 = reader.read_u16().unwrap();
     let constant_pool: ConstantPool = parse_constant_pool(reader, (cp_count - 1).into());
-    check_constant_pool(&constant_pool);
 
     let access_flags: Vec<ClassAccessFlag> = parse_class_access_flags(reader.read_u16().unwrap());
 
     let this_class: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(&constant_pool, this_class, ConstantPoolTag::Class);
+    assert_valid_and_type!(&constant_pool, this_class, ConstantPoolTag::Class);
 
     let super_class: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(&constant_pool, super_class, ConstantPoolTag::Class);
+    assert_valid_and_type!(&constant_pool, super_class, ConstantPoolTag::Class);
 
     let interfaces_count: u16 = reader.read_u16().unwrap();
     let interfaces: Vec<u16> = reader.read_u16_vec(interfaces_count.into()).unwrap();
     for interface_idx in interfaces.iter() {
-        assert_valid_and_type(&constant_pool, *interface_idx, ConstantPoolTag::Class);
+        assert_valid_and_type!(&constant_pool, *interface_idx, ConstantPoolTag::Class);
     }
 
     let fields_count: u16 = reader.read_u16().unwrap();
@@ -79,6 +79,8 @@ pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
     let attributes_count: u16 = reader.read_u16().unwrap();
     let attributes: Vec<AttributeInfo> =
         parse_class_attributes(reader, &constant_pool, attributes_count.into());
+
+    check_constant_pool(&constant_pool, &attributes);
 
     ClassFile {
         minor_version,

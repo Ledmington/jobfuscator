@@ -6,8 +6,9 @@ use crate::access_flags::{
     InnerClassAccessFlag, MethodParameterAccessFlag, parse_inner_class_access_flags,
     parse_method_parameter_access_flags,
 };
+use crate::assert_valid_and_type;
 use crate::bytecode::{BytecodeInstruction, parse_bytecode};
-use crate::constant_pool::{ConstantPool, ConstantPoolTag, assert_valid_and_type};
+use crate::constant_pool::{ConstantPool, ConstantPoolTag};
 
 pub enum AttributeInfo {
     Code {
@@ -311,7 +312,7 @@ pub fn parse_class_attributes(
 
 fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -321,7 +322,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                 "The attribute_length field of SourceFile must be 2 but was {attribute_length}.",
             );
             let source_file_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type(cp, source_file_index, ConstantPoolTag::Utf8);
+            assert_valid_and_type!(cp, source_file_index, ConstantPoolTag::Utf8);
             AttributeInfo::SourceFile {
                 name_index: attribute_name_index,
                 source_file_index,
@@ -441,7 +442,7 @@ fn check_attribute_length(
 
 fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -490,7 +491,7 @@ pub fn parse_method_attributes(
 
 fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -536,7 +537,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
                 );
                 let catch_type: u16 = reader.read_u16().unwrap();
                 if catch_type != 0 {
-                    assert_valid_and_type(cp, catch_type, ConstantPoolTag::Class);
+                    assert_valid_and_type!(cp, catch_type, ConstantPoolTag::Class);
                 }
                 exception_table.push(ExceptionTableEntry {
                     start_pc,
@@ -578,7 +579,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
         "Signature" => {
             check_attribute_length(attribute_length, 2, attribute_name);
             let signature_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type(cp, signature_index, ConstantPoolTag::Utf8);
+            assert_valid_and_type!(cp, signature_index, ConstantPoolTag::Utf8);
             AttributeInfo::Signature {
                 name_index: attribute_name_index,
                 signature_index,
@@ -603,13 +604,13 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
 
 fn parse_annotation(cp: &ConstantPool, reader: &mut BinaryReader) -> Annotation {
     let type_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, type_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, type_index, ConstantPoolTag::Utf8);
     let num_element_value_pairs: u16 = reader.read_u16().unwrap();
     let mut element_value_pairs: Vec<ElementValuePair> =
         Vec::with_capacity(num_element_value_pairs.into());
     for _ in 0..num_element_value_pairs {
         let element_name_index: u16 = reader.read_u16().unwrap();
-        assert_valid_and_type(cp, element_name_index, ConstantPoolTag::Utf8);
+        assert_valid_and_type!(cp, element_name_index, ConstantPoolTag::Utf8);
         let value: ElementValue = parse_element_value(cp, reader);
         element_value_pairs.push(ElementValuePair {
             element_name_index,
@@ -702,7 +703,7 @@ fn parse_code_attribute(
     code: &[(u32, BytecodeInstruction)],
 ) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
