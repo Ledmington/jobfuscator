@@ -461,7 +461,7 @@ dependencies = [
  "binary_reader",
  "classfile",
  "sha",
- "time",
+ "time 0.1.0",
 ]
 
 [[package]]
@@ -778,6 +778,10 @@ dependencies = [
 
 [[package]]
 name = "time"
+version = "0.1.0"
+
+[[package]]
+name = "time"
 version = "0.3.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "743bd48c283afc0388f9b8827b976905fb217ad9e647fae3a379a9283c4def2c"
@@ -1058,7 +1062,7 @@ dependencies = [
  "pbkdf2",
  "ppmd-rust",
  "sha1",
- "time",
+ "time 0.3.47",
  "typed-path",
  "zeroize",
  "zopfli",
