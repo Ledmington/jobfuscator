@@ -17,15 +17,17 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
         'L' => {
             let mut s = String::new();
             while let Some(&x) = it.peek() {
-                it.next();
                 if x == ';' {
+                    it.next();
                     return s;
                 }
                 if x == '<' {
+                    it.next();
                     s.push('<');
                     break;
                 }
                 s.push(if x == '/' { '.' } else { x });
+                it.next();
             }
 
             // parsing generics
@@ -36,7 +38,6 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
                     s.push('>');
                     break;
                 }
-                it.next_back();
                 s.push_str(", ");
                 s.push_str(&decode_type_it(it));
             }
@@ -55,24 +56,21 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
         '(' => {
             let mut s = String::new();
             s.push('(');
+            let mut first = true;
             while let Some(&x) = it.peek() {
                 it.next();
                 if x == ')' {
                     s.push(')');
                     break;
                 }
-
-                if s.len() > 1 {
+                if !first {
                     s.push_str(", ");
                 }
-
-                it.next_back();
+                first = false;
                 s.push_str(&decode_type_it(it));
             }
 
-            // return type
             let return_type = decode_type_it(it);
-
             return_type + &s
         }
         '[' => decode_type_it(it) + "[]",
@@ -85,7 +83,7 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
                 }
                 s.push(if x == '/' { '.' } else { x });
             }
-            panic!();
+            panic!("Unterminated type variable.");
         }
         '*' => "?".to_owned(),
         '+' => "? extends ".to_owned() + &decode_type_it(it),
@@ -96,11 +94,11 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
 fn decode_generics(it: &mut Peekable<Chars>) -> BTreeMap<String, Vec<String>> {
     expect(it, '<');
     let mut generics: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    while let Some(&_) = it.peek() {
-        if it.next().unwrap() == '>' {
+    while let Some(&x) = it.peek() {
+        if x == '>' {
+            it.next();
             break;
         }
-        it.next_back();
 
         let mut s = String::new();
         while let Some(&x) = it.peek() {
@@ -116,25 +114,22 @@ fn decode_generics(it: &mut Peekable<Chars>) -> BTreeMap<String, Vec<String>> {
 
         // optional class bound
         if let Some(&x) = it.peek() {
-            it.next();
             if x == ':' {
                 // empty class bound, this means that there is an implicit bound on java.lang.Object, but we can
                 // skip it
-                it.next_back();
+                it.next();
             } else {
                 // actual class bound
-                it.next_back();
                 generic_type_bounds.push(decode_type_it(it));
             }
         }
 
         // 0-N interface bounds
         while let Some(&x) = it.peek() {
-            it.next();
             if x != ':' {
-                it.next_back();
                 break;
             }
+            it.next();
             generic_type_bounds.push(decode_type_it(it));
         }
 
@@ -169,6 +164,7 @@ pub fn decode_type(descriptor: &str) -> String {
     while let Some(&_) = it.peek() {
         s.push_str(&decode_type_it(&mut it));
     }
+
     s
 }
 
@@ -186,7 +182,7 @@ fn split_class_name(it: &mut Peekable<Chars>) -> String {
         } else if x == '>' {
             n_generics -= 1;
             if n_generics < 0 {
-                panic!();
+                panic!("Unexpected '>' in class name.");
             }
         }
     }
@@ -344,6 +340,7 @@ mod tests {
             "Q",
             "[",
             "[]",
+            "[I]",
             "Ljava/lang/String",
             "java.lang.String",
             "I<Ljava/lang/String;>",
@@ -352,7 +349,12 @@ mod tests {
         ];
 
         for input in cases {
-            let result = std::panic::catch_unwind(|| decode_type(input));
+            // This exchanging of hooks is to catch any panic/unwind that happens and avoid printing anything on stdout unless there was not a panic.
+            let default_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(|_| {}));
+            let result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode_type(input)));
+            std::panic::set_hook(default_hook);
             assert!(
                 result.is_err(),
                 "Parsing of '{}' should have panicked but did not.",
