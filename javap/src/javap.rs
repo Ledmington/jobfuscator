@@ -13,7 +13,7 @@ use classfile::attributes::{
 use classfile::bytecode::BytecodeInstruction;
 use classfile::classfile::{ClassFile, parse_class_file};
 use classfile::constant_pool::{self, ConstantPool, ConstantPoolInfo};
-use classfile::descriptor::MethodDescriptor;
+use classfile::descriptor::{MethodDescriptor, parse_field_descriptor};
 use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
 use classfile::utils::absolute_no_symlinks;
@@ -123,10 +123,20 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         .print(&source_file)
         .println("\"");
 
-    let this_class_name = cf
-        .constant_pool
-        .get_class_name(cf.this_class)
-        .replace('/', ".");
+    let this_class_signature = find_attribute(&cf.attributes, AttributeKind::Signature);
+
+    let this_class_name = match this_class_signature {
+        Some(AttributeInfo::Signature {
+            signature_index, ..
+        }) => {
+            parse_class_descriptor(&cf.constant_pool.get_utf8_content(*signature_index)).to_string()
+        }
+        _ => cf
+            .constant_pool
+            .get_class_name(cf.this_class)
+            .replace('/', "."),
+    };
+
     lw.print(&access_flags::modifier_repr_vec(&cf.access_flags))
         .print(" ")
         .print(&this_class_name);

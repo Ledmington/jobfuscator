@@ -41,7 +41,7 @@ impl AccessFlag for ClassAccessFlag {
             ClassAccessFlag::Final => "final",
             ClassAccessFlag::Super => "class",
             ClassAccessFlag::Interface => "interface",
-            ClassAccessFlag::Abstract => "abstract",
+            ClassAccessFlag::Abstract => "",
             ClassAccessFlag::Synthetic => "synthetic",
             ClassAccessFlag::Annotation => "annotation",
             ClassAccessFlag::Enum => "",

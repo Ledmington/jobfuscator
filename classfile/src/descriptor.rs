@@ -53,13 +53,36 @@ impl Display for Type {
     }
 }
 
-pub trait Descriptor: Display {}
+pub struct ClassDescriptor {
+    super_class_name: String,
+    type_bounds: Vec<TypeBound>,
+    generic_types: Vec<String>,
+}
+
+pub struct TypeBound {
+    name: String,
+    extended_class: String,
+    implemented_interfaces: Vec<String>,
+}
+
+impl Display for ClassDescriptor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        if self.type_bounds.len() > 0 {
+            for (i, tb) in self.type_bounds.iter().enumerate() {
+                write(f, "{}", tb);
+                if i > 0 {
+                    write(f, ", ");
+                }
+            }
+            write(f, " ");
+        }
+        write(f, "{}", super_class_name);
+    }
+}
 
 pub struct FieldDescriptor {
     pub(crate) field_type: Type,
 }
-
-impl Descriptor for FieldDescriptor {}
 
 impl Display for FieldDescriptor {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
@@ -72,8 +95,6 @@ pub struct MethodDescriptor {
     pub return_type: Type,
     pub parameter_types: Vec<Type>,
 }
-
-impl Descriptor for MethodDescriptor {}
 
 impl Display for MethodDescriptor {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
@@ -260,30 +281,31 @@ mod tests {
     #[test]
     fn descriptor_parsing() {
         let cases = [
-            (Type::Void, "V"),
-            (Type::Boolean, "Z"),
-            (Type::Char, "C"),
-            (Type::Byte, "B"),
-            (Type::Short, "S"),
-            (Type::Int, "I"),
-            (Type::Long, "J"),
-            (Type::Float, "F"),
-            (Type::Double, "D"),
+            ("V", Type::Void),
+            ("Z", Type::Boolean),
+            ("C", Type::Char),
+            ("B", Type::Byte),
+            ("S", Type::Short),
+            ("I", Type::Int),
+            ("J", Type::Long),
+            ("F", Type::Float),
+            ("D", Type::Double),
             (
+                "[D",
                 Type::Array {
                     inner: Box::new(Type::Double),
                 },
-                "[D",
             ),
             (
+                "[[B",
                 Type::Array {
                     inner: Box::new(Type::Array {
                         inner: Box::new(Type::Byte),
                     }),
                 },
-                "[[B",
             ),
             (
+                "[[[J",
                 Type::Array {
                     inner: Box::new(Type::Array {
                         inner: Box::new(Type::Array {
@@ -291,24 +313,24 @@ mod tests {
                         }),
                     }),
                 },
-                "[[[J",
             ),
             (
+                "Ljava/lang/Object;",
                 Type::Object {
                     class_name: "java.lang.Object".to_string(),
                 },
-                "Ljava/lang/Object;",
             ),
             (
+                "Ljava/util/List<Ljava/lang/String;>;",
                 Type::Generic {
                     class_name: "java.util.List".to_string(),
                     types: vec![Type::Object {
                         class_name: "java.lang.String".to_string(),
                     }],
                 },
-                "Ljava/util/List<Ljava/lang/String;>;",
             ),
             (
+                "Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;",
                 Type::Generic {
                     class_name: "java.util.Map".to_string(),
                     types: vec![
@@ -320,9 +342,9 @@ mod tests {
                         },
                     ],
                 },
-                "Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;",
             ),
             (
+                "Ljava/util/Map<Ljava/util/List<Ljava/lang/String;>;Ljava/util/Set<Ljava/lang/Integer;>;>;",
                 Type::Generic {
                     class_name: "java.util.Map".to_string(),
                     types: vec![
@@ -340,11 +362,14 @@ mod tests {
                         },
                     ],
                 },
-                "Ljava/util/Map<Ljava/util/List<Ljava/lang/String;>;Ljava/util/Set<Ljava/lang/Integer;>;>;",
+            ),
+            (
+                "<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/stream/BaseStream<TT;Ljava/util/stream/Stream<TT;>;>;",
+                Type::Boolean,
             ),
         ];
 
-        for (expected, input) in cases {
+        for (input, expected) in cases {
             assert_eq!(
                 expected,
                 parse_type(&mut Reader {
@@ -358,7 +383,16 @@ mod tests {
     #[test]
     #[should_panic]
     fn invalid_parsing() {
-        let cases = ["Q", "[", "[]"];
+        let cases = [
+            "Q",
+            "[",
+            "[]",
+            "Ljava/lang/String",
+            "java.lang.String",
+            "I<Ljava/lang/String;>",
+            "Ljava/util/List<I>;",
+            "Ljava/util/List<Ljava/lang/String>;",
+        ];
 
         for input in cases {
             parse_type(&mut Reader {
@@ -371,6 +405,7 @@ mod tests {
     #[test]
     fn method_descriptor_parsing() {
         let cases = [(
+            "(Ljava/lang/String;IJ)V",
             MethodDescriptor {
                 return_type: Type::Void,
                 parameter_types: vec![
@@ -381,10 +416,9 @@ mod tests {
                     Type::Long,
                 ],
             },
-            "(Ljava/lang/String;IJ)V",
         )];
 
-        for (expected, input) in cases {
+        for (input, expected) in cases {
             assert_eq!(expected, parse_method_descriptor(input));
         }
     }
