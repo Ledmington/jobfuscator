@@ -52,10 +52,8 @@ pub fn parse_fields(
                 Type::Double => {
                     assert_valid_and_type(cp, *constant_value_index, ConstantPoolTag::Double)
                 }
-                Type::Object { class_name } => {
-                    if class_name == "java/lang/String" {
-                        assert_valid_and_type(cp, *constant_value_index, ConstantPoolTag::String);
-                    }
+                Type::Object { class_name } if class_name == "java/lang/String" => {
+                    assert_valid_and_type(cp, *constant_value_index, ConstantPoolTag::String);
                 }
                 _ => {}
             }
