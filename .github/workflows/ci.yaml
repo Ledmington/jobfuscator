@@ -1,10 +1,12 @@
-name: jobfuscator CI
+name: jObfuscator CI
 
 on:
   push:
     branches:
       - master
   pull_request:
+    branches:
+      - master
 
 jobs:
   format_check:
@@ -21,56 +23,38 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
 
-  debug_profile:
+  build_and_test:
     runs-on: ubuntu-latest
     needs: format_check
+    strategy:
+      matrix:
+        toolchain: ["1.88.0", "1.95.0"]
+        profile: ["debug", "release"]
+        include:
+          - profile: release
+            release_flag: "--release"
+          - profile: debug
+            release_flag: ""
     steps:
       - uses: actions/checkout@v6
 
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
+          toolchain: ${{ matrix.toolchain }}
           components: clippy
 
       - name: Build
-        run: cargo build
+        run: cargo build ${{ matrix.release_flag }}
 
       - name: Lint
-        run: cargo clippy --no-deps --all-targets --all-features -- -D warnings
+        run: cargo clippy --no-deps --all-targets --all-features ${{ matrix.release_flag }} -- -D warnings
 
       - name: Unit Tests
-        run: cargo test
+        run: cargo test ${{ matrix.release_flag }}
 
       - name: Integration tests
-        run: ${GITHUB_WORKSPACE}/test/run_e2e_tests.sh debug
+        run: ${GITHUB_WORKSPACE}/test/run_e2e_tests.sh ${{ matrix.profile }}
 
       - name: Docs
-        run: cargo doc --no-deps
-
-  release_profile:
-    runs-on: ubuntu-latest
-    needs: format_check
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Lint
-        run: cargo clippy --no-deps --all-targets --all-features --release -- -D warnings
-
-      - name: Unit Tests
-        run: cargo test --release
-
-      - name: Integration tests
-        run: ${GITHUB_WORKSPACE}/test/run_e2e_tests.sh release
-
-      - name: Docs
-        run: cargo doc --release --no-deps
+        run: cargo doc --no-deps ${{ matrix.release_flag }}
