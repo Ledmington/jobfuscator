@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
-use std::{collections::BTreeMap, str::Chars};
+use std::{collections::BTreeMap, iter::Peekable, str::Chars};
 
-fn decode_type_it(it: &mut Chars) -> String {
+fn decode_type_it(it: &mut Peekable<Chars>) -> String {
     let ch = it.next().unwrap();
     match ch {
         'B' => "byte".to_owned(),
@@ -16,9 +16,8 @@ fn decode_type_it(it: &mut Chars) -> String {
         'V' => "void".to_owned(),
         'L' => {
             let mut s = String::new();
-            while it.next().is_some() {
-                it.next_back();
-                let x = it.next().unwrap();
+            while let Some(&x) = it.peek() {
+                it.next();
                 if x == ';' {
                     return s;
                 }
@@ -31,9 +30,8 @@ fn decode_type_it(it: &mut Chars) -> String {
 
             // parsing generics
             s.push_str(&decode_type_it(it));
-            while it.next().is_some() {
-                it.next_back();
-                let x = it.next().unwrap();
+            while let Some(&x) = it.peek() {
+                it.next();
                 if x == '>' {
                     s.push('>');
                     break;
@@ -57,9 +55,8 @@ fn decode_type_it(it: &mut Chars) -> String {
         '(' => {
             let mut s = String::new();
             s.push('(');
-            while it.next().is_some() {
-                it.next_back();
-                let x = it.next().unwrap();
+            while let Some(&x) = it.peek() {
+                it.next();
                 if x == ')' {
                     s.push(')');
                     break;
@@ -81,9 +78,8 @@ fn decode_type_it(it: &mut Chars) -> String {
         '[' => decode_type_it(it) + "[]",
         'T' => {
             let mut s = String::new();
-            while it.next().is_some() {
-                it.next_back();
-                let x = it.next().unwrap();
+            while let Some(&x) = it.peek() {
+                it.next();
                 if x == ';' {
                     return s;
                 }
@@ -97,34 +93,31 @@ fn decode_type_it(it: &mut Chars) -> String {
     }
 }
 
-fn decode_generics(it: &mut Chars) -> BTreeMap<String, Vec<String>> {
+fn decode_generics(it: &mut Peekable<Chars>) -> BTreeMap<String, Vec<String>> {
     expect(it, '<');
     let mut generics: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    while it.next().is_some() {
-        it.next_back();
+    while let Some(&_) = it.peek() {
         if it.next().unwrap() == '>' {
             break;
         }
         it.next_back();
 
         let mut s = String::new();
-        while it.next().is_some() {
-            it.next_back();
-            let y = it.next().unwrap();
-            if y == ':' {
+        while let Some(&x) = it.peek() {
+            it.next();
+            if x == ':' {
                 break;
             }
-            s.push(y);
+            s.push(x);
         }
         let generic_type_name = s;
 
         let mut generic_type_bounds: Vec<String> = Vec::new();
 
         // optional class bound
-        if it.next().is_some() {
-            it.next_back();
-            let y = it.next().unwrap();
-            if y == ':' {
+        if let Some(&x) = it.peek() {
+            it.next();
+            if x == ':' {
                 // empty class bound, this means that there is an implicit bound on java.lang.Object, but we can
                 // skip it
                 it.next_back();
@@ -136,10 +129,9 @@ fn decode_generics(it: &mut Chars) -> BTreeMap<String, Vec<String>> {
         }
 
         // 0-N interface bounds
-        while it.next().is_some() {
-            it.next_back();
-            let y = it.next().unwrap();
-            if y != ':' {
+        while let Some(&x) = it.peek() {
+            it.next();
+            if x != ':' {
                 it.next_back();
                 break;
             }
@@ -151,14 +143,14 @@ fn decode_generics(it: &mut Chars) -> BTreeMap<String, Vec<String>> {
     generics
 }
 
-fn expect(it: &mut Chars, expected: char) {
+fn expect(it: &mut Peekable<Chars>, expected: char) {
     let x = it.next().unwrap();
     assert_eq!(expected, x, "Expected '{}' but was '{}'.", expected, x);
 }
 
 pub fn decode_type(descriptor: &str) -> String {
     let mut s = String::new();
-    let mut it = descriptor.chars();
+    let mut it = descriptor.chars().peekable();
 
     if descriptor.starts_with('<') {
         let generic_mappings: BTreeMap<String, Vec<String>> = decode_generics(&mut it);
@@ -174,19 +166,17 @@ pub fn decode_type(descriptor: &str) -> String {
         s.push(' ');
     }
 
-    while it.next().is_some() {
-        it.next_back();
+    while let Some(&_) = it.peek() {
         s.push_str(&decode_type_it(&mut it));
     }
     s
 }
 
-fn split_class_name(it: &mut Chars) -> String {
+fn split_class_name(it: &mut Peekable<Chars>) -> String {
     let mut s = String::new();
     let mut n_generics = 0;
-    while it.next().is_some() {
-        it.next_back();
-        let x = it.next().unwrap();
+    while let Some(&x) = it.peek() {
+        it.next();
         s.push(x);
 
         if x == ';' && n_generics == 0 {
@@ -210,12 +200,11 @@ pub struct ClassSignature {
 }
 
 pub fn decode_class_signature(class_signature: &str) -> ClassSignature {
-    let mut it = class_signature.chars();
+    let mut it = class_signature.chars().peekable();
     let super_class_name = decode_type(&split_class_name(&mut it));
     let mut interfaces: Vec<String> = Vec::new();
 
-    while it.next().is_some() {
-        it.next_back();
+    while let Some(&_) = it.peek() {
         interfaces.push(decode_type(&split_class_name(&mut it)));
     }
 
