@@ -40,6 +40,18 @@ struct Args {
 
     /// Output file
     output: String,
+
+    /// Suppress all output to stdout
+    #[arg(short, long)]
+    quiet: bool,
+}
+
+macro_rules! log {
+    ($quiet:expr, $($arg:tt)*) => {
+        if !$quiet {
+            println!($($arg)*);
+        }
+    };
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,6 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let input_filename = args.input;
     let output_filename = args.output;
+    let quiet = args.quiet;
 
     let mut file = File::open(&input_filename)?;
 
@@ -63,7 +76,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endianness::Big);
         let out_bytes = parse_and_rewrite(&mut reader);
-        println!(
+        log!(
+            quiet,
             "{} -> valid class file ({} bytes)",
             &input_filename,
             file_bytes.len()
@@ -72,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut out_file = File::create(&output_filename)?;
         out_file.write_all(&out_bytes)?;
 
-        println!("Wrote output to {}", &output_filename);
+        log!(quiet, "Wrote output to {}", &output_filename);
     } else if is_zip_file(&header) {
         let mut archive = ZipArchive::new(file)?;
 
@@ -95,14 +109,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endianness::Big);
             let out_bytes = parse_and_rewrite(&mut reader);
-            println!("{} ({} bytes) OK", name, file_bytes.len());
+            log!(quiet, "{} ({} bytes) OK", name, file_bytes.len());
 
             zip_writer.start_file(name, options)?;
             zip_writer.write_all(&out_bytes)?;
         }
 
         zip_writer.finish()?;
-        println!("Wrote output jar to {}", &output_filename);
+        log!(quiet, "Wrote output jar to {}", &output_filename);
     } else {
         return Err("Unknown file type (not .class or .jar)".into());
     }
