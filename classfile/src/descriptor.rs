@@ -1,276 +1,227 @@
 #![forbid(unsafe_code)]
 
-use std::fmt::{Display, Formatter, Result};
+use std::{collections::BTreeMap, str::Chars};
 
-#[derive(Debug, PartialEq)]
-pub enum Type {
-    Void,
-    Boolean,
-    Char,
-    Byte,
-    Short,
-    Int,
-    Long,
-    Float,
-    Double,
-    Array {
-        inner: Box<Type>,
-    },
-    Object {
-        class_name: String,
-    },
-    Generic {
-        class_name: String,
-        types: Vec<Type>,
-    },
-}
-
-impl Display for Type {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            Type::Void => write!(f, "void"),
-            Type::Boolean => write!(f, "boolean"),
-            Type::Char => write!(f, "char"),
-            Type::Byte => write!(f, "byte"),
-            Type::Short => write!(f, "short"),
-            Type::Int => write!(f, "int"),
-            Type::Long => write!(f, "long"),
-            Type::Float => write!(f, "float"),
-            Type::Double => write!(f, "double"),
-            Type::Array { inner } => write!(f, "{inner}[]"),
-            Type::Object { class_name } => write!(f, "{class_name}"),
-            Type::Generic { class_name, types } => write!(
-                f,
-                "{}<{}>",
-                class_name,
-                types
-                    .iter()
-                    .map(|t| format!("{t}"))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
-        }
-    }
-}
-
-pub struct ClassDescriptor {
-    super_class_name: String,
-    type_bounds: Vec<TypeBound>,
-    generic_types: Vec<String>,
-}
-
-pub struct TypeBound {
-    name: String,
-    extended_class: String,
-    implemented_interfaces: Vec<String>,
-}
-
-impl Display for ClassDescriptor {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        if self.type_bounds.len() > 0 {
-            for (i, tb) in self.type_bounds.iter().enumerate() {
-                write(f, "{}", tb);
-                if i > 0 {
-                    write(f, ", ");
-                }
-            }
-            write(f, " ");
-        }
-        write(f, "{}", super_class_name);
-    }
-}
-
-pub struct FieldDescriptor {
-    pub(crate) field_type: Type,
-}
-
-impl Display for FieldDescriptor {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.field_type)
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct MethodDescriptor {
-    pub return_type: Type,
-    pub parameter_types: Vec<Type>,
-}
-
-impl Display for MethodDescriptor {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(
-            f,
-            "{}({})",
-            self.return_type,
-            self.parameter_types
-                .iter()
-                .map(|t| format!("{t}"))
-                .collect::<Vec<String>>()
-                .join(", ")
-        )
-    }
-}
-
-struct Reader {
-    content: String,
-    pos: usize,
-}
-
-impl Reader {
-    /**
-     * Returns the next char without moving.
-     */
-    fn peek(&self) -> char {
-        self.content.chars().nth(self.pos).unwrap()
-    }
-
-    /**
-     * Moves the reader by one character.
-     */
-    fn move_1(&mut self) {
-        self.pos += 1;
-    }
-
-    /**
-     * Returns the next char and moves.
-     */
-    fn next(&mut self) -> char {
-        let ch: char = self.content.chars().nth(self.pos).unwrap();
-        self.pos += 1;
-        ch
-    }
-}
-
-fn parse_type(reader: &mut Reader) -> Type {
-    match reader.peek() {
-        'V' => {
-            reader.move_1();
-            Type::Void
-        }
-        'Z' => {
-            reader.move_1();
-            Type::Boolean
-        }
-        'C' => {
-            reader.move_1();
-            Type::Char
-        }
-        'B' => {
-            reader.move_1();
-            Type::Byte
-        }
-        'S' => {
-            reader.move_1();
-            Type::Short
-        }
-        'I' => {
-            reader.move_1();
-            Type::Int
-        }
-        'J' => {
-            reader.move_1();
-            Type::Long
-        }
-        'F' => {
-            reader.move_1();
-            Type::Float
-        }
-        'D' => {
-            reader.move_1();
-            Type::Double
-        }
-        '[' => {
-            reader.move_1();
-            Type::Array {
-                inner: Box::new(parse_type(reader)),
-            }
-        }
+fn decode_type_it(it: &mut Chars) -> String {
+    let ch = it.next().unwrap();
+    match ch {
+        'B' => "byte".to_owned(),
+        'C' => "char".to_owned(),
+        'D' => "double".to_owned(),
+        'F' => "float".to_owned(),
+        'I' => "int".to_owned(),
+        'J' => "long".to_owned(),
+        'S' => "short".to_owned(),
+        'Z' => "boolean".to_owned(),
+        'V' => "void".to_owned(),
         'L' => {
-            reader.move_1();
-            let mut s: String = "".to_owned();
-            while (reader.pos < reader.content.len() - 1)
-                && (reader.peek() != ';' && reader.peek() != '<')
-            {
-                let ch = reader.next();
-                if ch == '/' {
-                    s += ".";
-                } else {
-                    s += &ch.to_string();
+            let mut s = String::new();
+            while it.next().is_some() {
+                it.next_back();
+                let x = it.next().unwrap();
+                if x == ';' {
+                    return s;
                 }
+                if x == '<' {
+                    s.push('<');
+                    break;
+                }
+                s.push(if x == '/' { '.' } else { x });
             }
 
-            if reader.peek() == ';' {
-                reader.move_1();
-                Type::Object { class_name: s }
+            // parsing generics
+            s.push_str(&decode_type_it(it));
+            while it.next().is_some() {
+                it.next_back();
+                let x = it.next().unwrap();
+                if x == '>' {
+                    s.push('>');
+                    break;
+                }
+                it.next_back();
+                s.push_str(", ");
+                s.push_str(&decode_type_it(it));
+            }
+
+            // skipping the ending ';'
+            let last = it.next().unwrap();
+            if last != ';' {
+                panic!(
+                    "Expected to find ';' at the end of class name but was '{}'.",
+                    last
+                );
+            }
+
+            s
+        }
+        '(' => {
+            let mut s = String::new();
+            s.push('(');
+            while it.next().is_some() {
+                it.next_back();
+                let x = it.next().unwrap();
+                if x == ')' {
+                    s.push(')');
+                    break;
+                }
+
+                if s.len() > 1 {
+                    s.push_str(", ");
+                }
+
+                it.next_back();
+                s.push_str(&decode_type_it(it));
+            }
+
+            // return type
+            let return_type = decode_type_it(it);
+
+            return_type + &s
+        }
+        '[' => decode_type_it(it) + "[]",
+        'T' => {
+            let mut s = String::new();
+            while it.next().is_some() {
+                it.next_back();
+                let x = it.next().unwrap();
+                if x == ';' {
+                    return s;
+                }
+                s.push(if x == '/' { '.' } else { x });
+            }
+            panic!();
+        }
+        '*' => "?".to_owned(),
+        '+' => "? extends ".to_owned() + &decode_type_it(it),
+        _ => panic!("Unknown or unexpected character '{}'.", ch),
+    }
+}
+
+fn decode_generics(it: &mut Chars) -> BTreeMap<String, Vec<String>> {
+    expect(it, '<');
+    let mut generics: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    while it.next().is_some() {
+        it.next_back();
+        if it.next().unwrap() == '>' {
+            break;
+        }
+        it.next_back();
+
+        let mut s = String::new();
+        while it.next().is_some() {
+            it.next_back();
+            let y = it.next().unwrap();
+            if y == ':' {
+                break;
+            }
+            s.push(y);
+        }
+        let generic_type_name = s;
+
+        let mut generic_type_bounds: Vec<String> = Vec::new();
+
+        // optional class bound
+        if it.next().is_some() {
+            it.next_back();
+            let y = it.next().unwrap();
+            if y == ':' {
+                // empty class bound, this means that there is an implicit bound on java.lang.Object, but we can
+                // skip it
+                it.next_back();
             } else {
-                reader.move_1(); // '<'
-
-                let mut types = Vec::new();
-
-                while (reader.pos < reader.content.len()) && reader.peek() != '>' {
-                    types.push(parse_type(reader));
-                }
-
-                if reader.peek() != '>' {
-                    unreachable!("Invalid descriptor (expected '>'): '{}'.", reader.content);
-                }
-                reader.move_1(); // '>'
-
-                if reader.peek() != ';' {
-                    unreachable!("Invalid descriptor (expected ';'): '{}'.", reader.content);
-                }
-                reader.move_1(); // ';'
-
-                Type::Generic {
-                    class_name: s,
-                    types,
-                }
+                // actual class bound
+                it.next_back();
+                generic_type_bounds.push(decode_type_it(it));
             }
         }
-        _ => unreachable!("Invalid descriptor: '{}'.", reader.content),
+
+        // 0-N interface bounds
+        while it.next().is_some() {
+            it.next_back();
+            let y = it.next().unwrap();
+            if y != ':' {
+                it.next_back();
+                break;
+            }
+            generic_type_bounds.push(decode_type_it(it));
+        }
+
+        generics.insert(generic_type_name, generic_type_bounds);
     }
+    generics
 }
 
-pub fn parse_field_descriptor(raw_descriptor: &str) -> FieldDescriptor {
-    FieldDescriptor {
-        field_type: parse_type(&mut Reader {
-            content: raw_descriptor.to_owned(),
-            pos: 0,
-        }),
-    }
+fn expect(it: &mut Chars, expected: char) {
+    let x = it.next().unwrap();
+    assert_eq!(expected, x, "Expected '{}' but was '{}'.", expected, x);
 }
 
-pub fn parse_method_descriptor(raw_descriptor: &str) -> MethodDescriptor {
-    assert!(!raw_descriptor.is_empty(), "Empty method descriptor.");
-    debug_assert!(
-        raw_descriptor.starts_with('(')
-            && raw_descriptor.chars().filter(|c| *c == '(').count() == 1
-            && raw_descriptor.chars().filter(|c| *c == ')').count() == 1
-            && !raw_descriptor.ends_with(')'),
-        "Invalid method descriptor: '{raw_descriptor}'."
-    );
+pub fn decode_type(descriptor: &str) -> String {
+    let mut s = String::new();
+    let mut it = descriptor.chars();
 
-    let return_type: Type = parse_type(&mut Reader {
-        content: raw_descriptor.split(')').next_back().unwrap().to_owned(),
-        pos: 0,
-    });
-
-    let parameters_string: String = raw_descriptor.split(')').next().unwrap()[1..].to_owned();
-
-    let mut parameter_types = Vec::new();
-
-    let mut reader: Reader = Reader {
-        content: parameters_string,
-        pos: 0,
-    };
-
-    while reader.pos < reader.content.len() {
-        parameter_types.push(parse_type(&mut reader));
+    if descriptor.starts_with('<') {
+        let generic_mappings: BTreeMap<String, Vec<String>> = decode_generics(&mut it);
+        s.push('<');
+        s.push_str(
+            &generic_mappings
+                .iter()
+                .map(|(key, value)| format!("{} extends {}", key, value.join(" & ")))
+                .collect::<Vec<String>>()
+                .join(", "),
+        );
+        s.push('>');
+        s.push(' ');
     }
 
-    MethodDescriptor {
-        return_type,
-        parameter_types,
+    while it.next().is_some() {
+        it.next_back();
+        s.push_str(&decode_type_it(&mut it));
+    }
+    s
+}
+
+fn split_class_name(it: &mut Chars) -> String {
+    let mut s = String::new();
+    let mut n_generics = 0;
+    while it.next().is_some() {
+        it.next_back();
+        let x = it.next().unwrap();
+        s.push(x);
+
+        if x == ';' && n_generics == 0 {
+            break;
+        } else if x == '<' {
+            n_generics += 1;
+        } else if x == '>' {
+            n_generics -= 1;
+            if n_generics < 0 {
+                panic!();
+            }
+        }
+    }
+    s
+}
+
+#[derive(PartialEq, Debug)]
+pub struct ClassSignature {
+    pub super_class_name: String,
+    interfaces: Vec<String>,
+}
+
+pub fn decode_class_signature(class_signature: &str) -> ClassSignature {
+    let mut it = class_signature.chars();
+    let super_class_name = decode_type(&split_class_name(&mut it));
+    let mut interfaces: Vec<String> = Vec::new();
+
+    while it.next().is_some() {
+        it.next_back();
+        interfaces.push(decode_type(&split_class_name(&mut it)));
+    }
+
+    ClassSignature {
+        super_class_name,
+        interfaces,
     }
 }
 
@@ -279,103 +230,121 @@ mod tests {
     use super::*;
 
     #[test]
-    fn descriptor_parsing() {
+    fn decode_signatures() {
         let cases = [
-            ("V", Type::Void),
-            ("Z", Type::Boolean),
-            ("C", Type::Char),
-            ("B", Type::Byte),
-            ("S", Type::Short),
-            ("I", Type::Int),
-            ("J", Type::Long),
-            ("F", Type::Float),
-            ("D", Type::Double),
+            ("V", "void"),
+            ("Z", "boolean"),
+            ("B", "byte"),
+            ("S", "short"),
+            ("I", "int"),
+            ("J", "long"),
+            ("F", "float"),
+            ("D", "double"),
+            ("C", "char"),
+            //
+            ("[B", "byte[]"),
+            ("[Z", "boolean[]"),
+            ("[S", "short[]"),
+            ("[I", "int[]"),
+            ("[J", "long[]"),
+            ("[F", "float[]"),
+            ("[D", "double[]"),
+            ("[C", "char[]"),
+            //
+            ("[[B", "byte[][]"),
+            ("[[Z", "boolean[][]"),
+            ("[[S", "short[][]"),
+            ("[[I", "int[][]"),
+            ("[[J", "long[][]"),
+            ("[[F", "float[][]"),
+            ("[[D", "double[][]"),
+            ("[[C", "char[][]"),
+            //
+            ("Ljava/lang/Object;", "java.lang.Object"),
+            ("[Ljava/lang/String;", "java.lang.String[]"),
             (
-                "[D",
-                Type::Array {
-                    inner: Box::new(Type::Double),
-                },
+                "[[La/very/long/package/name/followed/by/another/much/longer/class/name/ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy;",
+                "a.very.long.package.name.followed.by.another.much.longer.class.name.ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy[][]",
             ),
-            (
-                "[[B",
-                Type::Array {
-                    inner: Box::new(Type::Array {
-                        inner: Box::new(Type::Byte),
-                    }),
-                },
-            ),
-            (
-                "[[[J",
-                Type::Array {
-                    inner: Box::new(Type::Array {
-                        inner: Box::new(Type::Array {
-                            inner: Box::new(Type::Long),
-                        }),
-                    }),
-                },
-            ),
-            (
-                "Ljava/lang/Object;",
-                Type::Object {
-                    class_name: "java.lang.Object".to_string(),
-                },
-            ),
+            //
             (
                 "Ljava/util/List<Ljava/lang/String;>;",
-                Type::Generic {
-                    class_name: "java.util.List".to_string(),
-                    types: vec![Type::Object {
-                        class_name: "java.lang.String".to_string(),
-                    }],
-                },
+                "java.util.List<java.lang.String>",
             ),
             (
                 "Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;",
-                Type::Generic {
-                    class_name: "java.util.Map".to_string(),
-                    types: vec![
-                        Type::Object {
-                            class_name: "java.lang.String".to_string(),
-                        },
-                        Type::Object {
-                            class_name: "java.lang.Integer".to_string(),
-                        },
-                    ],
-                },
+                "java.util.Map<java.lang.String, java.lang.Integer>",
             ),
             (
-                "Ljava/util/Map<Ljava/util/List<Ljava/lang/String;>;Ljava/util/Set<Ljava/lang/Integer;>;>;",
-                Type::Generic {
-                    class_name: "java.util.Map".to_string(),
-                    types: vec![
-                        Type::Generic {
-                            class_name: "java.util.List".to_string(),
-                            types: vec![Type::Object {
-                                class_name: "java.lang.String".to_string(),
-                            }],
-                        },
-                        Type::Generic {
-                            class_name: "java.util.Set".to_string(),
-                            types: vec![Type::Object {
-                                class_name: "java.lang.Integer".to_string(),
-                            }],
-                        },
-                    ],
-                },
+                "Lmy/personal/Class<Ljava/lang/String;[Ljava/lang/Integer;[[Ljava/lang/Long;>;",
+                "my.personal.Class<java.lang.String, java.lang.Integer[], java.lang.Long[][]>",
             ),
             (
-                "<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/stream/BaseStream<TT;Ljava/util/stream/Stream<TT;>;>;",
-                Type::Boolean,
+                "Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;",
+                "java.util.List<java.util.List<java.lang.String>>",
+            ),
+            (
+                "Ljava/util/List<Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;>;",
+                "java.util.List<java.util.List<java.util.List<java.lang.String>>>",
+            ),
+            (
+                "Ljava/util/Map<Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;Ljava/util/Map<Ljava/lang/Float;Ljava/lang/Double;>;>;",
+                "java.util.Map<java.util.Map<java.lang.String, java.lang.Integer>, java.util.Map<java.lang.Float, java.lang.Double>>",
+            ),
+            //
+            ("()V", "void()"),
+            ("()Ljava/lang/String;", "java.lang.String()"),
+            ("(I)S", "short(int)"),
+            ("(IFS)D", "double(int, float, short)"),
+            (
+                "([ZI[CJ[[S)[[[C",
+                "char[][][](boolean[], int, char[], long, short[][])",
+            ),
+            (
+                "(Ljava/lang/Object;ILjava/lang/String;)Ljava/util/List;",
+                "java.util.List(java.lang.Object, int, java.lang.String)",
+            ),
+            (
+                "(ILjava/util/List<Ljava/lang/String;>;I)Ljava/util/List<Ljava/lang/String;>;",
+                "java.util.List<java.lang.String>(int, java.util.List<java.lang.String>, int)",
+            ),
+            // generic methods
+            (
+                "<X:Ljava/lang/Object;>(Ljava/lang/String;TX;)TX;",
+                "<X extends java.lang.Object> X(java.lang.String, X)",
+            ),
+            (
+                "<K:Ljava/lang/Object;V:Ljava/lang/Integer;>Ljava/lang/String;",
+                "<K extends java.lang.Object, V extends java.lang.Integer> java.lang.String",
+            ),
+            (
+                "(Ljava.lang.String;)Ljava/util/Set<Ljava.util.List<*>;>;",
+                "java.util.Set<java.util.List<?>>(java.lang.String)",
+            ),
+            (
+                "(Ljava/util/Collection<+TX;>;)Z",
+                "boolean(java.util.Collection<? extends X>)",
+            ),
+            (
+                "<X::Ljava/io/Serializable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
+                "<X extends java.io.Serializable> java.util.Optional<X>(java.lang.Class<X>)",
+            ),
+            (
+                "<X::Ljava/io/Serializable;:Ljava/lang/Comparable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
+                "<X extends java.io.Serializable & java.lang.Comparable> java.util.Optional<X>(java.lang.Class<X>)",
+            ),
+            (
+                "<X:Ljava/lang/Integer;:Ljava/io/Serializable;:Ljava/lang/Comparable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
+                "<X extends java.lang.Integer & java.io.Serializable & java.lang.Comparable> java.util.Optional<X>(java.lang.Class<X>)",
             ),
         ];
 
         for (input, expected) in cases {
+            let actual = decode_type(input);
             assert_eq!(
-                expected,
-                parse_type(&mut Reader {
-                    content: input.to_string(),
-                    pos: 0
-                })
+                expected, actual,
+                "Expected '{}' to be decoded into '{}' but was '{}'.",
+                input, expected, actual
             );
         }
     }
@@ -395,31 +364,36 @@ mod tests {
         ];
 
         for input in cases {
-            parse_type(&mut Reader {
-                content: input.to_string(),
-                pos: 0,
-            });
+            decode_type(input);
         }
     }
 
     #[test]
-    fn method_descriptor_parsing() {
-        let cases = [(
-            "(Ljava/lang/String;IJ)V",
-            MethodDescriptor {
-                return_type: Type::Void,
-                parameter_types: vec![
-                    Type::Object {
-                        class_name: "java.lang.String".to_string(),
-                    },
-                    Type::Int,
-                    Type::Long,
-                ],
-            },
-        )];
+    fn decode_class_signatures() {
+        let cases = [
+            (
+                "Ljava/lang/Enum<Ljava/lang/String;>;",
+                ClassSignature {
+                    super_class_name: "java.lang.Enum<java.lang.String>".to_owned(),
+                    interfaces: Vec::new(),
+                },
+            ),
+            (
+                "Ljava/lang/Object;Ljava/util/function/Supplier<Ljava/lang/String;>;",
+                ClassSignature {
+                    super_class_name: "java.lang.Object".to_owned(),
+                    interfaces: vec!["java.util.function.Supplier<java.lang.String>".to_owned()],
+                },
+            ),
+        ];
 
         for (input, expected) in cases {
-            assert_eq!(expected, parse_method_descriptor(input));
+            let actual = decode_class_signature(input);
+            assert_eq!(
+                expected, actual,
+                "Expected class signature '{}' to be decoded into '{:?}' but was '{:?}'.",
+                input, expected, actual
+            );
         }
     }
 }

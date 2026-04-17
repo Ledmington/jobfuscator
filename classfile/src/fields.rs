@@ -5,9 +5,8 @@ use binary_reader::BinaryReader;
 use crate::{
     access_flags::{FieldAccessFlag, parse_field_access_flags},
     assert_valid_and_type,
-    attributes::{AttributeInfo, AttributeKind, find_attribute, parse_field_attributes},
+    attributes::{AttributeInfo, parse_field_attributes},
     constant_pool::{ConstantPool, ConstantPoolTag},
-    descriptor::{Type, parse_field_descriptor},
 };
 
 pub struct FieldInfo {
@@ -33,7 +32,7 @@ pub fn parse_fields(
         let attributes: Vec<AttributeInfo> =
             parse_field_attributes(reader, cp, attributes_count.into());
 
-        let constant_value = find_attribute(&attributes, AttributeKind::ConstantValue);
+        /*let constant_value = find_attribute(&attributes, AttributeKind::ConstantValue);
         if let Some(AttributeInfo::ConstantValue {
             constant_value_index,
             ..
@@ -58,7 +57,7 @@ pub fn parse_fields(
                 }
                 _ => {}
             }
-        }
+        }*/
 
         fields.push(FieldInfo {
             access_flags,

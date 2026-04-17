@@ -6,18 +6,18 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use binary_reader::{BinaryReader, Endianness};
-use classfile::access_flags::MethodAccessFlag;
+use classfile::access_flags::{ClassAccessFlag, MethodAccessFlag};
 use classfile::attributes::{
     AttributeInfo, AttributeKind, StackMapFrame, VerificationTypeInfo, find_attribute,
 };
 use classfile::bytecode::BytecodeInstruction;
 use classfile::classfile::{ClassFile, parse_class_file};
 use classfile::constant_pool::{self, ConstantPool, ConstantPoolInfo};
-use classfile::descriptor::{MethodDescriptor, parse_field_descriptor};
+use classfile::descriptor::{decode_class_signature, decode_type};
 use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
 use classfile::utils::absolute_no_symlinks;
-use classfile::{access_flags, descriptor, reference_kind};
+use classfile::{access_flags, reference_kind};
 use date::Date;
 
 use crate::line_writer::LineWriter;
@@ -82,14 +82,7 @@ pub(crate) fn print_class_file(filename: String) {
     lw.println("{");
     lw.indent(1);
     print_fields(&mut lw, &cf.constant_pool, &cf.fields);
-    print_methods(
-        &mut lw,
-        &cf.constant_pool,
-        cf.this_class,
-        cf.access_flags
-            .contains(&access_flags::ClassAccessFlag::Enum),
-        &cf.methods,
-    );
+    print_methods(&mut lw, &cf.constant_pool, cf.this_class, &cf.methods);
     lw.indent(-1);
     lw.println("}");
     print_class_attributes(&mut lw, &cf.constant_pool, &cf.attributes);
@@ -104,6 +97,10 @@ fn get_constant_pool_comment_start_index(cp: &ConstantPool) -> usize {
 
 fn num_digits(n: usize) -> usize {
     (n as f64).log10().floor() as usize
+}
+
+fn substring(s: &str, begin: usize, end: usize) -> String {
+    s.chars().skip(begin).take(end).collect()
 }
 
 fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
@@ -123,19 +120,39 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         .print(&source_file)
         .println("\"");
 
+    let this_class_name = cf
+        .constant_pool
+        .get_class_name(cf.this_class)
+        .replace('/', ".");
+
     let this_class_signature = find_attribute(&cf.attributes, AttributeKind::Signature);
 
-    let this_class_name = match this_class_signature {
-        Some(AttributeInfo::Signature {
-            signature_index, ..
-        }) => {
-            parse_class_descriptor(&cf.constant_pool.get_utf8_content(*signature_index)).to_string()
+    if let Some(AttributeInfo::Signature {
+        signature_index, ..
+    }) = this_class_signature
+    {
+        let decoded = decode_class_signature(&cf.constant_pool.get_utf8_content(*signature_index));
+        if decoded.super_class_name.starts_with('<') {
+            let generic_type: String = substring(
+                &decoded.super_class_name,
+                0,
+                decoded.super_class_name.find('<').unwrap() + 1,
+            );
+            let actual_super_class: String = substring(
+                &decoded.super_class_name,
+                decoded.super_class_name.find('>').unwrap() + 1,
+                decoded.super_class_name.len(),
+            )
+            .trim()
+            .to_owned();
+            lw.print(&generic_type);
+            if !cf.access_flags.contains(&ClassAccessFlag::Interface) {
+                lw.print(&format!(" extends {}", actual_super_class));
+            }
+        } else {
+            lw.print(&format!(" extends {}", decoded.super_class_name));
         }
-        _ => cf
-            .constant_pool
-            .get_class_name(cf.this_class)
-            .replace('/', "."),
-    };
+    }
 
     lw.print(&access_flags::modifier_repr_vec(&cf.access_flags))
         .print(" ")
@@ -356,9 +373,9 @@ fn print_fields(lw: &mut LineWriter, cp: &ConstantPool, fields: &[FieldInfo]) {
             match signature {
                 Some(AttributeInfo::Signature {
                     signature_index, ..
-                }) => descriptor::parse_field_descriptor(&cp.get_utf8_content(*signature_index)),
+                }) => decode_type(&cp.get_utf8_content(*signature_index)),
                 Some(_) => unreachable!(),
-                None => descriptor::parse_field_descriptor(&descriptor),
+                None => decode_type(&descriptor),
             },
             cp.get_utf8_content(field.name_index)
         ));
@@ -403,18 +420,11 @@ fn print_field_attributes(lw: &mut LineWriter, cp: &ConstantPool, field: &FieldI
     }
 }
 
-fn print_methods(
-    lw: &mut LineWriter,
-    cp: &ConstantPool,
-    this_class: u16,
-    is_enum: bool,
-    methods: &[MethodInfo],
-) {
+fn print_methods(lw: &mut LineWriter, cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
     for (i, method) in methods.iter().enumerate() {
         let method_name: String = cp.get_utf8_content(method.name_index);
         let raw_descriptor: String = cp.get_utf8_content(method.descriptor_index);
-        let parsed_descriptor: MethodDescriptor =
-            descriptor::parse_method_descriptor(&raw_descriptor);
+        let parsed_descriptor: String = decode_type(&raw_descriptor);
         if i > 0 {
             lw.println("");
         }
@@ -423,50 +433,17 @@ fn print_methods(
             access_flags::modifier_repr_vec(&method.access_flags)
         ));
 
-        if method_name == "<clinit>" {
+        let is_static_block: bool = method_name == "<clinit>";
+        let is_constructor: bool = method_name == "<init>";
+
+        if is_static_block {
             // this is the 'static {}' block of the class
             lw.println("{};");
-        } else if method_name == "<init>" {
+        } else if is_constructor {
             // this is a constructor of the class
-
-            let param_types = if is_enum {
-                parsed_descriptor
-                    .parameter_types
-                    .iter()
-                    .skip(2) // if this is an enum's constructor, we omit the first two parameter which are always the name and the ordinal, implicitly added by the compiler
-                    .map(|t| format!("{t}"))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            } else {
-                parsed_descriptor
-                    .parameter_types
-                    .iter()
-                    .map(|t| format!("{t}"))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            };
-
-            lw.println(&format!(
-                "{}({});",
-                cp.get_class_name(this_class).replace("/", "."),
-                param_types
-            ));
+            lw.println(&parsed_descriptor);
         } else {
-            let mut param_types = parsed_descriptor
-                .parameter_types
-                .iter()
-                .map(|t| format!("{t}"))
-                .collect::<Vec<String>>()
-                .join(", ");
-
-            if method.access_flags.contains(&MethodAccessFlag::Varargs) {
-                param_types = param_types[..(param_types.len() - 2)].to_owned() + "...";
-            }
-
-            lw.println(&format!(
-                "{} {}({});",
-                parsed_descriptor.return_type, method_name, param_types
-            ));
+            lw.println(&parsed_descriptor);
         }
 
         lw.indent(1);
@@ -1237,19 +1214,35 @@ fn get_verification_type_info_string(cp: &ConstantPool, vti: &VerificationTypeIn
 }
 
 fn get_number_of_arguments(cp: &ConstantPool, method: &MethodInfo) -> u8 {
-    let mut num_arguments: u8 =
-        descriptor::parse_method_descriptor(&cp.get_utf8_content(method.descriptor_index))
-            .parameter_types
-            .len()
-            .try_into()
-            .unwrap();
+    let descriptor: String = decode_type(&cp.get_utf8_content(method.descriptor_index));
+    let arguments: String = descriptor
+        .chars()
+        .skip(descriptor.find('(').unwrap())
+        .collect();
+
+    let mut args: u8 = 1;
+    let mut generics = 0;
+    for ch in arguments.chars() {
+        if ch == '<' {
+            generics += 1;
+        } else if ch == '>' {
+            generics -= 1;
+        } else if ch == ',' && generics == 0 {
+            args += 1;
+        }
+    }
+    assert_eq!(
+        0, generics,
+        "Invalid generics syntax in method descriptor: '{}'.",
+        arguments
+    );
 
     if !method.access_flags.contains(&MethodAccessFlag::Static) {
         // if the method is not static, there is the implicit 'this' argument
-        num_arguments += 1;
+        args += 1;
     }
 
-    num_arguments
+    args
 }
 
 fn print_method_attributes(
@@ -1600,7 +1593,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                     let descriptor = cp.get_utf8_content(component.descriptor_index);
                     lw.println(&format!(
                         "  {} {};",
-                        descriptor::parse_field_descriptor(&descriptor),
+                        decode_type(&descriptor),
                         cp.get_utf8_content(component.name_index)
                     ));
                     lw.println(&format!("    descriptor: {descriptor}"));
