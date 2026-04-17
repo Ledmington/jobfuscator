@@ -2,8 +2,40 @@
 
 use std::{collections::BTreeMap, iter::Peekable, str::Chars};
 
+fn consume_class_name(it: &mut Peekable<Chars>) -> String {
+    let mut s = String::new();
+
+    while let Some(&x) = it.peek() {
+        if x == '<' || x == ';' {
+            break;
+        }
+        it.next();
+        s.push(if x == '/' { '.' } else { x });
+    }
+
+    s
+}
+
+fn decode_generic_arg(it: &mut Peekable<Chars>) -> String {
+    let ch = it.next().unwrap();
+
+    match ch {
+        // ONLY reference types or arrays allowed
+        'L' => decode_ref_type(it),
+
+        '[' => {
+            let inner = decode_generic_arg(it);
+            inner + "[]"
+        }
+
+        // forbid everything else inside generics
+        _ => panic!("Invalid generic argument type: '{}'.", ch),
+    }
+}
+
 fn decode_type_it(it: &mut Peekable<Chars>) -> String {
     let ch = it.next().unwrap();
+
     match ch {
         'B' => "byte".to_owned(),
         'C' => "char".to_owned(),
@@ -14,28 +46,29 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
         'S' => "short".to_owned(),
         'Z' => "boolean".to_owned(),
         'V' => "void".to_owned(),
+
         'L' => decode_ref_type(it),
+
+        '[' => {
+            let inner = decode_type_it(it);
+            inner + "[]"
+        }
+
         '(' => {
-            let mut s = String::new();
-            s.push('(');
-            let mut first = true;
+            let mut args = Vec::new();
+
             while let Some(&x) = it.peek() {
-                it.next();
                 if x == ')' {
-                    s.push(')');
+                    it.next();
                     break;
                 }
-                if !first {
-                    s.push_str(", ");
-                }
-                first = false;
-                s.push_str(&decode_type_it(it));
+                args.push(decode_type_it(it));
             }
 
-            let return_type = decode_type_it(it);
-            return_type + &s
+            let ret = decode_type_it(it);
+            format!("{}({})", ret, args.join(", "))
         }
-        '[' => decode_type_it(it) + "[]",
+
         'T' => {
             let mut s = String::new();
             while let Some(&x) = it.peek() {
@@ -47,51 +80,42 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
             }
             panic!("Unterminated type variable.");
         }
+
         '*' => "?".to_owned(),
-        '+' => "? extends ".to_owned() + &decode_type_it(it),
-        _ => panic!("Unknown or unexpected character '{}'.", ch),
+        '+' => "? extends ".to_owned() + &decode_generic_arg(it),
+
+        _ => panic!("Unexpected '{}'", ch),
     }
 }
 
 fn decode_ref_type(it: &mut Peekable<Chars>) -> String {
-    let mut s = String::new();
-    while let Some(&x) = it.peek() {
-        if x == ';' {
-            it.next();
-            return s;
+    let mut s = consume_class_name(it);
+
+    // generics
+    if let Some(&'<') = it.peek() {
+        it.next(); // consume '<'
+        s.push('<');
+
+        let mut first = true;
+
+        while let Some(&x) = it.peek() {
+            if x == '>' {
+                it.next();
+                break;
+            }
+
+            if !first {
+                s.push_str(", ");
+            }
+            first = false;
+
+            s.push_str(&decode_generic_arg(it));
         }
-        if x == '<' {
-            it.next();
-            s.push('<');
-            break;
-        }
-        s.push(if x == '/' { '.' } else { x });
-        it.next();
+
+        s.push('>');
     }
 
-    // parsing generics
-    s.push_str(&decode_type_it(it));
-    while let Some(&x) = it.peek() {
-        if x == '>' {
-            it.next();
-            s.push('>');
-            break;
-        }
-
-        // Only ref types or arrays allowed inside generics
-        s.push_str(", ");
-        s.push_str(&decode_type_it(it));
-    }
-
-    // skipping the ending ';'
-    let last = it.next().unwrap();
-    if last != ';' {
-        panic!(
-            "Expected to find ';' at the end of class name but was '{}'.",
-            last
-        );
-    }
-
+    expect(it, ';');
     s
 }
 
@@ -398,11 +422,22 @@ mod tests {
                     super_class_name: "java.util.stream.BaseStream<T, java.util.stream.Stream<T>>"
                         .to_owned(),
                     interfaces: Vec::new(),
-                }, // "java.util.stream.Stream<T extends java.lang.Object> extends java.util.stream.BaseStream<T, java.util.stream.Stream<T>>"
+                },
             ),
-            // ("<K,V>Ljava/util/AbstractMap<TK;TV;>;Ljava/util/NavigableMap<TK;TV;>;Ljava/lang/Cloneable;Ljava/io/Serializable;",...),
-            // ("<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/concurrent/Future<TT;>;Ljava/lang/Runnable;Ljava/io/Serializable;",...),
-            // ("<E_IN:Ljava/lang/Object;E_OUT:Ljava/lang/Object;>Ljava/util/stream/AbstractPipeline<TE_IN;TE_OUT;Ljava/util/stream/Stream<TE_OUT;>;>;Ljava/util/stream/Stream<TE_OUT;>;...",...),
+            (
+                "<K:Ljava/lang/Object;V:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/Map<TK;TV;>;",
+                ClassSignature {
+                    super_class_name: "java.util.Object".to_owned(),
+                    interfaces: vec!["java.util.map<K, V>".to_owned()],
+                },
+            ),
+            (
+                "<E_IN:Ljava/lang/Object;E_OUT:Ljava/lang/Object;S::Ljava/util/stream/BaseStream<TE_OUT;TS;>;>Ljava/util/stream/PipelineHelper<TE_OUT;>;Ljava/util/stream/BaseStream<TE_OUT;TS;>;",
+                ClassSignature {
+                    super_class_name: "java.util.stream.PipelineHelper<E_OUT>".to_owned(),
+                    interfaces: vec!["java.util.stream.BaseStream<E_OUT, S>".to_owned()],
+                },
+            ),
         ];
 
         for (input, expected) in cases {
