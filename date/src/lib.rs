@@ -12,7 +12,7 @@ fn get_max_days_in_month(month: u8, year: u16) -> u8 {
     match month {
         0 => 31,
         1 => {
-            if year % 4 == 0 && year % 100 != 0 {
+            if year.is_multiple_of(4) && !year.is_multiple_of(100) {
                 29
             } else {
                 28
@@ -63,11 +63,11 @@ impl From<SystemTime> for Date {
 }
 
 impl Date {
-    pub fn day(self: &Self) -> String {
+    pub fn day(&self) -> String {
         self.day.to_string()
     }
 
-    pub fn month(self: &Self) -> String {
+    pub fn month(&self) -> String {
         match self.month {
             0 => "Jan".to_owned(),
             1 => "Feb".to_owned(),
@@ -85,7 +85,7 @@ impl Date {
         }
     }
 
-    pub fn year(self: &Self) -> String {
+    pub fn year(&self) -> String {
         self.year.to_string()
     }
 }
