@@ -14,45 +14,7 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
         'S' => "short".to_owned(),
         'Z' => "boolean".to_owned(),
         'V' => "void".to_owned(),
-        'L' => {
-            let mut s = String::new();
-            while let Some(&x) = it.peek() {
-                if x == ';' {
-                    it.next();
-                    return s;
-                }
-                if x == '<' {
-                    it.next();
-                    s.push('<');
-                    break;
-                }
-                s.push(if x == '/' { '.' } else { x });
-                it.next();
-            }
-
-            // parsing generics
-            s.push_str(&decode_type_it(it));
-            while let Some(&x) = it.peek() {
-                it.next();
-                if x == '>' {
-                    s.push('>');
-                    break;
-                }
-                s.push_str(", ");
-                s.push_str(&decode_type_it(it));
-            }
-
-            // skipping the ending ';'
-            let last = it.next().unwrap();
-            if last != ';' {
-                panic!(
-                    "Expected to find ';' at the end of class name but was '{}'.",
-                    last
-                );
-            }
-
-            s
-        }
+        'L' => decode_ref_type(it),
         '(' => {
             let mut s = String::new();
             s.push('(');
@@ -89,6 +51,48 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
         '+' => "? extends ".to_owned() + &decode_type_it(it),
         _ => panic!("Unknown or unexpected character '{}'.", ch),
     }
+}
+
+fn decode_ref_type(it: &mut Peekable<Chars>) -> String {
+    let mut s = String::new();
+    while let Some(&x) = it.peek() {
+        if x == ';' {
+            it.next();
+            return s;
+        }
+        if x == '<' {
+            it.next();
+            s.push('<');
+            break;
+        }
+        s.push(if x == '/' { '.' } else { x });
+        it.next();
+    }
+
+    // parsing generics
+    s.push_str(&decode_type_it(it));
+    while let Some(&x) = it.peek() {
+        if x == '>' {
+            it.next();
+            s.push('>');
+            break;
+        }
+
+        // Only ref types or arrays allowed inside generics
+        s.push_str(", ");
+        s.push_str(&decode_type_it(it));
+    }
+
+    // skipping the ending ';'
+    let last = it.next().unwrap();
+    if last != ';' {
+        panic!(
+            "Expected to find ';' at the end of class name but was '{}'.",
+            last
+        );
+    }
+
+    s
 }
 
 fn decode_generics(it: &mut Peekable<Chars>) -> BTreeMap<String, Vec<String>> {
@@ -257,6 +261,14 @@ mod tests {
                 "java.util.List<java.lang.String>",
             ),
             (
+                "Ljava/util/List<[Ljava/lang/String;>;",
+                "java.util.List<java.lang.String[]>",
+            ),
+            (
+                "Ljava/util/List<[[Ljava/lang/String;>;",
+                "java.util.List<java.lang.String[][]>",
+            ),
+            (
                 "Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;",
                 "java.util.Map<java.lang.String, java.lang.Integer>",
             ),
@@ -380,6 +392,17 @@ mod tests {
                     interfaces: vec!["java.util.function.Supplier<java.lang.String>".to_owned()],
                 },
             ),
+            (
+                "<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/stream/BaseStream<TT;Ljava/util/stream/Stream<TT;>;>;",
+                ClassSignature {
+                    super_class_name: "java.util.stream.BaseStream<T, java.util.stream.Stream<T>>"
+                        .to_owned(),
+                    interfaces: Vec::new(),
+                }, // "java.util.stream.Stream<T extends java.lang.Object> extends java.util.stream.BaseStream<T, java.util.stream.Stream<T>>"
+            ),
+            // ("<K,V>Ljava/util/AbstractMap<TK;TV;>;Ljava/util/NavigableMap<TK;TV;>;Ljava/lang/Cloneable;Ljava/io/Serializable;",...),
+            // ("<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/concurrent/Future<TT;>;Ljava/lang/Runnable;Ljava/io/Serializable;",...),
+            // ("<E_IN:Ljava/lang/Object;E_OUT:Ljava/lang/Object;>Ljava/util/stream/AbstractPipeline<TE_IN;TE_OUT;Ljava/util/stream/Stream<TE_OUT;>;>;Ljava/util/stream/Stream<TE_OUT;>;...",...),
         ];
 
         for (input, expected) in cases {
