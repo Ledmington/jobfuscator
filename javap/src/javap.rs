@@ -18,7 +18,7 @@ use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
 use classfile::utils::absolute_no_symlinks;
 use classfile::{access_flags, descriptor, reference_kind};
-use time::OffsetDateTime;
+use time::DateTime;
 
 use crate::line_writer::LineWriter;
 
@@ -46,21 +46,14 @@ pub(crate) fn print_class_file(filename: String) {
 
     let digest = sha::sha256(&file_bytes);
 
+    let date: DateTime = DateTime::from(modified_time);
+
     lw.print("  Last modified ")
-        .print(
-            &OffsetDateTime::from(modified_time)
-                .month()
-                .to_string()
-                .chars()
-                .take(3)
-                .map(|c| c.to_string())
-                .collect::<Vec<String>>()
-                .join(""),
-        )
+        .print(&date.month())
         .print(" ")
-        .print(&OffsetDateTime::from(modified_time).day().to_string())
+        .print(&date.day())
         .print(", ")
-        .print(&OffsetDateTime::from(modified_time).year().to_string())
+        .print(&date.year())
         .print("; size ")
         .print(&file_size.to_string())
         .println(" bytes");
