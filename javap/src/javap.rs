@@ -68,7 +68,7 @@ pub(crate) fn print_class_file(filename: String) {
     lw.print("  SHA-256 checksum ").println(
         &digest
             .iter()
-            .map(|x| format!("{:02x}", x))
+            .map(|x| format!("{x:02x}"))
             .collect::<Vec<String>>()
             .concat(),
     );
@@ -265,7 +265,7 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
                 ));
             }
             ConstantPoolInfo::String { string_index } => {
-                lw.print(&format!("#{}", string_index)).tab();
+                lw.print(&format!("#{string_index}")).tab();
                 let string_content: String =
                     cp.get_utf8_content(*string_index).trim_end().to_owned();
                 if string_content.trim().is_empty() {
@@ -285,7 +285,7 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
                 class_index,
                 name_and_type_index,
             } => {
-                lw.print(&format!("#{}.#{}", class_index, name_and_type_index))
+                lw.print(&format!("#{class_index}.#{name_and_type_index}"))
                     .tab()
                     .print("// ")
                     .println(&cp.get_field_ref_string(*class_index, *name_and_type_index));
@@ -294,7 +294,7 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
                 class_index,
                 name_and_type_index,
             } => {
-                lw.print(&format!("#{}.#{}", class_index, name_and_type_index))
+                lw.print(&format!("#{class_index}.#{name_and_type_index}"))
                     .tab()
                     .print("// ")
                     .println(&cp.get_method_ref_string(*class_index, *name_and_type_index));
@@ -319,7 +319,7 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
                 name_index,
                 descriptor_index,
             } => {
-                lw.print(&format!("#{}:#{}", name_index, descriptor_index))
+                lw.print(&format!("#{name_index}:#{descriptor_index}"))
                     .tab()
                     .print("// ")
                     .println(&cp.get_name_and_type_string(*name_index, *descriptor_index));
@@ -387,7 +387,7 @@ fn print_fields(lw: &mut LineWriter, cp: &ConstantPool, fields: &[FieldInfo]) {
 
         lw.indent(1);
 
-        lw.println(&format!("descriptor: {}", descriptor));
+        lw.println(&format!("descriptor: {descriptor}"));
         lw.println(&format!(
             "flags: (0x{:04x}) {}",
             access_flags::to_u16(&field.access_flags),
@@ -407,7 +407,7 @@ fn print_field_attributes(lw: &mut LineWriter, cp: &ConstantPool, field: &FieldI
             AttributeInfo::Signature {
                 signature_index, ..
             } => {
-                lw.print(&format!("Signature: #{}", signature_index))
+                lw.print(&format!("Signature: #{signature_index}"))
                     .tab()
                     .println(&format!("// {}", cp.get_utf8_content(*signature_index)));
             }
@@ -456,14 +456,14 @@ fn print_methods(
                     .parameter_types
                     .iter()
                     .skip(2) // if this is an enum's constructor, we omit the first two parameter which are always the name and the ordinal, implicitly added by the compiler
-                    .map(|t| format!("{}", t))
+                    .map(|t| format!("{t}"))
                     .collect::<Vec<String>>()
                     .join(", ")
             } else {
                 parsed_descriptor
                     .parameter_types
                     .iter()
-                    .map(|t| format!("{}", t))
+                    .map(|t| format!("{t}"))
                     .collect::<Vec<String>>()
                     .join(", ")
             };
@@ -477,7 +477,7 @@ fn print_methods(
             let mut param_types = parsed_descriptor
                 .parameter_types
                 .iter()
-                .map(|t| format!("{}", t))
+                .map(|t| format!("{t}"))
                 .collect::<Vec<String>>()
                 .join(", ");
 
@@ -493,7 +493,7 @@ fn print_methods(
 
         lw.indent(1);
 
-        lw.println(&format!("descriptor: {}", raw_descriptor));
+        lw.println(&format!("descriptor: {raw_descriptor}"));
         lw.println(&format!(
             "flags: (0x{:04x}) {}",
             access_flags::to_u16(&method.access_flags),
@@ -662,7 +662,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
         BytecodeInstruction::CaStore {} => "castore".to_owned(),
         BytecodeInstruction::SaStore {} => "sastore".to_owned(),
         BytecodeInstruction::NewArray { atype } => {
-            "newarray       ".to_owned() + &format!("{}", atype)
+            "newarray       ".to_owned() + &format!("{atype}")
         }
         BytecodeInstruction::ANewArray {
             constant_pool_index,
@@ -1295,8 +1295,7 @@ fn print_method_attributes(
                 lw.indent(1);
                 let args_size = get_number_of_arguments(cp, method);
                 lw.println(&format!(
-                    "stack={}, locals={}, args_size={}",
-                    max_stack, max_locals, args_size
+                    "stack={max_stack}, locals={max_locals}, args_size={args_size}"
                 ));
                 for (position, instruction) in code.iter() {
                     let opcode_and_arguments: String =
@@ -1305,16 +1304,14 @@ fn print_method_attributes(
                     match comment {
                         Some(content) => {
                             lw.print(&format!(
-                                "{:>BYTECODE_INDEX_LENGTH$}: {}",
-                                position, opcode_and_arguments
+                                "{position:>BYTECODE_INDEX_LENGTH$}: {opcode_and_arguments}"
                             ))
                             .tab()
-                            .println(&format!("// {}", content));
+                            .println(&format!("// {content}"));
                         }
                         None => {
                             lw.println(&format!(
-                                "{:>BYTECODE_INDEX_LENGTH$}: {}",
-                                position, opcode_and_arguments,
+                                "{position:>BYTECODE_INDEX_LENGTH$}: {opcode_and_arguments}",
                             ));
                         }
                     }
@@ -1345,7 +1342,7 @@ fn print_method_attributes(
                     } else {
                         &cp.get_utf8_content(param.name_index)
                     };
-                    print!("      {}", name);
+                    print!("      {name}");
                     if !param.access_flags.is_empty() {
                         print!(
                             "                      {}",
@@ -1439,12 +1436,11 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                 for frame in stack_map_table.iter() {
                     match frame {
                         StackMapFrame::SameFrame { frame_type } => {
-                            println!("        frame_type = {} /* same */", frame_type)
+                            println!("        frame_type = {frame_type} /* same */")
                         }
                         StackMapFrame::SameLocals1StackItemFrame { frame_type, stack } => {
                             println!(
-                                "        frame_type = {} /* same_locals_1_stack_item */",
-                                frame_type
+                                "        frame_type = {frame_type} /* same_locals_1_stack_item */"
                             );
                             println!(
                                 "          stack = [ {} ]",
@@ -1458,7 +1454,7 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                             println!(
                                 "        frame_type = 247 /* same_locals_1_stack_item_frame_extended */"
                             );
-                            println!("          offset_delta = {}", offset_delta);
+                            println!("          offset_delta = {offset_delta}");
                             println!(
                                 "          stack = [ {} ]",
                                 get_verification_type_info_string(cp, stack)
@@ -1468,20 +1464,20 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                             frame_type,
                             offset_delta,
                         } => {
-                            println!("        frame_type = {} /* chop */", frame_type);
-                            println!("          offset_delta = {}", offset_delta);
+                            println!("        frame_type = {frame_type} /* chop */");
+                            println!("          offset_delta = {offset_delta}");
                         }
                         StackMapFrame::SameFrameExtended { offset_delta } => {
                             println!("        frame_type = 251 /* same_frame_extended */");
-                            println!("          offset_delta = {}", offset_delta);
+                            println!("          offset_delta = {offset_delta}");
                         }
                         StackMapFrame::AppendFrame {
                             frame_type,
                             offset_delta,
                             locals,
                         } => {
-                            println!("        frame_type = {} /* append */", frame_type);
-                            println!("          offset_delta = {}", offset_delta);
+                            println!("        frame_type = {frame_type} /* append */");
+                            println!("          offset_delta = {offset_delta}");
                             println!(
                                 "          locals = {}",
                                 if locals.is_empty() {
@@ -1503,7 +1499,7 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                             stack,
                         } => {
                             println!("        frame_type = 255 /* full_frame */");
-                            println!("          offset_delta = {}", offset_delta);
+                            println!("          offset_delta = {offset_delta}");
                             println!(
                                 "          locals = {}",
                                 if locals.is_empty() {
@@ -1594,7 +1590,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                     }
                     lw.println("    Method arguments:");
                     for arg in method.bootstrap_arguments.iter() {
-                        lw.print(&format!("      #{} ", arg));
+                        lw.print(&format!("      #{arg} "));
                         match cp[arg - 1] {
                             ConstantPoolInfo::String { string_index } => {
                                 lw.println(&cp.get_utf8_content(string_index));
@@ -1629,14 +1625,14 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                         descriptor::parse_field_descriptor(&descriptor),
                         cp.get_utf8_content(component.name_index)
                     ));
-                    lw.println(&format!("    descriptor: {}", descriptor));
+                    lw.println(&format!("    descriptor: {descriptor}"));
                     lw.println("");
                 }
             }
             AttributeInfo::Signature {
                 signature_index, ..
             } => {
-                lw.print(&format!("Signature: #{}", signature_index))
+                lw.print(&format!("Signature: #{signature_index}"))
                     .tab()
                     .println(&format!("// {}", cp.get_utf8_content(*signature_index)));
             }
@@ -1678,14 +1674,14 @@ fn java_format_double(val: f64) -> String {
             "-4.9E-324".to_owned()
         }
     } else if val.abs() >= 1.0e-3 && val.abs() < 1.0e7 {
-        format!("{:?}", val)
+        format!("{val:?}")
     } else {
         format_scientific_f64(val)
     }
 }
 
 fn format_scientific_f64(val: f64) -> String {
-    let raw = format!("{:E}", val);
+    let raw = format!("{val:E}");
 
     let e_pos = raw.find('E').unwrap();
     let mantissa = &raw[..e_pos];
@@ -1695,16 +1691,16 @@ fn format_scientific_f64(val: f64) -> String {
     let trimmed = if mantissa.find('.').is_some() {
         let trimmed = mantissa.trim_end_matches('0');
         if trimmed.ends_with('.') {
-            format!("{}0", trimmed)
+            format!("{trimmed}0")
         } else {
             trimmed.to_owned()
         }
     } else {
         // No decimal point at all (e.g. "1E8") — add ".0"
-        format!("{}.0", mantissa)
+        format!("{mantissa}.0")
     };
 
-    format!("{}E{}", trimmed, exp)
+    format!("{trimmed}E{exp}")
 }
 
 /**
@@ -1734,7 +1730,7 @@ fn java_format_float(val: f32) -> String {
             "-1.4E-45".to_owned()
         }
     } else {
-        let debug = format!("{:?}", val);
+        let debug = format!("{val:?}");
         if val.abs() >= 1.0e-3f32 && val.abs() < 1.0e7f32 {
             debug
         } else {
@@ -1745,7 +1741,7 @@ fn java_format_float(val: f32) -> String {
 
 fn format_scientific_f32(val: f32) -> String {
     // Format as f32 to get shortest round-trip digits for f32
-    let raw = format!("{:E}", val);
+    let raw = format!("{val:E}");
 
     let e_pos = raw.find('E').unwrap();
     let mantissa = &raw[..e_pos];
@@ -1754,15 +1750,15 @@ fn format_scientific_f32(val: f32) -> String {
     let trimmed = if mantissa.find('.').is_some() {
         let trimmed = mantissa.trim_end_matches('0');
         if trimmed.ends_with('.') {
-            format!("{}0", trimmed)
+            format!("{trimmed}0")
         } else {
             trimmed.to_owned()
         }
     } else {
-        format!("{}.0", mantissa)
+        format!("{mantissa}.0")
     };
 
-    format!("{}E{}", trimmed, exp)
+    format!("{trimmed}E{exp}")
 }
 
 #[cfg(test)]

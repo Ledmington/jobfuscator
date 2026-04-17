@@ -37,15 +37,15 @@ impl Display for Type {
             Type::Long => write!(f, "long"),
             Type::Float => write!(f, "float"),
             Type::Double => write!(f, "double"),
-            Type::Array { inner } => write!(f, "{}[]", inner),
-            Type::Object { class_name } => write!(f, "{}", class_name),
+            Type::Array { inner } => write!(f, "{inner}[]"),
+            Type::Object { class_name } => write!(f, "{class_name}"),
             Type::Generic { class_name, types } => write!(
                 f,
                 "{}<{}>",
                 class_name,
                 types
                     .iter()
-                    .map(|t| format!("{}", t))
+                    .map(|t| format!("{t}"))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -83,7 +83,7 @@ impl Display for MethodDescriptor {
             self.return_type,
             self.parameter_types
                 .iter()
-                .map(|t| format!("{}", t))
+                .map(|t| format!("{t}"))
                 .collect::<Vec<String>>()
                 .join(", ")
         )
@@ -226,8 +226,7 @@ pub fn parse_method_descriptor(raw_descriptor: &str) -> MethodDescriptor {
             && raw_descriptor.chars().filter(|c| *c == '(').count() == 1
             && raw_descriptor.chars().filter(|c| *c == ')').count() == 1
             && !raw_descriptor.ends_with(')'),
-        "Invalid method descriptor: '{}'.",
-        raw_descriptor
+        "Invalid method descriptor: '{raw_descriptor}'."
     );
 
     let return_type: Type = parse_type(&mut Reader {

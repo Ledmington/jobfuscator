@@ -92,7 +92,7 @@ pub enum AttributeKind {
 
 impl std::fmt::Display for AttributeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -318,8 +318,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
         "SourceFile" => {
             assert!(
                 attribute_length == 2,
-                "The attribute_length field of SourceFile must be 2 but was {}.",
-                attribute_length
+                "The attribute_length field of SourceFile must be 2 but was {attribute_length}.",
             );
             let source_file_index: u16 = reader.read_u16().unwrap();
             assert_valid_and_type(cp, source_file_index, ConstantPoolTag::Utf8);
@@ -403,8 +402,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
             }
         }
         _ => panic!(
-            "The name '{}' is either not of an attribute or not a class attribute.",
-            attribute_name
+            "The name '{attribute_name}' is either not of an attribute or not a class attribute.",
         ),
     }
 }
@@ -437,10 +435,7 @@ fn check_attribute_length(
 ) {
     assert!(
         expected_attribute_length == actual_attribute_length,
-        "Expected length of attribute {} to be {} bytes but was {} bytes.",
-        attribute_name,
-        expected_attribute_length,
-        actual_attribute_length
+        "Expected length of attribute {attribute_name} to be {expected_attribute_length} bytes but was {actual_attribute_length} bytes.",
     );
 }
 
@@ -467,8 +462,7 @@ fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attrib
             }
         }
         _ => panic!(
-            "The name '{}' is either not of an attribute or not a field attribute.",
-            attribute_name
+            "The name '{attribute_name}' is either not of an attribute or not a field attribute.",
         ),
     }
 }
@@ -506,8 +500,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             let code_length: u32 = reader.read_u32().unwrap();
             assert!(
                 code_length > 0 && code_length < 65_536,
-                "Invalid code length: must be > 0 and < 65536 but was {}.",
-                code_length
+                "Invalid code length: must be > 0 and < 65536 but was {code_length}.",
             );
             let code_bytes: Vec<u8> = reader.read_u8_vec(code_length.try_into().unwrap()).unwrap();
             let code: Vec<(u32, BytecodeInstruction)> = parse_bytecode(
@@ -522,33 +515,24 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
                 let end_pc: u16 = reader.read_u16().unwrap();
                 assert!(
                     start_pc < end_pc,
-                    "Exception {} has start_pc ({}) >= end_pc ({}).",
-                    i,
-                    start_pc,
-                    end_pc
+                    "Exception {i} has start_pc ({start_pc}) >= end_pc ({end_pc}).",
                 );
                 assert!(
                     code.iter()
                         .any(|(position, _)| *position == (start_pc as u32)),
-                    "Exception {} has start_pc ({}) which does not correspond to a valid instruction.",
-                    i,
-                    start_pc
+                    "Exception {i} has start_pc ({start_pc}) which does not correspond to a valid instruction.",
                 );
                 assert!(
                     code.iter()
                         .any(|(position, _)| *position == (end_pc as u32))
                         || (end_pc as u32) == code_length,
-                    "Exception {} has end_pc ({}) which does not correspond to a valid instruction.",
-                    i,
-                    end_pc
+                    "Exception {i} has end_pc ({end_pc}) which does not correspond to a valid instruction.",
                 );
                 let handler_pc: u16 = reader.read_u16().unwrap();
                 assert!(
                     code.iter()
                         .any(|(position, _)| *position == (handler_pc as u32)),
-                    "Exception {} has handler_pc ({}) which does not correspond to a valid instruction.",
-                    i,
-                    handler_pc
+                    "Exception {i} has handler_pc ({handler_pc}) which does not correspond to a valid instruction.",
                 );
                 let catch_type: u16 = reader.read_u16().unwrap();
                 if catch_type != 0 {
@@ -612,8 +596,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             }
         }
         _ => panic!(
-            "The name '{}' is either not of an attribute or not a method attribute.",
-            attribute_name
+            "The name '{attribute_name}' is either not of an attribute or not a method attribute.",
         ),
     }
 }
@@ -687,7 +670,7 @@ fn parse_element_value(cp: &ConstantPool, reader: &mut BinaryReader) -> ElementV
             }
             ElementValue::Array { values }
         }
-        _ => panic!("'{}' is not a valid element value tag.", element_value_tag),
+        _ => panic!("'{element_value_tag}' is not a valid element value tag."),
     }
 }
 
@@ -728,10 +711,7 @@ fn parse_code_attribute(
             let expected_attribute_length: u32 = 2 + (2 * 2) * (line_number_table_length as u32);
             assert!(
                 attribute_length == expected_attribute_length,
-                "The field attribute_length for LineNumberTable (with {} entries) must be {} but was {}.",
-                line_number_table_length,
-                expected_attribute_length,
-                attribute_length
+                "The field attribute_length for LineNumberTable (with {line_number_table_length} entries) must be {expected_attribute_length} but was {attribute_length}.",
             );
             let mut line_number_table: Vec<LineNumberTableEntry> =
                 Vec::with_capacity(line_number_table_length.into());
@@ -740,9 +720,7 @@ fn parse_code_attribute(
                 assert!(
                     code.iter()
                         .any(|(position, _)| *position == (start_pc as u32)),
-                    "LineNumberTable entry {} has start_pc ({}) which does not correspond to a valid instruction.",
-                    i,
-                    start_pc
+                    "LineNumberTable entry {i} has start_pc ({start_pc}) which does not correspond to a valid instruction.",
                 );
                 let line_number: u16 = reader.read_u16().unwrap();
                 line_number_table.push(LineNumberTableEntry {
@@ -814,8 +792,7 @@ fn parse_code_attribute(
             }
         }
         _ => panic!(
-            "The name '{}' is either not of an attribute or not a code attribute.",
-            attribute_name
+            "The name '{attribute_name}' is either not of an attribute or not a code attribute."
         ),
     }
 }
@@ -828,7 +805,7 @@ fn parse_stack_map_entry(reader: &mut BinaryReader) -> StackMapFrame {
             frame_type,
             stack: parse_verification_type_info(reader),
         },
-        128..=246 => panic!("Frame type {} is reserved.", frame_type),
+        128..=246 => panic!("Frame type {frame_type} is reserved."),
         247 => StackMapFrame::SameLocals1StackItemFrameExtended {
             offset_delta: reader.read_u16().unwrap(),
             stack: parse_verification_type_info(reader),
@@ -889,7 +866,7 @@ fn parse_verification_type_info(reader: &mut BinaryReader) -> VerificationTypeIn
         8 => VerificationTypeInfo::UninitializedVariable {
             offset: reader.read_u16().unwrap(),
         },
-        _ => panic!("Wrong verification type info tag {}", tag),
+        _ => panic!("Wrong verification type info tag {tag}."),
     }
 }
 

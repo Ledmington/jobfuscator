@@ -154,11 +154,11 @@ mod tests {
         for (input, expected) in cases {
             let input_bytes = input.to_owned().into_bytes();
             let output = sha256(&input_bytes);
-            let output_string: String = output.iter().map(|b| format!("{:02x}", b)).collect();
+            let output_string: String = output.iter().map(|b| format!("{b:02x}")).collect();
             assert_eq!(
                 Sha256::digest(input_bytes)
                     .iter()
-                    .map(|b| format!("{:02x}", b))
+                    .map(|b| format!("{b:02x}"))
                     .collect::<String>(),
                 expected
             );
@@ -182,15 +182,15 @@ mod tests {
             let input_bytes: Vec<u8> = (0..length).map(|_| seeded_rng.random::<u8>()).collect();
             let input_bytes_hex: String = input_bytes
                 .iter()
-                .map(|b| format!("{:02x}", b))
+                .map(|b| format!("{b:02x}"))
                 .collect::<String>();
 
             let output = sha256(&input_bytes);
-            let actual: String = output.iter().map(|b| format!("{:02x}", b)).collect();
+            let actual: String = output.iter().map(|b| format!("{b:02x}")).collect();
 
             let expected = Sha256::digest(&input_bytes)
                 .iter()
-                .map(|b| format!("{:02x}", b))
+                .map(|b| format!("{b:02x}"))
                 .collect::<String>();
 
             assert_eq!(

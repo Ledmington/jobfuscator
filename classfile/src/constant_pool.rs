@@ -15,10 +15,7 @@ impl ConstantPool {
         let class_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match class_entry {
             ConstantPoolInfo::Class { name_index } => self.get_wrapped_utf8_content(*name_index),
-            _ => panic!(
-                "Expected entry #{} to be of Class type but it wasn't.",
-                cp_index
-            ),
+            _ => panic!("Expected entry #{cp_index} to be of Class type but it wasn't."),
         }
     }
 
@@ -37,10 +34,7 @@ impl ConstantPool {
                 class_index,
                 name_and_type_index,
             } => self.get_method_ref_string(*class_index, *name_and_type_index),
-            _ => panic!(
-                "Expected entry #{} to be of Methodref type but it wasn't.",
-                cp_index
-            ),
+            _ => panic!("Expected entry #{cp_index} to be of Methodref type but it wasn't."),
         }
     }
 
@@ -55,10 +49,7 @@ impl ConstantPool {
                 class_index,
                 name_and_type_index,
             } => self.get_field_ref_string(*class_index, *name_and_type_index),
-            _ => panic!(
-                "Expected entry #{} to be of Fieldref type but it wasn't.",
-                cp_index
-            ),
+            _ => panic!("Expected entry #{cp_index} to be of Fieldref type but it wasn't."),
         }
     }
 
@@ -73,10 +64,7 @@ impl ConstantPool {
                 name_and_type_index,
                 ..
             } => self.get_name_and_type(*name_and_type_index),
-            _ => panic!(
-                "Expected entry #{} to be of Fieldref type but it wasn't.",
-                cp_index
-            ),
+            _ => panic!("Expected entry #{cp_index} to be of Fieldref type but it wasn't."),
         }
     }
 
@@ -87,10 +75,7 @@ impl ConstantPool {
                 bootstrap_method_attr_index,
                 name_and_type_index,
             } => self.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index),
-            _ => panic!(
-                "Expected entry #{} to be of InvokeDynamic type but it wasn't.",
-                cp_index
-            ),
+            _ => panic!("Expected entry #{cp_index} to be of InvokeDynamic type but it wasn't."),
         }
     }
 
@@ -112,10 +97,7 @@ impl ConstantPool {
                 name_index,
                 descriptor_index,
             } => self.get_name_and_type_string(*name_index, *descriptor_index),
-            _ => panic!(
-                "Expected entry #{} to be of NameAndType type but it wasn't.",
-                cp_index
-            ),
+            _ => panic!("Expected entry #{cp_index} to be of NameAndType type but it wasn't."),
         }
     }
 
@@ -142,10 +124,7 @@ impl ConstantPool {
         let name_entry: &ConstantPoolInfo = &self[cp_index - 1];
         match name_entry {
             ConstantPoolInfo::Utf8 { bytes } => convert_utf8(bytes),
-            _ => panic!(
-                "Expected entry #{} to be of Utf8 type but it wasn't.",
-                cp_index
-            ),
+            _ => panic!("Expected entry #{cp_index} to be of Utf8 type but it wasn't."),
         }
     }
 
@@ -330,7 +309,7 @@ impl From<ConstantPoolTag> for u8 {
 
 impl std::fmt::Display for ConstantPoolTag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -405,7 +384,7 @@ fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) ->
             bootstrap_method_attr_index: reader.read_u16().unwrap(),
             name_and_type_index: reader.read_u16().unwrap(),
         },
-        _ => panic!("Unknown constant pool tag {:?}.", tag),
+        _ => panic!("Unknown constant pool tag {tag:?}."),
     }
 }
 
@@ -469,19 +448,14 @@ pub(crate) fn assert_valid_and_type(
     cp_index: u16,
     expected_tag: ConstantPoolTag,
 ) {
+    let cp_len = cp.len();
     assert!(
-        cp_index >= 1 && cp_index <= (cp.len() as u16),
-        "Constant pool index must be >= 1 and <= {} but was {} (0x{:04x}).",
-        cp.len(),
-        cp_index,
-        cp_index
+        cp_index >= 1 && cp_index <= (cp_len as u16),
+        "Constant pool index must be >= 1 and <= {cp_len} but was {cp_index} (0x{cp_index:04x})."
     );
     let actual_tag = cp[cp_index - 1].tag();
     assert!(
         actual_tag == expected_tag,
-        "Expected an entry with tag {} at index {} but was {}.",
-        expected_tag,
-        cp_index,
-        actual_tag
+        "Expected an entry with tag {expected_tag} at index {cp_index} but was {actual_tag}."
     );
 }

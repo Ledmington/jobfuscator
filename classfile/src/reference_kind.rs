@@ -26,7 +26,7 @@ impl From<u8> for ReferenceKind {
             7 => ReferenceKind::InvokeSpecial,
             8 => ReferenceKind::NewInvokeSpecial,
             9 => ReferenceKind::InvokeInterface,
-            _ => panic!("Unknwon reference_kind value {}.", value),
+            _ => panic!("Unknwon reference_kind value {value}."),
         }
     }
 }

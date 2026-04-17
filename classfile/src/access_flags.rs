@@ -365,8 +365,7 @@ const METHOD_PARAMETER_ACCESS_FLAGS_MASK: u16 = 0x9010;
 pub fn parse_class_access_flags(flags: u16) -> Vec<ClassAccessFlag> {
     assert!(
         (flags & !CLASS_ACCESS_FLAGS_MASK) == 0,
-        "{} is not a valid combination of class access flags.",
-        flags
+        "{flags} is not a valid combination of class access flags.",
     );
 
     let mut result: Vec<ClassAccessFlag> = Vec::new();
@@ -381,8 +380,7 @@ pub fn parse_class_access_flags(flags: u16) -> Vec<ClassAccessFlag> {
 pub fn parse_inner_class_access_flags(flags: u16) -> Vec<InnerClassAccessFlag> {
     assert!(
         (flags & !INNER_CLASS_ACCESS_FLAGS_MASK) == 0,
-        "{} is not a valid combination of inner class access flags.",
-        flags
+        "{flags} is not a valid combination of inner class access flags.",
     );
 
     let mut result: Vec<InnerClassAccessFlag> = Vec::new();
@@ -397,8 +395,7 @@ pub fn parse_inner_class_access_flags(flags: u16) -> Vec<InnerClassAccessFlag> {
 pub fn parse_field_access_flags(flags: u16) -> Vec<FieldAccessFlag> {
     assert!(
         (flags & !FIELD_ACCESS_FLAGS_MASK) == 0,
-        "{} is not a valid combination of field access flags.",
-        flags
+        "{flags} is not a valid combination of field access flags.",
     );
 
     let mut result: Vec<FieldAccessFlag> = Vec::new();
@@ -413,8 +410,7 @@ pub fn parse_field_access_flags(flags: u16) -> Vec<FieldAccessFlag> {
 pub fn parse_method_access_flags(flags: u16) -> Vec<MethodAccessFlag> {
     assert!(
         (flags & !METHOD_ACCESS_FLAGS_MASK) == 0,
-        "{} is not a valid combination of method access flags.",
-        flags
+        "{flags} is not a valid combination of method access flags.",
     );
 
     let mut result: Vec<MethodAccessFlag> = Vec::new();
@@ -429,8 +425,7 @@ pub fn parse_method_access_flags(flags: u16) -> Vec<MethodAccessFlag> {
 pub fn parse_method_parameter_access_flags(flags: u16) -> Vec<MethodParameterAccessFlag> {
     assert!(
         (flags & !METHOD_PARAMETER_ACCESS_FLAGS_MASK) == 0,
-        "{} is not a valid combination of method parameter access flags.",
-        flags
+        "{flags} is not a valid combination of method parameter access flags.",
     );
 
     let mut result: Vec<MethodParameterAccessFlag> = Vec::new();

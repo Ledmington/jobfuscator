@@ -31,9 +31,7 @@ pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
     const EXPECTED_MAGIC_NUMBER: u32 = 0xcafebabe;
     assert!(
         actual_magic_number == EXPECTED_MAGIC_NUMBER,
-        "Wrong magic number: expected 0x{:08x} but was 0x{:08x}.",
-        EXPECTED_MAGIC_NUMBER,
-        actual_magic_number
+        "Wrong magic number: expected 0x{EXPECTED_MAGIC_NUMBER:08x} but was 0x{actual_magic_number:08x}."
     );
 
     let minor_version: u16 = reader.read_u16().unwrap();
@@ -43,22 +41,14 @@ pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
         const OLDEST_MAJOR_VERSION: u16 = 45;
         assert!(
             major_version >= OLDEST_MAJOR_VERSION,
-            "Invalid class file version {}.{} (0x{:04x}.{:04x}) is older than the oldest supported java class file version {}.0",
-            major_version,
-            minor_version,
-            major_version,
-            minor_version,
-            OLDEST_MAJOR_VERSION
+            "Invalid class file version {major_version}.{minor_version} (0x{major_version:04x}.{minor_version:04x}) is older than the oldest supported java class file version {OLDEST_MAJOR_VERSION}.0.",
         );
 
         // class file format version of java 25
         const LATEST_MAJOR_VERSION: u16 = 69;
         assert!(
             major_version <= LATEST_MAJOR_VERSION,
-            "Class file version {}.{} is greater than the latest supported version {}.0",
-            major_version,
-            minor_version,
-            LATEST_MAJOR_VERSION
+            "Class file version {major_version}.{minor_version} is greater than the latest supported version {LATEST_MAJOR_VERSION}.0.",
         );
     }
 

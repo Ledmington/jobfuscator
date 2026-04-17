@@ -288,7 +288,7 @@ impl From<u8> for ArrayType {
             9 => ArrayType::Short,
             10 => ArrayType::Int,
             11 => ArrayType::Long,
-            _ => panic!("Unknown array type value {}.", value),
+            _ => panic!("Unknown array type value {value}."),
         }
     }
 }
@@ -707,7 +707,7 @@ pub fn parse_bytecode(
             0xc7 => BytecodeInstruction::IfNonNull {
                 offset: reader.read_i16().unwrap(),
             },
-            _ => panic!("Unknown bytecode instruction 0x{:02x}", opcode),
+            _ => panic!("Unknown bytecode instruction 0x{opcode:02x}"),
         };
         instructions.push((position, instruction));
     }
