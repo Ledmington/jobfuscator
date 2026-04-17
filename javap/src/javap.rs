@@ -96,20 +96,6 @@ pub(crate) fn print_class_file(filename: String) {
 }
 
 /**
- * Returns the index of the column (on the terminal) where the index of each constant pool entry ends.
- */
-fn get_constant_pool_index_width(cp: &ConstantPool) -> usize {
-    4 + num_digits(cp.len())
-}
-
-/**
- * Returns the index of the column (on the terminal) where the information of each entry is displayed.
- */
-fn get_constant_pool_info_start_index(cp: &ConstantPool) -> usize {
-    26 + num_digits(cp.len())
-}
-
-/**
  * Returns the index of the column (on the terminal) where the comments (the '//') start for the constant pool.
  */
 fn get_constant_pool_comment_start_index(cp: &ConstantPool) -> usize {
@@ -193,10 +179,6 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
 }
 
 fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
-    let index_width: usize = get_constant_pool_index_width(cp);
-    let info_start_index: usize = get_constant_pool_info_start_index(cp);
-    let comment_index: usize = get_constant_pool_comment_start_index(cp);
-
     lw.println("Constant pool:");
     lw.indent(1);
 
@@ -295,19 +277,12 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
             ConstantPoolInfo::InterfaceMethodRef {
                 class_index,
                 name_and_type_index,
-            } => println!(
-                "{:<comment_index$}// {}",
-                format!(
-                    "{:<info_start_index$}#{}.#{}",
-                    format!(
-                        "{:>index_width$} = InterfaceMethodref",
-                        format!("#{}", i + 1),
-                    ),
-                    class_index,
-                    name_and_type_index,
-                ),
-                cp.get_method_ref_string(*class_index, *name_and_type_index),
-            ),
+            } => {
+                lw.print(&format!("#{class_index}.#{name_and_type_index}"))
+                    .tab()
+                    .print("// ")
+                    .println(&cp.get_method_ref_string(*class_index, *name_and_type_index));
+            }
             ConstantPoolInfo::NameAndType {
                 name_index,
                 descriptor_index,
@@ -317,42 +292,42 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
                     .print("// ")
                     .println(&cp.get_name_and_type_string(*name_index, *descriptor_index));
             }
-            ConstantPoolInfo::MethodType { descriptor_index } => println!(
-                "{:<comment_index$}//  {}",
-                format!(
-                    "{:<info_start_index$}#{}",
-                    format!("{:>index_width$} = MethodType", format!("#{}", i + 1),),
-                    descriptor_index,
-                ),
-                cp.get_utf8_content(*descriptor_index),
-            ),
+            ConstantPoolInfo::MethodType { descriptor_index } => {
+                lw.print(&format!("#{descriptor_index}"))
+                    .tab()
+                    .print("//  ")
+                    .println(&cp.get_utf8_content(*descriptor_index));
+            }
             ConstantPoolInfo::MethodHandle {
                 reference_kind,
                 reference_index,
-            } => println!(
-                "{:<comment_index$}// {} {}",
-                format!(
-                    "{:<info_start_index$}{}:#{}",
-                    format!("{:>index_width$} = MethodHandle", format!("#{}", i + 1),),
-                    *reference_kind as u8,
-                    reference_index,
-                ),
-                reference_kind::java_repr(*reference_kind),
-                cp.get_method_ref(*reference_index),
-            ),
+            } => {
+                let ref_kind: u8 = *reference_kind as u8;
+                lw.print(&format!("{ref_kind}:#{reference_index}"))
+                    .tab()
+                    .print("// ")
+                    .println(&format!(
+                        "{} {}",
+                        reference_kind::java_repr(*reference_kind),
+                        cp.get_method_ref(*reference_index)
+                    ));
+            }
             ConstantPoolInfo::InvokeDynamic {
                 bootstrap_method_attr_index,
                 name_and_type_index,
-            } => println!(
-                "{:<comment_index$}// {}",
-                format!(
-                    "{:<info_start_index$}#{}:#{}",
-                    format!("{:>index_width$} = InvokeDynamic", format!("#{}", i + 1),),
-                    bootstrap_method_attr_index,
-                    name_and_type_index,
-                ),
-                cp.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index),
-            ),
+            } => {
+                lw.print(&format!(
+                    "#{bootstrap_method_attr_index}:#{name_and_type_index}"
+                ))
+                .tab()
+                .print("// ")
+                .println(
+                    &cp.get_invoke_dynamic_string(
+                        *bootstrap_method_attr_index,
+                        *name_and_type_index,
+                    ),
+                );
+            }
             ConstantPoolInfo::Null {} => unreachable!(),
         }
     }

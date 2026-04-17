@@ -40,9 +40,9 @@ pub fn java_repr(ref_kind: ReferenceKind) -> String {
         ReferenceKind::PutStatic => "REF_PutStatic",
         ReferenceKind::InvokeVirtual => "REF_invokeVirtual",
         ReferenceKind::InvokeStatic => "REF_invokeStatic",
-        ReferenceKind::InvokeSpecial => "REF_InvokeSpecial",
+        ReferenceKind::InvokeSpecial => "REF_invokeSpecial",
         ReferenceKind::NewInvokeSpecial => "REF_NewInvokeSpecial",
-        ReferenceKind::InvokeInterface => "REF_InvokeInterface",
+        ReferenceKind::InvokeInterface => "REF_invokeInterface",
     }
     .to_string()
 }

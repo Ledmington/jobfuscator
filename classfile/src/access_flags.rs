@@ -26,12 +26,12 @@ impl AccessFlag for ClassAccessFlag {
             ClassAccessFlag::Public => "ACC_PUBLIC",
             ClassAccessFlag::Final => "ACC_FINAL",
             ClassAccessFlag::Super => "ACC_SUPER",
-            ClassAccessFlag::Interface => todo!(),
-            ClassAccessFlag::Abstract => todo!(),
-            ClassAccessFlag::Synthetic => todo!(),
-            ClassAccessFlag::Annotation => todo!(),
+            ClassAccessFlag::Interface => "ACC_INTERFACE",
+            ClassAccessFlag::Abstract => "ACC_ABSTRACT",
+            ClassAccessFlag::Synthetic => "ACC_SYNTHETIC",
+            ClassAccessFlag::Annotation => "ACC_ANNOTATION",
             ClassAccessFlag::Enum => "ACC_ENUM",
-            ClassAccessFlag::Module => todo!(),
+            ClassAccessFlag::Module => "ACC_MODULE",
         }
     }
 
@@ -40,12 +40,12 @@ impl AccessFlag for ClassAccessFlag {
             ClassAccessFlag::Public => "public",
             ClassAccessFlag::Final => "final",
             ClassAccessFlag::Super => "class",
-            ClassAccessFlag::Interface => todo!(),
-            ClassAccessFlag::Abstract => todo!(),
-            ClassAccessFlag::Synthetic => todo!(),
-            ClassAccessFlag::Annotation => todo!(),
+            ClassAccessFlag::Interface => "interface",
+            ClassAccessFlag::Abstract => "abstract",
+            ClassAccessFlag::Synthetic => "synthetic",
+            ClassAccessFlag::Annotation => "annotation",
             ClassAccessFlag::Enum => "",
-            ClassAccessFlag::Module => todo!(),
+            ClassAccessFlag::Module => "module",
         }
     }
 
@@ -78,13 +78,13 @@ impl AccessFlag for InnerClassAccessFlag {
         match self {
             InnerClassAccessFlag::Public => "public",
             InnerClassAccessFlag::Private => "private",
-            InnerClassAccessFlag::Protected => todo!(),
+            InnerClassAccessFlag::Protected => "protected",
             InnerClassAccessFlag::Static => "static",
             InnerClassAccessFlag::Final => "final",
             InnerClassAccessFlag::Interface => "",
             InnerClassAccessFlag::Abstract => "",
-            InnerClassAccessFlag::Synthetic => todo!(),
-            InnerClassAccessFlag::Annotation => todo!(),
+            InnerClassAccessFlag::Synthetic => "synthetic",
+            InnerClassAccessFlag::Annotation => "annotation",
             InnerClassAccessFlag::Enum => "",
         }
     }
@@ -113,11 +113,11 @@ impl AccessFlag for FieldAccessFlag {
         match self {
             FieldAccessFlag::Public => "ACC_PUBLIC",
             FieldAccessFlag::Private => "ACC_PRIVATE",
-            FieldAccessFlag::Protected => todo!(),
+            FieldAccessFlag::Protected => "ACC_PROTECTED",
             FieldAccessFlag::Static => "ACC_STATIC",
             FieldAccessFlag::Final => "ACC_FINAL",
-            FieldAccessFlag::Volatile => todo!(),
-            FieldAccessFlag::Transient => todo!(),
+            FieldAccessFlag::Volatile => "ACC_VOLATILE",
+            FieldAccessFlag::Transient => "ACC_TRANSIENT",
             FieldAccessFlag::Synthetic => "ACC_SYNTHETIC",
             FieldAccessFlag::Enum => "ACC_ENUM",
         }
@@ -127,11 +127,11 @@ impl AccessFlag for FieldAccessFlag {
         match self {
             FieldAccessFlag::Public => "public",
             FieldAccessFlag::Private => "private",
-            FieldAccessFlag::Protected => todo!(),
+            FieldAccessFlag::Protected => "protected",
             FieldAccessFlag::Static => "static",
             FieldAccessFlag::Final => "final",
-            FieldAccessFlag::Volatile => todo!(),
-            FieldAccessFlag::Transient => todo!(),
+            FieldAccessFlag::Volatile => "volatile",
+            FieldAccessFlag::Transient => "transient",
             FieldAccessFlag::Synthetic => "",
             FieldAccessFlag::Enum => "",
         }
@@ -164,15 +164,15 @@ impl AccessFlag for MethodAccessFlag {
         match self {
             MethodAccessFlag::Public => "ACC_PUBLIC",
             MethodAccessFlag::Private => "ACC_PRIVATE",
-            MethodAccessFlag::Protected => todo!(),
+            MethodAccessFlag::Protected => "ACC_PROTECTED",
             MethodAccessFlag::Static => "ACC_STATIC",
             MethodAccessFlag::Final => "ACC_FINAL",
-            MethodAccessFlag::Synchronized => todo!(),
-            MethodAccessFlag::Bridge => todo!(),
+            MethodAccessFlag::Synchronized => "ACC_SYNCHRONIZED",
+            MethodAccessFlag::Bridge => "ACC_BRIDGE",
             MethodAccessFlag::Varargs => "ACC_VARARGS",
-            MethodAccessFlag::Native => todo!(),
-            MethodAccessFlag::Abstract => todo!(),
-            MethodAccessFlag::Strict => todo!(),
+            MethodAccessFlag::Native => "ACC_NATIVE",
+            MethodAccessFlag::Abstract => "ACC_ABSTRACT",
+            MethodAccessFlag::Strict => "ACC_STRICT",
             MethodAccessFlag::Synthetic => "ACC_SYNTHETIC",
         }
     }
@@ -181,15 +181,15 @@ impl AccessFlag for MethodAccessFlag {
         match self {
             MethodAccessFlag::Public => "public",
             MethodAccessFlag::Private => "private",
-            MethodAccessFlag::Protected => todo!(),
+            MethodAccessFlag::Protected => "protected",
             MethodAccessFlag::Static => "static",
             MethodAccessFlag::Final => "final",
-            MethodAccessFlag::Synchronized => todo!(),
-            MethodAccessFlag::Bridge => todo!(),
+            MethodAccessFlag::Synchronized => "synchronized",
+            MethodAccessFlag::Bridge => "bridge",
             MethodAccessFlag::Varargs => "",
-            MethodAccessFlag::Native => todo!(),
-            MethodAccessFlag::Abstract => todo!(),
-            MethodAccessFlag::Strict => todo!(),
+            MethodAccessFlag::Native => "native",
+            MethodAccessFlag::Abstract => "abstract",
+            MethodAccessFlag::Strict => "strictfp",
             MethodAccessFlag::Synthetic => "",
         }
     }
