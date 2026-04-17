@@ -350,7 +350,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn invalid_parsing() {
         let cases = [
             "Q",
@@ -364,7 +363,12 @@ mod tests {
         ];
 
         for input in cases {
-            decode_type(input);
+            let result = std::panic::catch_unwind(|| decode_type(input));
+            assert!(
+                result.is_err(),
+                "Parsing of '{}' should have panicked but did not.",
+                input
+            );
         }
     }
 
