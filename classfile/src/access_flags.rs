@@ -271,7 +271,7 @@ impl MethodAccessFlags {
             (MethodAccessFlag::Static, "static"),
             (MethodAccessFlag::Final, "final"),
             (MethodAccessFlag::Synchronized, "synchronized"),
-            (MethodAccessFlag::Bridge, "bridge"),
+            (MethodAccessFlag::Bridge, ""),
             (MethodAccessFlag::Varargs, ""),
             (MethodAccessFlag::Native, "native"),
             (MethodAccessFlag::Abstract, "abstract"),

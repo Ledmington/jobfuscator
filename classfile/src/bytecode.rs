@@ -186,6 +186,7 @@ pub enum BytecodeInstruction {
         offset: i16,
     },
     TableSwitch {
+        num_padding_bytes: u8,
         default: i32,
         low: i32,
         offsets: Vec<i32>,
@@ -269,6 +270,7 @@ pub struct LookupSwitchPair {
 }
 
 #[repr(u8)]
+#[derive(Clone, Copy)]
 pub enum ArrayType {
     Boolean = 4,
     Char = 5,
@@ -596,8 +598,12 @@ pub fn parse_bytecode(
             },
             0xaa => {
                 // skip padding
-                while !reader.position().is_multiple_of(4) {
-                    _ = reader.read_u8();
+                let current_position = reader.position();
+                let next_multiple_of_4 = current_position.div_ceil(4) * 4;
+                let num_padding_bytes: u8 = (next_multiple_of_4 - current_position) as u8;
+                for _ in 0..num_padding_bytes {
+                    let pad = reader.read_u8().unwrap();
+                    assert!(pad == 0x00);
                 }
                 let default: i32 = reader.read_i32().unwrap();
                 let low: i32 = reader.read_i32().unwrap();
@@ -606,6 +612,7 @@ pub fn parse_bytecode(
                     .read_i32_vec((high - low + 1).try_into().unwrap())
                     .unwrap();
                 BytecodeInstruction::TableSwitch {
+                    num_padding_bytes,
                     default,
                     low,
                     offsets,
@@ -868,14 +875,22 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0x39);
             w.write_u8(*local_variable_index);
         }
-        BytecodeInstruction::AaLoad {} => todo!(),
-        BytecodeInstruction::BaLoad {} => todo!(),
-        BytecodeInstruction::AaStore {} => todo!(),
-        BytecodeInstruction::BaStore {} => todo!(),
-        BytecodeInstruction::CaStore {} => todo!(),
-        BytecodeInstruction::SaStore {} => todo!(),
-        BytecodeInstruction::NewArray { .. } => todo!(),
-        BytecodeInstruction::ANewArray { .. } => todo!(),
+        BytecodeInstruction::AaLoad {} => w.write_u8(0x32),
+        BytecodeInstruction::BaLoad {} => w.write_u8(0x33),
+        BytecodeInstruction::AaStore {} => w.write_u8(0x53),
+        BytecodeInstruction::BaStore {} => w.write_u8(0x54),
+        BytecodeInstruction::CaStore {} => w.write_u8(0x55),
+        BytecodeInstruction::SaStore {} => w.write_u8(0x56),
+        BytecodeInstruction::NewArray { atype } => {
+            w.write_u8(0xbc);
+            w.write_u8(*atype as u8);
+        }
+        BytecodeInstruction::ANewArray {
+            constant_pool_index,
+        } => {
+            w.write_u8(0xbd);
+            w.write_u16(*constant_pool_index);
+        }
         BytecodeInstruction::AThrow {} => w.write_u8(0xbf),
         BytecodeInstruction::New {
             constant_pool_index,
@@ -939,7 +954,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(*count);
             w.write_u8(0x00);
         }
-        BytecodeInstruction::ArrayLength {} => todo!(),
+        BytecodeInstruction::ArrayLength {} => w.write_u8(0xbe),
         BytecodeInstruction::LCmp {} => w.write_u8(0x94),
         BytecodeInstruction::FCmpL {} => w.write_u8(0x95),
         BytecodeInstruction::FCmpG {} => w.write_u8(0x96),
@@ -1004,14 +1019,29 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0xa7);
             w.write_i16(*offset);
         }
-        BytecodeInstruction::TableSwitch { .. } => todo!(),
+        BytecodeInstruction::TableSwitch {
+            num_padding_bytes,
+            default,
+            low,
+            offsets,
+        } => {
+            w.write_u8(0xaa);
+            for _ in 0..*num_padding_bytes {
+                w.write_u8(0x00);
+            }
+            w.write_i32(*default);
+            w.write_i32(*low);
+            let high: i32 = (offsets.len() as i32) + low - 1;
+            w.write_i32(high);
+            w.write_i32_vec(offsets);
+        }
         BytecodeInstruction::LookupSwitch {
             num_padding_bytes,
             default,
             pairs,
         } => {
             w.write_u8(0xab);
-            for _ in 0u8..*num_padding_bytes {
+            for _ in 0..*num_padding_bytes {
                 w.write_u8(0x00);
             }
             w.write_i32(*default);
@@ -1027,8 +1057,17 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0xc0);
             w.write_u16(*constant_pool_index);
         }
-        BytecodeInstruction::Instanceof { .. } => todo!(),
-        BytecodeInstruction::IInc { .. } => todo!(),
+        BytecodeInstruction::Instanceof {
+            constant_pool_index,
+        } => {
+            w.write_u8(0xc1);
+            w.write_u16(*constant_pool_index);
+        }
+        BytecodeInstruction::IInc { index, constant } => {
+            w.write_u8(0x84);
+            w.write_u8(*index);
+            w.write_i8(*constant);
+        }
         BytecodeInstruction::I2L {} => w.write_u8(0x85),
         BytecodeInstruction::I2F {} => todo!(),
         BytecodeInstruction::I2D {} => todo!(),
@@ -1151,8 +1190,8 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         BytecodeInstruction::BaStore {} => 1,
         BytecodeInstruction::CaStore {} => 1,
         BytecodeInstruction::SaStore {} => 1,
-        BytecodeInstruction::NewArray { .. } => todo!(),
-        BytecodeInstruction::ANewArray { .. } => todo!(),
+        BytecodeInstruction::NewArray { .. } => 2,
+        BytecodeInstruction::ANewArray { .. } => 3,
         BytecodeInstruction::AThrow {} => 1,
         BytecodeInstruction::New { .. } => 3,
         BytecodeInstruction::BiPush { .. } => 2,
@@ -1174,7 +1213,7 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         BytecodeInstruction::InvokeVirtual { .. } => 3,
         BytecodeInstruction::InvokeDynamic { .. } => 5,
         BytecodeInstruction::InvokeInterface { .. } => 5,
-        BytecodeInstruction::ArrayLength {} => todo!(),
+        BytecodeInstruction::ArrayLength {} => 1,
         BytecodeInstruction::LCmp {} => 1,
         BytecodeInstruction::FCmpL {} => 1,
         BytecodeInstruction::FCmpG {} => 1,
@@ -1194,18 +1233,22 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         BytecodeInstruction::IfGe { .. } => 3,
         BytecodeInstruction::IfGt { .. } => 3,
         BytecodeInstruction::IfLe { .. } => 3,
-        BytecodeInstruction::IfNull { .. } => todo!(),
+        BytecodeInstruction::IfNull { .. } => 3,
         BytecodeInstruction::IfNonNull { .. } => 3,
         BytecodeInstruction::GoTo { .. } => 3,
-        BytecodeInstruction::TableSwitch { .. } => todo!(),
+        BytecodeInstruction::TableSwitch {
+            num_padding_bytes,
+            offsets,
+            ..
+        } => 1 + (*num_padding_bytes as u32) + 4 + 4 + 4 + 4 * (offsets.len() as u32),
         BytecodeInstruction::LookupSwitch {
             num_padding_bytes,
             pairs,
             ..
         } => 1 + (*num_padding_bytes as u32) + 4 + 4 + (2 * 4) * (pairs.len() as u32),
         BytecodeInstruction::CheckCast { .. } => 3,
-        BytecodeInstruction::Instanceof { .. } => todo!(),
-        BytecodeInstruction::IInc { .. } => todo!(),
+        BytecodeInstruction::Instanceof { .. } => 3,
+        BytecodeInstruction::IInc { .. } => 3,
         BytecodeInstruction::I2L {} => 1,
         BytecodeInstruction::I2F {} => 1,
         BytecodeInstruction::I2D {} => 1,
