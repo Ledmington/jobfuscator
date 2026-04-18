@@ -8,6 +8,11 @@ const SEMICOLON: char = ';';
 const COLON: char = ':';
 const FORWARD_SLASH: char = '/';
 const DOT: char = '.';
+const REFERENCE_START: char = 'L';
+const TYPE_VAR_START: char = 'T';
+const LEFT_SQUARE_BRACKET: char = '[';
+const LEFT_BRACKET: char = '(';
+const RIGHT_BRACKET: char = ')';
 
 fn consume_class_name(it: &mut Peekable<Chars>) -> String {
     let mut s = String::new();
@@ -23,16 +28,40 @@ fn consume_class_name(it: &mut Peekable<Chars>) -> String {
     s
 }
 
+/// Decodes a type variable declaration, for example `TX;`.
+fn decode_type_variable(it: &mut Peekable<Chars>) -> String {
+    expect(it, TYPE_VAR_START);
+    let mut s = String::new();
+    while let Some(&x) = it.peek() {
+        if x == SEMICOLON {
+            it.next();
+            return s;
+        }
+        it.next();
+        s.push(if x == FORWARD_SLASH { DOT } else { x });
+    }
+    panic!("Unterminated type variable: '{}'.", s);
+}
+
 fn decode_generic_arg(it: &mut Peekable<Chars>) -> String {
-    let ch = it.next().unwrap();
-
-    match ch {
-        // ONLY reference types or arrays allowed
-        'L' => decode_ref_type(it),
-
-        '[' => {
+    let ch = it
+        .peek()
+        .expect("Expected generic argument but found end of input.");
+    match *ch {
+        REFERENCE_START => decode_ref_type(it),
+        LEFT_SQUARE_BRACKET => {
+            it.next();
             let inner = decode_generic_arg(it);
             inner + "[]"
+        }
+        TYPE_VAR_START => decode_type_variable(it),
+        '*' => {
+            it.next();
+            "?".to_owned()
+        }
+        '+' => {
+            it.next();
+            "? extends ".to_owned() + &decode_generic_arg(it)
         }
 
         // forbid everything else inside generics
@@ -41,31 +70,60 @@ fn decode_generic_arg(it: &mut Peekable<Chars>) -> String {
 }
 
 fn decode_type_it(it: &mut Peekable<Chars>) -> String {
-    let ch = it.next().unwrap();
+    let ch = it
+        .peek()
+        .expect("Expected start of type but found end of input.");
+    match *ch {
+        'B' => {
+            it.next();
+            "byte".to_owned()
+        }
+        'C' => {
+            it.next();
+            "char".to_owned()
+        }
+        'D' => {
+            it.next();
+            "double".to_owned()
+        }
+        'F' => {
+            it.next();
+            "float".to_owned()
+        }
+        'I' => {
+            it.next();
+            "int".to_owned()
+        }
+        'J' => {
+            it.next();
+            "long".to_owned()
+        }
+        'S' => {
+            it.next();
+            "short".to_owned()
+        }
+        'Z' => {
+            it.next();
+            "boolean".to_owned()
+        }
+        'V' => {
+            it.next();
+            "void".to_owned()
+        }
 
-    match ch {
-        'B' => "byte".to_owned(),
-        'C' => "char".to_owned(),
-        'D' => "double".to_owned(),
-        'F' => "float".to_owned(),
-        'I' => "int".to_owned(),
-        'J' => "long".to_owned(),
-        'S' => "short".to_owned(),
-        'Z' => "boolean".to_owned(),
-        'V' => "void".to_owned(),
+        REFERENCE_START => decode_ref_type(it),
 
-        'L' => decode_ref_type(it),
-
-        '[' => {
+        LEFT_SQUARE_BRACKET => {
+            it.next();
             let inner = decode_type_it(it);
             inner + "[]"
         }
 
-        '(' => {
+        LEFT_BRACKET => {
+            it.next();
             let mut args = Vec::new();
-
             while let Some(&x) = it.peek() {
-                if x == ')' {
+                if x == RIGHT_BRACKET {
                     it.next();
                     break;
                 }
@@ -76,26 +134,15 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
             format!("{}({})", ret, args.join(", "))
         }
 
-        'T' => {
-            let mut s = String::new();
-            while let Some(&x) = it.peek() {
-                it.next();
-                if x == SEMICOLON {
-                    return s;
-                }
-                s.push(if x == FORWARD_SLASH { DOT } else { x });
-            }
-            panic!("Unterminated type variable.");
-        }
+        TYPE_VAR_START => decode_type_variable(it),
 
-        '*' => "?".to_owned(),
-        '+' => "? extends ".to_owned() + &decode_generic_arg(it),
-
-        _ => panic!("Unexpected '{}'", ch),
+        _ => panic!("Unexpected '{}' at the start of type.", ch),
     }
 }
 
 fn decode_ref_type(it: &mut Peekable<Chars>) -> String {
+    expect(it, REFERENCE_START);
+
     let mut s = consume_class_name(it);
 
     // generics
@@ -126,17 +173,25 @@ fn decode_ref_type(it: &mut Peekable<Chars>) -> String {
     s
 }
 
-/// Represents the type bounds of a generic type in a descriptor.
-/// For example: <X:Ljava/lang/String;:Ljava/io/Serializable;> which
-/// becomes '<X extends java.lang.String implements java.io.Serializable>'
+/// Describes the bounds of a generic type parameter in a JVM-style descriptor.
+///
+/// For example, the descriptor:
+/// `<X:Ljava/lang/String;:Ljava/io/Serializable;>`
+///
+/// corresponds to:
+/// `X extends java.lang.String implements java.io.Serializable`.
+///
+/// If no explicit superclass is provided, `java.lang.Object` is implied.
 struct GenericTypeBound {
-    /// The name of the generic type variable
+    /// Name of the generic type parameter (e.g. `X`).
     type_name: String,
 
-    /// The name of the super class. This can be empty, in which case it represents the implicit java.lang.Object
-    super_class_name: String,
+    /// Fully qualified name of the superclass.
+    ///
+    /// If empty, this implies `java.lang.Object`.
+    super_class_name: Option<String>,
 
-    /// The list of implemented interfaces
+    /// Fully qualified names of implemented interfaces.
     interfaces: Vec<String>,
 }
 
@@ -151,16 +206,18 @@ fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> 
 
         let mut s = String::new();
         while let Some(&x) = it.peek() {
-            it.next();
             if x == COLON {
+                it.next();
                 break;
             }
+
             s.push(x);
+            it.next();
         }
         let type_name = s;
 
         // optional class bound
-        let mut super_class_name: String = "".to_owned();
+        let mut super_class_name: Option<String> = None;
         if let Some(&x) = it.peek() {
             if x == COLON {
                 // empty class bound, this means that there is an implicit bound on java.lang.Object, but we can
@@ -168,18 +225,17 @@ fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> 
                 it.next();
             } else {
                 // actual class bound
-                super_class_name = decode_type_it(it);
+                super_class_name = Some(decode_type_it(it));
             }
         }
 
-        let mut interfaces: Vec<String> = Vec::new();
-
         // 0-N interface bounds
+        let mut interfaces: Vec<String> = Vec::new();
         while let Some(&x) = it.peek() {
             if x != COLON {
                 break;
             }
-            it.next();
+            it.next(); // consume ':'
             interfaces.push(decode_type_it(it));
         }
 
@@ -189,10 +245,10 @@ fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> 
             interfaces,
         });
     }
-    expect(it, END_GENERIC);
     generics
 }
 
+/// Checks if the next character in the iterator is the given one and consumes it.
 fn expect(it: &mut Peekable<Chars>, expected: char) {
     let x = it.next().unwrap();
     assert_eq!(expected, x, "Expected '{}' but was '{}'.", expected, x);
@@ -203,22 +259,20 @@ pub fn decode_type(descriptor: &str) -> String {
     let mut it = descriptor.chars().peekable();
 
     if descriptor.starts_with(START_GENERIC) {
-        let generic_mappings: Vec<GenericTypeBound> = parse_generic_type_bounds(&mut it);
+        let generic_type_bounds: Vec<GenericTypeBound> = parse_generic_type_bounds(&mut it);
         s.push(START_GENERIC);
         s.push_str(
-            &generic_mappings
+            &generic_type_bounds
                 .iter()
                 .map(|gtb| {
-                    format!(
-                        "{} extends {}{}",
-                        gtb.type_name,
-                        gtb.super_class_name,
-                        if gtb.interfaces.len() > 0 {
-                            " & ".to_owned() + &gtb.interfaces.join(" & ")
-                        } else {
-                            "".to_owned()
-                        }
-                    )
+                    let mut tmp: Vec<String> = Vec::new();
+                    if let Some(scn) = &gtb.super_class_name {
+                        tmp.push(scn.to_string());
+                    }
+                    for x in &gtb.interfaces {
+                        tmp.push(x.to_string());
+                    }
+                    format!("{} extends {}", gtb.type_name, tmp.join(" & "))
                 })
                 .collect::<Vec<String>>()
                 .join(", "),
@@ -283,107 +337,107 @@ mod tests {
     #[test]
     fn decode_signatures() {
         let cases = [
-            // ("V", "void"),
-            // ("Z", "boolean"),
-            // ("B", "byte"),
-            // ("S", "short"),
-            // ("I", "int"),
-            // ("J", "long"),
-            // ("F", "float"),
-            // ("D", "double"),
-            // ("C", "char"),
-            // //
-            // ("[B", "byte[]"),
-            // ("[Z", "boolean[]"),
-            // ("[S", "short[]"),
-            // ("[I", "int[]"),
-            // ("[J", "long[]"),
-            // ("[F", "float[]"),
-            // ("[D", "double[]"),
-            // ("[C", "char[]"),
-            // //
-            // ("[[B", "byte[][]"),
-            // ("[[Z", "boolean[][]"),
-            // ("[[S", "short[][]"),
-            // ("[[I", "int[][]"),
-            // ("[[J", "long[][]"),
-            // ("[[F", "float[][]"),
-            // ("[[D", "double[][]"),
-            // ("[[C", "char[][]"),
-            // //
-            // ("Ljava/lang/Object;", "java.lang.Object"),
-            // ("[Ljava/lang/String;", "java.lang.String[]"),
-            // (
-            //     "[[La/very/long/package/name/followed/by/another/much/longer/class/name/ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy;",
-            //     "a.very.long.package.name.followed.by.another.much.longer.class.name.ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy[][]",
-            // ),
-            // //
-            // (
-            //     "Ljava/util/List<Ljava/lang/String;>;",
-            //     "java.util.List<java.lang.String>",
-            // ),
-            // (
-            //     "Ljava/util/List<[Ljava/lang/String;>;",
-            //     "java.util.List<java.lang.String[]>",
-            // ),
-            // (
-            //     "Ljava/util/List<[[Ljava/lang/String;>;",
-            //     "java.util.List<java.lang.String[][]>",
-            // ),
-            // (
-            //     "Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;",
-            //     "java.util.Map<java.lang.String, java.lang.Integer>",
-            // ),
-            // (
-            //     "Lmy/personal/Class<Ljava/lang/String;[Ljava/lang/Integer;[[Ljava/lang/Long;>;",
-            //     "my.personal.Class<java.lang.String, java.lang.Integer[], java.lang.Long[][]>",
-            // ),
-            // (
-            //     "Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;",
-            //     "java.util.List<java.util.List<java.lang.String>>",
-            // ),
-            // (
-            //     "Ljava/util/List<Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;>;",
-            //     "java.util.List<java.util.List<java.util.List<java.lang.String>>>",
-            // ),
-            // (
-            //     "Ljava/util/Map<Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;Ljava/util/Map<Ljava/lang/Float;Ljava/lang/Double;>;>;",
-            //     "java.util.Map<java.util.Map<java.lang.String, java.lang.Integer>, java.util.Map<java.lang.Float, java.lang.Double>>",
-            // ),
-            // //
-            // ("()V", "void()"),
-            // ("()Ljava/lang/String;", "java.lang.String()"),
-            // ("(I)S", "short(int)"),
-            // ("(IFS)D", "double(int, float, short)"),
-            // (
-            //     "([ZI[CJ[[S)[[[C",
-            //     "char[][][](boolean[], int, char[], long, short[][])",
-            // ),
-            // (
-            //     "(Ljava/lang/Object;ILjava/lang/String;)Ljava/util/List;",
-            //     "java.util.List(java.lang.Object, int, java.lang.String)",
-            // ),
-            // (
-            //     "(ILjava/util/List<Ljava/lang/String;>;I)Ljava/util/List<Ljava/lang/String;>;",
-            //     "java.util.List<java.lang.String>(int, java.util.List<java.lang.String>, int)",
-            // ),
-            // // generic methods
-            // (
-            //     "<X:Ljava/lang/Object;>(Ljava/lang/String;TX;)TX;",
-            //     "<X extends java.lang.Object> X(java.lang.String, X)",
-            // ),
-            // (
-            //     "<K:Ljava/lang/Object;V:Ljava/lang/Integer;>Ljava/lang/String;",
-            //     "<K extends java.lang.Object, V extends java.lang.Integer> java.lang.String",
-            // ),
-            // (
-            //     "(Ljava.lang.String;)Ljava/util/Set<Ljava.util.List<*>;>;",
-            //     "java.util.Set<java.util.List<?>>(java.lang.String)",
-            // ),
-            // (
-            //     "(Ljava/util/Collection<+TX;>;)Z",
-            //     "boolean(java.util.Collection<? extends X>)",
-            // ),
+            ("V", "void"),
+            ("Z", "boolean"),
+            ("B", "byte"),
+            ("S", "short"),
+            ("I", "int"),
+            ("J", "long"),
+            ("F", "float"),
+            ("D", "double"),
+            ("C", "char"),
+            //
+            ("[B", "byte[]"),
+            ("[Z", "boolean[]"),
+            ("[S", "short[]"),
+            ("[I", "int[]"),
+            ("[J", "long[]"),
+            ("[F", "float[]"),
+            ("[D", "double[]"),
+            ("[C", "char[]"),
+            //
+            ("[[B", "byte[][]"),
+            ("[[Z", "boolean[][]"),
+            ("[[S", "short[][]"),
+            ("[[I", "int[][]"),
+            ("[[J", "long[][]"),
+            ("[[F", "float[][]"),
+            ("[[D", "double[][]"),
+            ("[[C", "char[][]"),
+            //
+            ("Ljava/lang/Object;", "java.lang.Object"),
+            ("[Ljava/lang/String;", "java.lang.String[]"),
+            (
+                "[[La/very/long/package/name/followed/by/another/much/longer/class/name/ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy;",
+                "a.very.long.package.name.followed.by.another.much.longer.class.name.ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy[][]",
+            ),
+            //
+            (
+                "Ljava/util/List<Ljava/lang/String;>;",
+                "java.util.List<java.lang.String>",
+            ),
+            (
+                "Ljava/util/List<[Ljava/lang/String;>;",
+                "java.util.List<java.lang.String[]>",
+            ),
+            (
+                "Ljava/util/List<[[Ljava/lang/String;>;",
+                "java.util.List<java.lang.String[][]>",
+            ),
+            (
+                "Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;",
+                "java.util.Map<java.lang.String, java.lang.Integer>",
+            ),
+            (
+                "Lmy/personal/Class<Ljava/lang/String;[Ljava/lang/Integer;[[Ljava/lang/Long;>;",
+                "my.personal.Class<java.lang.String, java.lang.Integer[], java.lang.Long[][]>",
+            ),
+            (
+                "Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;",
+                "java.util.List<java.util.List<java.lang.String>>",
+            ),
+            (
+                "Ljava/util/List<Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;>;",
+                "java.util.List<java.util.List<java.util.List<java.lang.String>>>",
+            ),
+            (
+                "Ljava/util/Map<Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;Ljava/util/Map<Ljava/lang/Float;Ljava/lang/Double;>;>;",
+                "java.util.Map<java.util.Map<java.lang.String, java.lang.Integer>, java.util.Map<java.lang.Float, java.lang.Double>>",
+            ),
+            //
+            ("()V", "void()"),
+            ("()Ljava/lang/String;", "java.lang.String()"),
+            ("(I)S", "short(int)"),
+            ("(IFS)D", "double(int, float, short)"),
+            (
+                "([ZI[CJ[[S)[[[C",
+                "char[][][](boolean[], int, char[], long, short[][])",
+            ),
+            (
+                "(Ljava/lang/Object;ILjava/lang/String;)Ljava/util/List;",
+                "java.util.List(java.lang.Object, int, java.lang.String)",
+            ),
+            (
+                "(ILjava/util/List<Ljava/lang/String;>;I)Ljava/util/List<Ljava/lang/String;>;",
+                "java.util.List<java.lang.String>(int, java.util.List<java.lang.String>, int)",
+            ),
+            // generic methods
+            (
+                "<X:Ljava/lang/Object;>(Ljava/lang/String;TX;)TX;",
+                "<X extends java.lang.Object> X(java.lang.String, X)",
+            ),
+            (
+                "<K:Ljava/lang/Object;V:Ljava/lang/Integer;>Ljava/lang/String;",
+                "<K extends java.lang.Object, V extends java.lang.Integer> java.lang.String",
+            ),
+            (
+                "(Ljava.lang.String;)Ljava/util/Set<Ljava.util.List<*>;>;",
+                "java.util.Set<java.util.List<?>>(java.lang.String)",
+            ),
+            (
+                "(Ljava/util/Collection<+TX;>;)Z",
+                "boolean(java.util.Collection<? extends X>)",
+            ),
             (
                 "<X::Ljava/io/Serializable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
                 "<X extends java.io.Serializable> java.util.Optional<X>(java.lang.Class<X>)",
