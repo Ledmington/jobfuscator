@@ -439,11 +439,22 @@ fn print_methods(lw: &mut LineWriter, cp: &ConstantPool, this_class: u16, method
         if is_static_block {
             // this is the 'static {}' block of the class
             lw.println("{};");
-        } else if is_constructor {
-            // this is a constructor of the class
-            lw.println(&parsed_descriptor);
         } else {
-            lw.println(&parsed_descriptor);
+            let first_bracket_index = parsed_descriptor.find('(').unwrap();
+            let return_type: String = parsed_descriptor[0..first_bracket_index].to_owned();
+            let arguments_string: String =
+                parsed_descriptor[first_bracket_index..parsed_descriptor.len()].to_owned();
+
+            if is_constructor {
+                // this is a constructor of the class
+                let this_class_name: String = cp.get_class_name(this_class).replace('/', ".");
+                lw.println(&format!("{}{};", this_class_name, arguments_string));
+            } else {
+                lw.println(&format!(
+                    "{} {}{};",
+                    return_type, method_name, arguments_string
+                ));
+            }
         }
 
         lw.indent(1);
@@ -1221,21 +1232,26 @@ fn get_number_of_arguments(cp: &ConstantPool, method: &MethodInfo) -> u8 {
         .collect();
 
     let mut args: u8 = 1;
-    let mut generics = 0;
-    for ch in arguments.chars() {
-        if ch == '<' {
-            generics += 1;
-        } else if ch == '>' {
-            generics -= 1;
-        } else if ch == ',' && generics == 0 {
-            args += 1;
+    if arguments == "()" {
+        args = 0;
+    } else {
+        let mut generics = 0;
+        for ch in arguments.chars() {
+            if ch == '<' {
+                generics += 1;
+            } else if ch == '>' {
+                generics -= 1;
+                if generics < 0 {
+                    panic!(
+                        "Invalid generics syntax in method descriptor: '{}'.",
+                        arguments
+                    );
+                }
+            } else if ch == ',' && generics == 0 {
+                args += 1;
+            }
         }
     }
-    assert_eq!(
-        0, generics,
-        "Invalid generics syntax in method descriptor: '{}'.",
-        arguments
-    );
 
     if !method.access_flags.contains(&MethodAccessFlag::Static) {
         // if the method is not static, there is the implicit 'this' argument
