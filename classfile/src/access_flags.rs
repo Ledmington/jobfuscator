@@ -48,9 +48,9 @@ impl ClassAccessFlags {
         let parts: Vec<&str> = [
             (ClassAccessFlag::Public, "public"),
             (ClassAccessFlag::Final, "final"),
-            (ClassAccessFlag::Super, "super"),
+            (ClassAccessFlag::Super, "class"),
             (ClassAccessFlag::Interface, "interface"),
-            (ClassAccessFlag::Abstract, "abstract"),
+            (ClassAccessFlag::Abstract, ""),
             (ClassAccessFlag::Synthetic, "synthetic"),
             (ClassAccessFlag::Annotation, "annotation"),
             (ClassAccessFlag::Enum, "enum"),
@@ -114,7 +114,15 @@ impl InnerClassAccessFlags {
             (InnerClassAccessFlag::Enum, ""),
         ]
         .iter()
-        .filter(|(flag, repr)| self.contains(*flag) && !repr.is_empty())
+        .filter(|(flag, repr)| {
+            self.contains(*flag)
+                && !repr.is_empty()
+                && 
+                // This weird condition is taken directly from the original javap source code:
+                // https://github.com/openjdk/jdk/blob/0dd0108c1a7b3658df536adbc2bd68fa5167539d/src/jdk.jdeps/share/classes/com/sun/tools/javap/AttributeWriter.java#L222
+                !(*flag == InnerClassAccessFlag::Abstract
+                    && self.contains(InnerClassAccessFlag::Interface))
+        })
         .map(|(_, repr)| *repr)
         .collect::<Vec<_>>()
         .join(" ")
