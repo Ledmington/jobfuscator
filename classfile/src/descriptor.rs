@@ -146,7 +146,7 @@ fn decode_ref_type(it: &mut Peekable<Chars>) -> String {
     let mut s = consume_class_name(it);
 
     // generics
-    if let Some(&START_GENERIC) = it.peek() {
+    if it.peek() == Some(&START_GENERIC) {
         it.next();
         s.push(START_GENERIC);
 
@@ -188,7 +188,7 @@ struct GenericTypeBound {
 
     /// Fully qualified name of the superclass.
     ///
-    /// If empty, this implies `java.lang.Object`.
+    /// If None, this implies `java.lang.Object`.
     super_class_name: Option<String>,
 
     /// Fully qualified names of implemented interfaces.
@@ -250,7 +250,9 @@ fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> 
 
 /// Checks if the next character in the iterator is the given one and consumes it.
 fn expect(it: &mut Peekable<Chars>, expected: char) {
-    let x = it.next().unwrap();
+    let x = it
+        .next()
+        .expect(&format!("Expected '{}' but found end of input.", expected));
     assert_eq!(expected, x, "Expected '{}' but was '{}'.", expected, x);
 }
 
@@ -265,12 +267,13 @@ pub fn decode_type(descriptor: &str) -> String {
             &generic_type_bounds
                 .iter()
                 .map(|gtb| {
+                    assert!(gtb.super_class_name.is_some() || gtb.interfaces.len() > 0);
                     let mut tmp: Vec<String> = Vec::new();
                     if let Some(scn) = &gtb.super_class_name {
-                        tmp.push(scn.to_string());
+                        tmp.push(scn.clone());
                     }
                     for x in &gtb.interfaces {
-                        tmp.push(x.to_string());
+                        tmp.push(x.clone());
                     }
                     format!("{} extends {}", gtb.type_name, tmp.join(" & "))
                 })
@@ -281,13 +284,14 @@ pub fn decode_type(descriptor: &str) -> String {
         s.push(' ');
     }
 
-    while let Some(&_) = it.peek() {
+    while it.peek().is_some() {
         s.push_str(&decode_type_it(&mut it));
     }
 
     s
 }
 
+/// From the given iterator, this function extracts the full class name included with generic declarations from the raw descriptor.
 fn split_class_name(it: &mut Peekable<Chars>) -> String {
     let mut s = String::new();
     let mut n_generics = 0;
@@ -320,7 +324,7 @@ pub fn decode_class_signature(class_signature: &str) -> ClassSignature {
     let super_class_name = decode_type(&split_class_name(&mut it));
     let mut interfaces: Vec<String> = Vec::new();
 
-    while let Some(&_) = it.peek() {
+    while it.peek().is_some() {
         interfaces.push(decode_type(&split_class_name(&mut it)));
     }
 
@@ -333,212 +337,178 @@ pub fn decode_class_signature(class_signature: &str) -> ClassSignature {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn decode_signatures() {
-        let cases = [
-            ("V", "void"),
-            ("Z", "boolean"),
-            ("B", "byte"),
-            ("S", "short"),
-            ("I", "int"),
-            ("J", "long"),
-            ("F", "float"),
-            ("D", "double"),
-            ("C", "char"),
-            //
-            ("[B", "byte[]"),
-            ("[Z", "boolean[]"),
-            ("[S", "short[]"),
-            ("[I", "int[]"),
-            ("[J", "long[]"),
-            ("[F", "float[]"),
-            ("[D", "double[]"),
-            ("[C", "char[]"),
-            //
-            ("[[B", "byte[][]"),
-            ("[[Z", "boolean[][]"),
-            ("[[S", "short[][]"),
-            ("[[I", "int[][]"),
-            ("[[J", "long[][]"),
-            ("[[F", "float[][]"),
-            ("[[D", "double[][]"),
-            ("[[C", "char[][]"),
-            //
-            ("Ljava/lang/Object;", "java.lang.Object"),
-            ("[Ljava/lang/String;", "java.lang.String[]"),
-            (
-                "[[La/very/long/package/name/followed/by/another/much/longer/class/name/ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy;",
-                "a.very.long.package.name.followed.by.another.much.longer.class.name.ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy[][]",
-            ),
-            //
-            (
-                "Ljava/util/List<Ljava/lang/String;>;",
-                "java.util.List<java.lang.String>",
-            ),
-            (
-                "Ljava/util/List<[Ljava/lang/String;>;",
-                "java.util.List<java.lang.String[]>",
-            ),
-            (
-                "Ljava/util/List<[[Ljava/lang/String;>;",
-                "java.util.List<java.lang.String[][]>",
-            ),
-            (
-                "Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;",
-                "java.util.Map<java.lang.String, java.lang.Integer>",
-            ),
-            (
-                "Lmy/personal/Class<Ljava/lang/String;[Ljava/lang/Integer;[[Ljava/lang/Long;>;",
-                "my.personal.Class<java.lang.String, java.lang.Integer[], java.lang.Long[][]>",
-            ),
-            (
-                "Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;",
-                "java.util.List<java.util.List<java.lang.String>>",
-            ),
-            (
-                "Ljava/util/List<Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;>;",
-                "java.util.List<java.util.List<java.util.List<java.lang.String>>>",
-            ),
-            (
-                "Ljava/util/Map<Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;Ljava/util/Map<Ljava/lang/Float;Ljava/lang/Double;>;>;",
-                "java.util.Map<java.util.Map<java.lang.String, java.lang.Integer>, java.util.Map<java.lang.Float, java.lang.Double>>",
-            ),
-            //
-            ("()V", "void()"),
-            ("()Ljava/lang/String;", "java.lang.String()"),
-            ("(I)S", "short(int)"),
-            ("(IFS)D", "double(int, float, short)"),
-            (
-                "([ZI[CJ[[S)[[[C",
-                "char[][][](boolean[], int, char[], long, short[][])",
-            ),
-            (
-                "(Ljava/lang/Object;ILjava/lang/String;)Ljava/util/List;",
-                "java.util.List(java.lang.Object, int, java.lang.String)",
-            ),
-            (
-                "(ILjava/util/List<Ljava/lang/String;>;I)Ljava/util/List<Ljava/lang/String;>;",
-                "java.util.List<java.lang.String>(int, java.util.List<java.lang.String>, int)",
-            ),
-            // generic methods
-            (
-                "<X:Ljava/lang/Object;>(Ljava/lang/String;TX;)TX;",
-                "<X extends java.lang.Object> X(java.lang.String, X)",
-            ),
-            (
-                "<K:Ljava/lang/Object;V:Ljava/lang/Integer;>Ljava/lang/String;",
-                "<K extends java.lang.Object, V extends java.lang.Integer> java.lang.String",
-            ),
-            (
-                "(Ljava.lang.String;)Ljava/util/Set<Ljava.util.List<*>;>;",
-                "java.util.Set<java.util.List<?>>(java.lang.String)",
-            ),
-            (
-                "(Ljava/util/Collection<+TX;>;)Z",
-                "boolean(java.util.Collection<? extends X>)",
-            ),
-            (
-                "<X::Ljava/io/Serializable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
-                "<X extends java.io.Serializable> java.util.Optional<X>(java.lang.Class<X>)",
-            ),
-            (
-                "<X::Ljava/io/Serializable;:Ljava/lang/Comparable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
-                "<X extends java.io.Serializable & java.lang.Comparable> java.util.Optional<X>(java.lang.Class<X>)",
-            ),
-            (
-                "<X:Ljava/lang/Integer;:Ljava/io/Serializable;:Ljava/lang/Comparable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
-                "<X extends java.lang.Integer & java.io.Serializable & java.lang.Comparable> java.util.Optional<X>(java.lang.Class<X>)",
-            ),
-        ];
-
-        for (input, expected) in cases {
-            let actual = decode_type(input);
-            assert_eq!(
-                expected, actual,
-                "Expected '{}' to be decoded into '{}' but was '{}'.",
-                input, expected, actual
-            );
-        }
+    #[rstest]
+    #[case("V", "void")]
+    #[case("Z", "boolean")]
+    #[case("B", "byte")]
+    #[case("S", "short")]
+    #[case("I", "int")]
+    #[case("J", "long")]
+    #[case("F", "float")]
+    #[case("D", "double")]
+    #[case("C", "char")]
+    // single-dimensional primitive arrays
+    #[case("[B", "byte[]")]
+    #[case("[Z", "boolean[]")]
+    #[case("[S", "short[]")]
+    #[case("[I", "int[]")]
+    #[case("[J", "long[]")]
+    #[case("[F", "float[]")]
+    #[case("[D", "double[]")]
+    #[case("[C", "char[]")]
+    // two-dimensional primitive arrays
+    #[case("[[B", "byte[][]")]
+    #[case("[[Z", "boolean[][]")]
+    #[case("[[S", "short[][]")]
+    #[case("[[I", "int[][]")]
+    #[case("[[J", "long[][]")]
+    #[case("[[F", "float[][]")]
+    #[case("[[D", "double[][]")]
+    #[case("[[C", "char[][]")]
+    // object types
+    #[case("Ljava/lang/Object;", "java.lang.Object")]
+    #[case("[Ljava/lang/String;", "java.lang.String[]")]
+    #[case(
+        "[[La/very/long/package/name/followed/by/another/much/longer/class/name/ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy;",
+        "a.very.long.package.name.followed.by.another.much.longer.class.name.ProjectContractChargingPeriodProjectAccountReferenceVMFactoryBuilderStrategy[][]"
+    )]
+    // generics
+    #[case(
+        "Ljava/util/List<Ljava/lang/String;>;",
+        "java.util.List<java.lang.String>"
+    )]
+    #[case(
+        "Ljava/util/List<[Ljava/lang/String;>;",
+        "java.util.List<java.lang.String[]>"
+    )]
+    #[case(
+        "Ljava/util/List<[[Ljava/lang/String;>;",
+        "java.util.List<java.lang.String[][]>"
+    )]
+    #[case(
+        "Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;",
+        "java.util.Map<java.lang.String, java.lang.Integer>"
+    )]
+    #[case(
+        "Lmy/personal/Class<Ljava/lang/String;[Ljava/lang/Integer;[[Ljava/lang/Long;>;",
+        "my.personal.Class<java.lang.String, java.lang.Integer[], java.lang.Long[][]>"
+    )]
+    #[case(
+        "Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;",
+        "java.util.List<java.util.List<java.lang.String>>"
+    )]
+    #[case(
+        "Ljava/util/List<Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;>;",
+        "java.util.List<java.util.List<java.util.List<java.lang.String>>>"
+    )]
+    #[case(
+        "Ljava/util/Map<Ljava/util/Map<Ljava/lang/String;Ljava/lang/Integer;>;Ljava/util/Map<Ljava/lang/Float;Ljava/lang/Double;>;>;",
+        "java.util.Map<java.util.Map<java.lang.String, java.lang.Integer>, java.util.Map<java.lang.Float, java.lang.Double>>"
+    )]
+    // method signatures
+    #[case("()V", "void()")]
+    #[case("()Ljava/lang/String;", "java.lang.String()")]
+    #[case("(I)S", "short(int)")]
+    #[case("(IFS)D", "double(int, float, short)")]
+    #[case(
+        "([ZI[CJ[[S)[[[C",
+        "char[][][](boolean[], int, char[], long, short[][])"
+    )]
+    #[case(
+        "(Ljava/lang/Object;ILjava/lang/String;)Ljava/util/List;",
+        "java.util.List(java.lang.Object, int, java.lang.String)"
+    )]
+    #[case(
+        "(ILjava/util/List<Ljava/lang/String;>;I)Ljava/util/List<Ljava/lang/String;>;",
+        "java.util.List<java.lang.String>(int, java.util.List<java.lang.String>, int)"
+    )]
+    // generic methods
+    #[case(
+        "<X:Ljava/lang/Object;>(Ljava/lang/String;TX;)TX;",
+        "<X extends java.lang.Object> X(java.lang.String, X)"
+    )]
+    #[case(
+        "<K:Ljava/lang/Object;V:Ljava/lang/Integer;>Ljava/lang/String;",
+        "<K extends java.lang.Object, V extends java.lang.Integer> java.lang.String"
+    )]
+    #[case(
+        "(Ljava.lang.String;)Ljava/util/Set<Ljava.util.List<*>;>;",
+        "java.util.Set<java.util.List<?>>(java.lang.String)"
+    )]
+    #[case(
+        "(Ljava/util/Collection<+TX;>;)Z",
+        "boolean(java.util.Collection<? extends X>)"
+    )]
+    #[case(
+        "<X::Ljava/io/Serializable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
+        "<X extends java.io.Serializable> java.util.Optional<X>(java.lang.Class<X>)"
+    )]
+    #[case(
+        "<X::Ljava/io/Serializable;:Ljava/lang/Comparable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
+        "<X extends java.io.Serializable & java.lang.Comparable> java.util.Optional<X>(java.lang.Class<X>)"
+    )]
+    #[case(
+        "<X:Ljava/lang/Integer;:Ljava/io/Serializable;:Ljava/lang/Comparable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",
+        "<X extends java.lang.Integer & java.io.Serializable & java.lang.Comparable> java.util.Optional<X>(java.lang.Class<X>)"
+    )]
+    fn decode_signatures(#[case] input: &str, #[case] expected: &str) {
+        assert_eq!(expected, decode_type(input));
     }
 
-    #[test]
-    fn invalid_parsing() {
-        let cases = [
-            "Q",
-            "[",
-            "[]",
-            "[I]",
-            "Ljava/lang/String",
-            "java.lang.String",
-            "I<Ljava/lang/String;>",
-            "Ljava/util/List<I>;",
-            "Ljava/util/List<Ljava/lang/String>;",
-        ];
-
-        for input in cases {
-            // This exchanging of hooks is to catch any panic/unwind that happens and avoid printing anything on stdout unless there was not a panic.
-            let default_hook = std::panic::take_hook();
-            std::panic::set_hook(Box::new(|_| {}));
-            let result =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode_type(input)));
-            std::panic::set_hook(default_hook);
-            assert!(
-                result.is_err(),
-                "Parsing of '{}' should have panicked but did not.",
-                input
-            );
-        }
+    #[rstest]
+    #[case("Q")]
+    #[case("[")]
+    #[case("[]")]
+    #[case("[I]")]
+    #[case("Ljava/lang/String")]
+    #[case("java.lang.String")]
+    #[case("I<Ljava/lang/String;>")]
+    #[case("Ljava/util/List<I>;")]
+    #[case("Ljava/util/List<Ljava/lang/String>;")]
+    #[should_panic]
+    fn invalid_parsing(#[case] input: &str) {
+        decode_type(input);
     }
 
-    // #[test]
-    // fn decode_class_signatures() {
-    //     let cases = [
-    //         (
-    //             "Ljava/lang/Enum<Ljava/lang/String;>;",
-    //             ClassSignature {
-    //                 super_class_name: "java.lang.Enum<java.lang.String>".to_owned(),
-    //                 interfaces: Vec::new(),
-    //             },
-    //         ),
-    //         (
-    //             "Ljava/lang/Object;Ljava/util/function/Supplier<Ljava/lang/String;>;",
-    //             ClassSignature {
-    //                 super_class_name: "java.lang.Object".to_owned(),
-    //                 interfaces: vec!["java.util.function.Supplier<java.lang.String>".to_owned()],
-    //             },
-    //         ),
-    //         (
-    //             "<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/stream/BaseStream<TT;Ljava/util/stream/Stream<TT;>;>;",
-    //             ClassSignature {
-    //                 super_class_name: "java.util.stream.BaseStream<T, java.util.stream.Stream<T>>"
-    //                     .to_owned(),
-    //                 interfaces: Vec::new(),
-    //             },
-    //         ),
-    //         (
-    //             "<K:Ljava/lang/Object;V:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/Map<TK;TV;>;",
-    //             ClassSignature {
-    //                 super_class_name: "java.util.Object".to_owned(),
-    //                 interfaces: vec!["java.util.map<K, V>".to_owned()],
-    //             },
-    //         ),
-    //         (
-    //             "<E_IN:Ljava/lang/Object;E_OUT:Ljava/lang/Object;S::Ljava/util/stream/BaseStream<TE_OUT;TS;>;>Ljava/util/stream/PipelineHelper<TE_OUT;>;Ljava/util/stream/BaseStream<TE_OUT;TS;>;",
-    //             ClassSignature {
-    //                 super_class_name: "java.util.stream.PipelineHelper<E_OUT>".to_owned(),
-    //                 interfaces: vec!["java.util.stream.BaseStream<E_OUT, S>".to_owned()],
-    //             },
-    //         ),
-    //     ];
-
-    //     for (input, expected) in cases {
-    //         let actual = decode_class_signature(input);
-    //         assert_eq!(
-    //             expected, actual,
-    //             "Expected class signature '{}' to be decoded into '{:?}' but was '{:?}'.",
-    //             input, expected, actual
-    //         );
-    //     }
-    // }
+    #[rstest]
+    #[case(
+        "Ljava/lang/Enum<Ljava/lang/String;>;",
+        ClassSignature {
+            super_class_name: "java.lang.Enum<java.lang.String>".to_owned(),
+            interfaces: Vec::new(),
+        }
+    )]
+    #[case(
+        "Ljava/lang/Object;Ljava/util/function/Supplier<Ljava/lang/String;>;",
+        ClassSignature {
+            super_class_name: "java.lang.Object".to_owned(),
+            interfaces: vec!["java.util.function.Supplier<java.lang.String>".to_owned()],
+        }
+    )]
+    #[case(
+        "<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/stream/BaseStream<TT;Ljava/util/stream/Stream<TT;>;>;",
+        ClassSignature {
+            super_class_name: "java.util.stream.BaseStream<T, java.util.stream.Stream<T>>".to_owned(),
+            interfaces: Vec::new(),
+        }
+    )]
+    #[case(
+        "<K:Ljava/lang/Object;V:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/Map<TK;TV;>;",
+        ClassSignature {
+            super_class_name: "java.util.Object".to_owned(),
+            interfaces: vec!["java.util.map<K, V>".to_owned()],
+        }
+    )]
+    #[case(
+        "<E_IN:Ljava/lang/Object;E_OUT:Ljava/lang/Object;S::Ljava/util/stream/BaseStream<TE_OUT;TS;>;>Ljava/util/stream/PipelineHelper<TE_OUT;>;Ljava/util/stream/BaseStream<TE_OUT;TS;>;",
+        ClassSignature {
+            super_class_name: "java.util.stream.PipelineHelper<E_OUT>".to_owned(),
+            interfaces: vec!["java.util.stream.BaseStream<E_OUT, S>".to_owned()],
+        }
+    )]
+    fn decode_class_signatures(#[case] input: &str, #[case] expected: ClassSignature) {
+        assert_eq!(expected, decode_class_signature(input));
+    }
 }
