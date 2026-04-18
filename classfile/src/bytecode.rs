@@ -891,14 +891,14 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0x11);
             w.write_u16(*immediate);
         }
-        BytecodeInstruction::Pop {} => todo!(),
-        BytecodeInstruction::Pop2 {} => todo!(),
+        BytecodeInstruction::Pop {} => w.write_u8(0x57),
+        BytecodeInstruction::Pop2 {} => w.write_u8(0x58),
         BytecodeInstruction::Return {} => w.write_u8(0xb1),
         BytecodeInstruction::IReturn {} => w.write_u8(0xac),
         BytecodeInstruction::LReturn {} => w.write_u8(0xad),
         BytecodeInstruction::FReturn {} => w.write_u8(0xae),
         BytecodeInstruction::DReturn {} => w.write_u8(0xaf),
-        BytecodeInstruction::AReturn {} => todo!(),
+        BytecodeInstruction::AReturn {} => w.write_u8(0xb0),
         BytecodeInstruction::GetStatic { field_ref_index } => {
             w.write_u8(0xb2);
             w.write_u16(*field_ref_index);
@@ -922,8 +922,23 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0xb6);
             w.write_u16(*method_ref_index);
         }
-        BytecodeInstruction::InvokeDynamic { .. } => todo!(),
-        BytecodeInstruction::InvokeInterface { .. } => todo!(),
+        BytecodeInstruction::InvokeDynamic {
+            constant_pool_index,
+        } => {
+            w.write_u8(0xba);
+            w.write_u16(*constant_pool_index);
+            w.write_u8(0x00);
+            w.write_u8(0x00);
+        }
+        BytecodeInstruction::InvokeInterface {
+            constant_pool_index,
+            count,
+        } => {
+            w.write_u8(0xb9);
+            w.write_u16(*constant_pool_index);
+            w.write_u8(*count);
+            w.write_u8(0x00);
+        }
         BytecodeInstruction::ArrayLength {} => todo!(),
         BytecodeInstruction::LCmp {} => w.write_u8(0x94),
         BytecodeInstruction::FCmpL {} => w.write_u8(0x95),
@@ -981,7 +996,10 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_i16(*offset);
         }
         BytecodeInstruction::IfNull { .. } => todo!(),
-        BytecodeInstruction::IfNonNull { .. } => todo!(),
+        BytecodeInstruction::IfNonNull { offset } => {
+            w.write_u8(0xc7);
+            w.write_i16(*offset);
+        }
         BytecodeInstruction::GoTo { offset } => {
             w.write_u8(0xa7);
             w.write_i16(*offset);
@@ -1003,7 +1021,12 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
                 w.write_i32(pair.offset);
             }
         }
-        BytecodeInstruction::CheckCast { .. } => todo!(),
+        BytecodeInstruction::CheckCast {
+            constant_pool_index,
+        } => {
+            w.write_u8(0xc0);
+            w.write_u16(*constant_pool_index);
+        }
         BytecodeInstruction::Instanceof { .. } => todo!(),
         BytecodeInstruction::IInc { .. } => todo!(),
         BytecodeInstruction::I2L {} => w.write_u8(0x85),
@@ -1060,9 +1083,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
     }
 }
 
-/**
- * Returns the number of bytes required to fully encode (opcode and padding included) the given instruction.
- */
+/// Returns the number of bytes required to fully encode (opcode and padding included) the given instruction.
 pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
     match instruction {
         BytecodeInstruction::Dup {} => 1,
@@ -1151,8 +1172,8 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         BytecodeInstruction::InvokeSpecial { .. } => 3,
         BytecodeInstruction::InvokeStatic { .. } => 3,
         BytecodeInstruction::InvokeVirtual { .. } => 3,
-        BytecodeInstruction::InvokeDynamic { .. } => todo!(),
-        BytecodeInstruction::InvokeInterface { .. } => todo!(),
+        BytecodeInstruction::InvokeDynamic { .. } => 5,
+        BytecodeInstruction::InvokeInterface { .. } => 5,
         BytecodeInstruction::ArrayLength {} => todo!(),
         BytecodeInstruction::LCmp {} => 1,
         BytecodeInstruction::FCmpL {} => 1,
@@ -1174,7 +1195,7 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         BytecodeInstruction::IfGt { .. } => 3,
         BytecodeInstruction::IfLe { .. } => 3,
         BytecodeInstruction::IfNull { .. } => todo!(),
-        BytecodeInstruction::IfNonNull { .. } => todo!(),
+        BytecodeInstruction::IfNonNull { .. } => 3,
         BytecodeInstruction::GoTo { .. } => 3,
         BytecodeInstruction::TableSwitch { .. } => todo!(),
         BytecodeInstruction::LookupSwitch {
@@ -1182,7 +1203,7 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
             pairs,
             ..
         } => 1 + (*num_padding_bytes as u32) + 4 + 4 + (2 * 4) * (pairs.len() as u32),
-        BytecodeInstruction::CheckCast { .. } => todo!(),
+        BytecodeInstruction::CheckCast { .. } => 3,
         BytecodeInstruction::Instanceof { .. } => todo!(),
         BytecodeInstruction::IInc { .. } => todo!(),
         BytecodeInstruction::I2L {} => 1,
