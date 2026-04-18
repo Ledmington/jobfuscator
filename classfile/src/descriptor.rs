@@ -14,33 +14,31 @@ const LEFT_SQUARE_BRACKET: char = '[';
 const LEFT_BRACKET: char = '(';
 const RIGHT_BRACKET: char = ')';
 
-fn consume_class_name(it: &mut Peekable<Chars>) -> String {
+fn collect_until(it: &mut Peekable<Chars>, stop: impl Fn(char) -> bool) -> String {
     let mut s = String::new();
-
     while let Some(&x) = it.peek() {
-        if x == START_GENERIC || x == SEMICOLON {
+        if stop(x) {
             break;
         }
         it.next();
         s.push(if x == FORWARD_SLASH { DOT } else { x });
     }
-
     s
+}
+
+fn consume_class_name(it: &mut Peekable<Chars>) -> String {
+    collect_until(it, |x| x == START_GENERIC || x == SEMICOLON)
 }
 
 /// Decodes a type variable declaration, for example `TX;`.
 fn decode_type_variable(it: &mut Peekable<Chars>) -> String {
     expect(it, TYPE_VAR_START);
-    let mut s = String::new();
-    while let Some(&x) = it.peek() {
-        if x == SEMICOLON {
-            it.next();
-            return s;
-        }
-        it.next();
-        s.push(if x == FORWARD_SLASH { DOT } else { x });
+    let name = collect_until(it, |x| x == SEMICOLON);
+    if name.is_empty() {
+        panic!("Unterminated type variable.");
     }
-    panic!("Unterminated type variable: '{}'.", s);
+    expect(it, SEMICOLON);
+    name
 }
 
 fn decode_generic_arg(it: &mut Peekable<Chars>) -> String {
@@ -186,13 +184,9 @@ struct GenericTypeBound {
     /// Name of the generic type parameter (e.g. `X`).
     type_name: String,
 
-    /// Fully qualified name of the superclass.
-    ///
-    /// If None, this implies `java.lang.Object`.
-    super_class_name: Option<String>,
-
-    /// Fully qualified names of implemented interfaces.
-    interfaces: Vec<String>,
+    /// Fully qualified names of superclass and interfaces.
+    /// The first entry is the superclass, if present.
+    type_bounds: Vec<String>,
 }
 
 fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> {
@@ -204,43 +198,33 @@ fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> 
             break;
         }
 
-        let mut s = String::new();
-        while let Some(&x) = it.peek() {
-            if x == COLON {
-                it.next();
-                break;
-            }
+        let type_name = collect_until(it, |x| x == COLON);
+        expect(it, COLON);
 
-            s.push(x);
-            it.next();
-        }
-        let type_name = s;
+        let mut type_bounds: Vec<String> = Vec::new();
 
         // optional class bound
-        let mut super_class_name: Option<String> = None;
         if let Some(&x) = it.peek() {
             if x == COLON {
                 // empty class bound — do NOT consume, the interface loop will handle it
             } else {
                 // actual class bound
-                super_class_name = Some(decode_type_it(it));
+                type_bounds.push(decode_type_it(it));
             }
         }
 
         // 0-N interface bounds
-        let mut interfaces: Vec<String> = Vec::new();
         while let Some(&x) = it.peek() {
             if x != COLON {
                 break;
             }
             it.next(); // consume ':'
-            interfaces.push(decode_type_it(it));
+            type_bounds.push(decode_type_it(it));
         }
 
         generics.push(GenericTypeBound {
             type_name,
-            super_class_name,
-            interfaces,
+            type_bounds,
         });
     }
     generics
@@ -250,8 +234,21 @@ fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> 
 fn expect(it: &mut Peekable<Chars>, expected: char) {
     let x = it
         .next()
-        .expect(&format!("Expected '{}' but found end of input.", expected));
+        .unwrap_or_else(|| panic!("Expected '{}' but found end of input.", expected));
     assert_eq!(expected, x, "Expected '{}' but was '{}'.", expected, x);
+}
+
+fn format_generic_bound(gtb: &GenericTypeBound) -> String {
+    assert!(!gtb.type_bounds.is_empty());
+    format!(
+        "{} extends {}",
+        gtb.type_name,
+        gtb.type_bounds
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join(" & ")
+    )
 }
 
 pub fn decode_type(descriptor: &str) -> String {
@@ -264,17 +261,7 @@ pub fn decode_type(descriptor: &str) -> String {
         s.push_str(
             &generic_type_bounds
                 .iter()
-                .map(|gtb| {
-                    assert!(gtb.super_class_name.is_some() || gtb.interfaces.len() > 0);
-                    let mut tmp: Vec<String> = Vec::new();
-                    if let Some(scn) = &gtb.super_class_name {
-                        tmp.push(scn.clone());
-                    }
-                    for x in &gtb.interfaces {
-                        tmp.push(x.clone());
-                    }
-                    format!("{} extends {}", gtb.type_name, tmp.join(" & "))
-                })
+                .map(format_generic_bound)
                 .collect::<Vec<String>>()
                 .join(", "),
         );
@@ -293,20 +280,19 @@ pub fn decode_type(descriptor: &str) -> String {
 /// For example, `Ljava/util/List<Ljava/lang/String;>;`.
 fn split_class_name(it: &mut Peekable<Chars>) -> String {
     let mut s = String::new();
-    let mut n_generics = 0;
+    let mut depth: usize = 0;
     while let Some(&x) = it.peek() {
         it.next();
         s.push(x);
-
-        if x == SEMICOLON && n_generics == 0 {
-            break;
-        } else if x == START_GENERIC {
-            n_generics += 1;
-        } else if x == END_GENERIC {
-            n_generics -= 1;
-            if n_generics < 0 {
-                panic!("Unexpected '{}' in class name.", END_GENERIC);
+        match x {
+            SEMICOLON if depth == 0 => break,
+            START_GENERIC => depth += 1,
+            END_GENERIC => {
+                depth = depth
+                    .checked_sub(1)
+                    .unwrap_or_else(|| panic!("Unexpected '{}' in class name.", END_GENERIC))
             }
+            _ => {}
         }
     }
     s
