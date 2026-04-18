@@ -117,7 +117,7 @@ impl InnerClassAccessFlags {
         .filter(|(flag, repr)| {
             self.contains(*flag)
                 && !repr.is_empty()
-                && 
+                &&
                 // This weird condition is taken directly from the original javap source code:
                 // https://github.com/openjdk/jdk/blob/0dd0108c1a7b3658df536adbc2bd68fa5167539d/src/jdk.jdeps/share/classes/com/sun/tools/javap/AttributeWriter.java#L222
                 !(*flag == InnerClassAccessFlag::Abstract
