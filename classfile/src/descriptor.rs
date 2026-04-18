@@ -220,9 +220,7 @@ fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> 
         let mut super_class_name: Option<String> = None;
         if let Some(&x) = it.peek() {
             if x == COLON {
-                // empty class bound, this means that there is an implicit bound on java.lang.Object, but we can
-                // skip it
-                it.next();
+                // empty class bound — do NOT consume, the interface loop will handle it
             } else {
                 // actual class bound
                 super_class_name = Some(decode_type_it(it));
@@ -292,6 +290,7 @@ pub fn decode_type(descriptor: &str) -> String {
 }
 
 /// From the given iterator, this function extracts the full class name included with generic declarations from the raw descriptor.
+/// For example, `Ljava/util/List<Ljava/lang/String;>;`.
 fn split_class_name(it: &mut Peekable<Chars>) -> String {
     let mut s = String::new();
     let mut n_generics = 0;
@@ -321,6 +320,11 @@ pub struct ClassSignature {
 
 pub fn decode_class_signature(class_signature: &str) -> ClassSignature {
     let mut it = class_signature.chars().peekable();
+
+    if it.peek() == Some(&START_GENERIC) {
+        parse_generic_type_bounds(&mut it);
+    }
+
     let super_class_name = decode_type(&split_class_name(&mut it));
     let mut interfaces: Vec<String> = Vec::new();
 
@@ -454,7 +458,12 @@ mod tests {
         "<X extends java.lang.Integer & java.io.Serializable & java.lang.Comparable> java.util.Optional<X>(java.lang.Class<X>)"
     )]
     fn decode_signatures(#[case] input: &str, #[case] expected: &str) {
-        assert_eq!(expected, decode_type(input));
+        let actual = decode_type(input);
+        assert_eq!(
+            expected, actual,
+            "Expected '{}' to be decoded into '{}' but was '{}'.",
+            input, expected, actual
+        );
     }
 
     #[rstest]
@@ -467,9 +476,13 @@ mod tests {
     #[case("I<Ljava/lang/String;>")]
     #[case("Ljava/util/List<I>;")]
     #[case("Ljava/util/List<Ljava/lang/String>;")]
-    #[should_panic]
     fn invalid_parsing(#[case] input: &str) {
-        decode_type(input);
+        let result = std::panic::catch_unwind(|| decode_type(input));
+        assert!(
+            result.is_err(),
+            "Parsing of '{}' should have panicked but did not.",
+            input
+        );
     }
 
     #[rstest]
@@ -490,15 +503,15 @@ mod tests {
     #[case(
         "<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/stream/BaseStream<TT;Ljava/util/stream/Stream<TT;>;>;",
         ClassSignature {
-            super_class_name: "java.util.stream.BaseStream<T, java.util.stream.Stream<T>>".to_owned(),
-            interfaces: Vec::new(),
+            super_class_name: "java.lang.Object".to_owned(),
+            interfaces: vec!["java.util.stream.BaseStream<T, java.util.stream.Stream<T>>".to_owned()],
         }
     )]
     #[case(
         "<K:Ljava/lang/Object;V:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/Map<TK;TV;>;",
         ClassSignature {
-            super_class_name: "java.util.Object".to_owned(),
-            interfaces: vec!["java.util.map<K, V>".to_owned()],
+            super_class_name: "java.lang.Object".to_owned(),
+            interfaces: vec!["java.util.Map<K, V>".to_owned()],
         }
     )]
     #[case(
@@ -509,6 +522,11 @@ mod tests {
         }
     )]
     fn decode_class_signatures(#[case] input: &str, #[case] expected: ClassSignature) {
-        assert_eq!(expected, decode_class_signature(input));
+        let actual = decode_class_signature(input);
+        assert_eq!(
+            expected, actual,
+            "Expected class signature '{}' to be decoded into '{:?}' but was '{:?}'.",
+            input, expected, actual
+        );
     }
 }
