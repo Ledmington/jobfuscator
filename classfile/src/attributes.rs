@@ -349,15 +349,49 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
         }
         "InnerClasses" => {
             let number_of_classes: u16 = reader.read_u16().unwrap();
+            let expected_attribute_length: u32 = 2 + (2 * 4) * (number_of_classes as u32);
+            assert!(
+                attribute_length == expected_attribute_length,
+                "Expected length of attribute InnerClasses (with {} inner classes) to be {} bytes but was {}.",
+                number_of_classes,
+                expected_attribute_length,
+                attribute_length
+            );
             let mut classes: Vec<Class> = Vec::with_capacity(number_of_classes.into());
-            for _ in 0..number_of_classes {
+            for i in 0..number_of_classes {
+                let inner_class_info_index = reader.read_u16().unwrap();
+                let outer_class_info_index = reader.read_u16().unwrap();
+                if inner_class_info_index == 0 {
+                    assert!(
+                        outer_class_info_index == 0,
+                        "Expected field outer_class_info_index of entry n.{} to be 0 since inner_class_info_index was zero, but it was {}.",
+                        i,
+                        outer_class_info_index
+                    );
+                } else {
+                    assert_valid_and_type!(cp, inner_class_info_index, ConstantPoolTag::Class);
+                    assert!(
+                        inner_class_info_index != outer_class_info_index,
+                        "Expected field outer_class_info_index of entry n.{} to be different from inner_class_info_index ({}) but it was.",
+                        i,
+                        inner_class_info_index
+                    );
+                    if outer_class_info_index != 0 {
+                        assert_valid_and_type!(cp, outer_class_info_index, ConstantPoolTag::Class);
+                    }
+                }
+                let inner_name_index = reader.read_u16().unwrap();
+                if inner_name_index != 0 {
+                    // The inner class is not anonymous
+                    assert_valid_and_type!(cp, inner_name_index, ConstantPoolTag::Utf8);
+                }
+                let inner_class_access_flags =
+                    parse_inner_class_access_flags(reader.read_u16().unwrap());
                 classes.push(Class {
-                    inner_class_info_index: reader.read_u16().unwrap(),
-                    outer_class_info_index: reader.read_u16().unwrap(),
-                    inner_name_index: reader.read_u16().unwrap(),
-                    inner_class_access_flags: parse_inner_class_access_flags(
-                        reader.read_u16().unwrap(),
-                    ),
+                    inner_class_info_index,
+                    outer_class_info_index,
+                    inner_name_index,
+                    inner_class_access_flags,
                 });
             }
             AttributeInfo::InnerClasses {
