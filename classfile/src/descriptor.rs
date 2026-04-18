@@ -61,6 +61,10 @@ fn decode_generic_arg(it: &mut Peekable<Chars>) -> String {
             it.next();
             "? extends ".to_owned() + &decode_generic_arg(it)
         }
+        '-' => {
+            it.next();
+            "? super ".to_owned() + &decode_generic_arg(it)
+        }
 
         // forbid everything else inside generics
         _ => panic!("Invalid generic argument type: '{}'.", ch),
@@ -435,6 +439,10 @@ mod tests {
     #[case(
         "(Ljava/util/Collection<+TX;>;)Z",
         "boolean(java.util.Collection<? extends X>)"
+    )]
+    #[case(
+        "(Ljava/util/function/Predicate<-TT;>;)Ljava/util/stream/Stream<TT;>;",
+        "java.util.stream.Stream<T>(java.util.function.Predicate<? super T>)"
     )]
     #[case(
         "<X::Ljava/io/Serializable;>(Ljava/lang/Class<TX;>;)Ljava/util/Optional<TX;>;",

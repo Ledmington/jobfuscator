@@ -82,7 +82,7 @@ pub(crate) fn print_class_file(filename: String) {
     lw.println("{");
     lw.indent(1);
     print_fields(&mut lw, &cf.constant_pool, &cf.fields);
-    print_methods(&mut lw, &cf.constant_pool, cf.this_class, &cf.methods);
+    print_methods(&mut lw, &cf.constant_pool, &cf, cf.this_class, &cf.methods);
     lw.indent(-1);
     lw.println("}");
     print_class_attributes(&mut lw, &cf.constant_pool, &cf.attributes);
@@ -416,11 +416,26 @@ fn print_field_attributes(lw: &mut LineWriter, cp: &ConstantPool, field: &FieldI
     }
 }
 
-fn print_methods(lw: &mut LineWriter, cp: &ConstantPool, this_class: u16, methods: &[MethodInfo]) {
+fn print_methods(
+    lw: &mut LineWriter,
+    cp: &ConstantPool,
+    cf: &ClassFile,
+    this_class: u16,
+    methods: &[MethodInfo],
+) {
     for (i, method) in methods.iter().enumerate() {
         let method_name: String = cp.get_utf8_content(method.name_index);
         let raw_descriptor: String = cp.get_utf8_content(method.descriptor_index);
-        let parsed_descriptor: String = decode_type(&raw_descriptor);
+
+        let signature = find_attribute(&method.attributes, AttributeKind::Signature);
+
+        let parsed_descriptor: String = match signature {
+            Some(AttributeInfo::Signature {
+                signature_index, ..
+            }) => decode_type(&cp.get_utf8_content(*signature_index)),
+            _ => decode_type(&raw_descriptor),
+        };
+
         if i > 0 {
             lw.println("");
         }
@@ -429,10 +444,22 @@ fn print_methods(lw: &mut LineWriter, cp: &ConstantPool, this_class: u16, method
             access_flags::modifier_repr_vec(&method.access_flags)
         ));
 
-        let is_static_block: bool = method_name == "<clinit>";
+        let is_class_initializer: bool = method_name == "<clinit>";
+
+        // This obscure condition has been copied from the original javap source code
+        // https://github.com/openjdk/jdk/blob/08b25611f688ae85c05242afc4cee5b538db4f67/src/jdk.jdeps/share/classes/com/sun/tools/javap/ClassWriter.java#L493
+        if cf.access_flags.contains(&ClassAccessFlag::Interface)
+            && !method.access_flags.contains(&MethodAccessFlag::Abstract)
+            && !is_class_initializer
+            && !method.access_flags.contains(&MethodAccessFlag::Static)
+            && !method.access_flags.contains(&MethodAccessFlag::Private)
+        {
+            lw.print("default ");
+        }
+
         let is_constructor: bool = method_name == "<init>";
 
-        if is_static_block {
+        if is_class_initializer {
             // this is the 'static {}' block of the class
             lw.println("{};");
         } else {
