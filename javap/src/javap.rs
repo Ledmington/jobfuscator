@@ -13,7 +13,7 @@ use classfile::attributes::{
 use classfile::bytecode::BytecodeInstruction;
 use classfile::classfile::{ClassFile, parse_class_file};
 use classfile::constant_pool::{self, ConstantPool, ConstantPoolInfo};
-use classfile::descriptor::{decode_class_signature, decode_type};
+use classfile::descriptor::{ClassSignature, decode_class_signature, decode_type};
 use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
 use classfile::utils::absolute_no_symlinks;
@@ -99,10 +99,6 @@ fn num_digits(n: usize) -> usize {
     (n as f64).log10().floor() as usize
 }
 
-fn substring(s: &str, begin: usize, end: usize) -> String {
-    s.chars().skip(begin).take(end).collect()
-}
-
 fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
     let source_file: String = cf
         .attributes
@@ -125,42 +121,42 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         .get_class_name(cf.this_class)
         .replace('/', ".");
 
-    let this_class_signature = find_attribute(&cf.attributes, AttributeKind::Signature);
-
-    if let Some(AttributeInfo::Signature {
-        signature_index, ..
-    }) = this_class_signature
-    {
-        let decoded = decode_class_signature(&cf.constant_pool.get_utf8_content(*signature_index));
-        if decoded.super_class_name.starts_with('<') {
-            let generic_type: String = substring(
-                &decoded.super_class_name,
-                0,
-                decoded.super_class_name.find('<').unwrap() + 1,
-            );
-            let actual_super_class: String = substring(
-                &decoded.super_class_name,
-                decoded.super_class_name.find('>').unwrap() + 1,
-                decoded.super_class_name.len(),
-            )
-            .trim()
-            .to_owned();
-            lw.print(&generic_type);
-            if !cf.access_flags.contains(&ClassAccessFlag::Interface) {
-                lw.print(&format!(" extends {}", actual_super_class));
-            }
-        } else {
-            lw.print(&format!(" extends {}", decoded.super_class_name));
-        }
-    }
-
     lw.print(&access_flags::modifier_repr_vec(&cf.access_flags))
         .print(" ")
         .print(&this_class_name);
 
-    let is_enum: bool = cf
-        .access_flags
-        .contains(&access_flags::ClassAccessFlag::Enum);
+    let this_class_signature = find_attribute(&cf.attributes, AttributeKind::Signature);
+    if let Some(AttributeInfo::Signature {
+        signature_index, ..
+    }) = this_class_signature
+    {
+        let is_interface: bool = cf.access_flags.contains(&ClassAccessFlag::Interface);
+        let decoded: ClassSignature =
+            decode_class_signature(&cf.constant_pool.get_utf8_content(*signature_index));
+
+        let actual_super_class: String = decoded.super_class_name.clone();
+
+        if !decoded.generic_type_bounds.is_empty() {
+            lw.print(&format!(
+                "<{}>",
+                decoded
+                    .generic_type_bounds
+                    .iter()
+                    .map(|gtb| format!("{} extends {}", gtb.type_name, gtb.type_bounds.join(", ")))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ));
+        }
+
+        if is_interface {
+            lw.print(&format!(" extends {}", decoded.interfaces.join(", ")));
+        } else {
+            lw.print(&format!(" extends {}", actual_super_class));
+        }
+    }
+
+    let is_enum: bool = cf.access_flags.contains(&ClassAccessFlag::Enum);
+
     let super_class_name = cf.constant_pool.get_class_name(cf.super_class);
     if is_enum {
         lw.print(" extends java.lang.Enum<")

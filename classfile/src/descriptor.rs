@@ -180,13 +180,14 @@ fn decode_ref_type(it: &mut Peekable<Chars>) -> String {
 /// `X extends java.lang.String implements java.io.Serializable`.
 ///
 /// If no explicit superclass is provided, `java.lang.Object` is implied.
-struct GenericTypeBound {
+#[derive(PartialEq, Debug)]
+pub struct GenericTypeBound {
     /// Name of the generic type parameter (e.g. `X`).
-    type_name: String,
+    pub type_name: String,
 
     /// Fully qualified names of superclass and interfaces.
     /// The first entry is the superclass, if present.
-    type_bounds: Vec<String>,
+    pub type_bounds: Vec<String>,
 }
 
 fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> {
@@ -300,16 +301,19 @@ fn split_class_name(it: &mut Peekable<Chars>) -> String {
 
 #[derive(PartialEq, Debug)]
 pub struct ClassSignature {
+    pub generic_type_bounds: Vec<GenericTypeBound>,
     pub super_class_name: String,
-    interfaces: Vec<String>,
+    pub interfaces: Vec<String>,
 }
 
 pub fn decode_class_signature(class_signature: &str) -> ClassSignature {
     let mut it = class_signature.chars().peekable();
 
-    if it.peek() == Some(&START_GENERIC) {
-        parse_generic_type_bounds(&mut it);
-    }
+    let generic_type_bounds = if it.peek() == Some(&START_GENERIC) {
+        parse_generic_type_bounds(&mut it)
+    } else {
+        Vec::new()
+    };
 
     let super_class_name = decode_type(&split_class_name(&mut it));
     let mut interfaces: Vec<String> = Vec::new();
@@ -319,6 +323,7 @@ pub fn decode_class_signature(class_signature: &str) -> ClassSignature {
     }
 
     ClassSignature {
+        generic_type_bounds,
         super_class_name,
         interfaces,
     }
@@ -475,13 +480,15 @@ mod tests {
     #[case(
         "Ljava/lang/Enum<Ljava/lang/String;>;",
         ClassSignature {
+            generic_type_bounds: vec![],
             super_class_name: "java.lang.Enum<java.lang.String>".to_owned(),
-            interfaces: Vec::new(),
+            interfaces: vec![],
         }
     )]
     #[case(
         "Ljava/lang/Object;Ljava/util/function/Supplier<Ljava/lang/String;>;",
         ClassSignature {
+            generic_type_bounds: vec![],
             super_class_name: "java.lang.Object".to_owned(),
             interfaces: vec!["java.util.function.Supplier<java.lang.String>".to_owned()],
         }
@@ -489,6 +496,12 @@ mod tests {
     #[case(
         "<T:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/stream/BaseStream<TT;Ljava/util/stream/Stream<TT;>;>;",
         ClassSignature {
+            generic_type_bounds: vec![
+                GenericTypeBound {
+                    type_name: "T".to_owned(),
+                    type_bounds: vec!["java.lang.Object".to_owned()]
+                }
+            ],
             super_class_name: "java.lang.Object".to_owned(),
             interfaces: vec!["java.util.stream.BaseStream<T, java.util.stream.Stream<T>>".to_owned()],
         }
@@ -496,6 +509,16 @@ mod tests {
     #[case(
         "<K:Ljava/lang/Object;V:Ljava/lang/Object;>Ljava/lang/Object;Ljava/util/Map<TK;TV;>;",
         ClassSignature {
+            generic_type_bounds: vec![
+                GenericTypeBound {
+                    type_name: "K".to_owned(),
+                    type_bounds: vec!["java.lang.Object".to_owned()]
+                },
+                GenericTypeBound {
+                    type_name: "V".to_owned(),
+                    type_bounds: vec!["java.lang.Object".to_owned()]
+                }
+            ],
             super_class_name: "java.lang.Object".to_owned(),
             interfaces: vec!["java.util.Map<K, V>".to_owned()],
         }
@@ -503,6 +526,20 @@ mod tests {
     #[case(
         "<E_IN:Ljava/lang/Object;E_OUT:Ljava/lang/Object;S::Ljava/util/stream/BaseStream<TE_OUT;TS;>;>Ljava/util/stream/PipelineHelper<TE_OUT;>;Ljava/util/stream/BaseStream<TE_OUT;TS;>;",
         ClassSignature {
+            generic_type_bounds: vec![
+                GenericTypeBound {
+                    type_name: "E_IN".to_owned(),
+                    type_bounds: vec!["java.lang.Object".to_owned()]
+                },
+                GenericTypeBound {
+                    type_name: "E_OUT".to_owned(),
+                    type_bounds: vec!["java.lang.Object".to_owned()]
+                },
+                GenericTypeBound {
+                    type_name: "S".to_owned(),
+                    type_bounds: vec!["java.util.stream.BaseStream<E_OUT, S>".to_owned()]
+                }
+            ],
             super_class_name: "java.util.stream.PipelineHelper<E_OUT>".to_owned(),
             interfaces: vec!["java.util.stream.BaseStream<E_OUT, S>".to_owned()],
         }
