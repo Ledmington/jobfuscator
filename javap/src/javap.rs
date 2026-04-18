@@ -151,7 +151,7 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         if is_interface {
             lw.print(&format!(" extends {}", decoded.interfaces.join(", ")));
         } else {
-            lw.print(&format!(" extends {}", actual_super_class));
+            lw.print(&format!(" extends {actual_super_class}"));
         }
     }
 
@@ -474,12 +474,9 @@ fn print_methods(
             if is_constructor {
                 // this is a constructor of the class
                 let this_class_name: String = cp.get_class_name(this_class).replace('/', ".");
-                lw.println(&format!("{}{};", this_class_name, arguments_string));
+                lw.println(&format!("{this_class_name}{arguments_string};"));
             } else {
-                lw.println(&format!(
-                    "{} {}{};",
-                    return_type, method_name, arguments_string
-                ));
+                lw.println(&format!("{return_type} {method_name}{arguments_string};",));
             }
         }
 
@@ -1293,10 +1290,7 @@ fn get_number_of_arguments(cp: &ConstantPool, method: &MethodInfo) -> u8 {
             } else if ch == '>' {
                 generics -= 1;
                 if generics < 0 {
-                    panic!(
-                        "Invalid generics syntax in method descriptor: '{}'.",
-                        arguments
-                    );
+                    panic!("Invalid generics syntax in method descriptor: '{arguments}'.",);
                 }
             } else if ch == ',' && generics == 0 {
                 args += 1;
@@ -1592,14 +1586,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                 for class in classes.iter() {
                     let modifiers = class.inner_class_access_flags.modifier_repr();
 
-                    if class.is_anonymous() {
-                        lw.print(&format!("#{};", class.inner_class_info_index))
-                            .tab()
-                            .println(&format!(
-                                "// class {}",
-                                cp.get_class_name(class.inner_class_info_index)
-                            ));
-                    } else if class.is_local() {
+                    if class.is_anonymous() || class.is_local() {
                         lw.print(&format!("#{};", class.inner_class_info_index))
                             .tab()
                             .println(&format!(

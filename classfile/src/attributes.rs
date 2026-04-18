@@ -391,10 +391,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
             let expected_attribute_length: u32 = 2 + (2 * 4) * (number_of_classes as u32);
             assert!(
                 attribute_length == expected_attribute_length,
-                "Expected length of attribute InnerClasses (with {} inner classes) to be {} bytes but was {}.",
-                number_of_classes,
-                expected_attribute_length,
-                attribute_length
+                "Expected length of attribute InnerClasses (with {number_of_classes} inner classes) to be {expected_attribute_length} bytes but was {attribute_length}.",
             );
             let mut classes: Vec<InnerClassInfo> = Vec::with_capacity(number_of_classes.into());
             for i in 0..number_of_classes {
@@ -403,17 +400,13 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                 if inner_class_info_index == 0 {
                     assert!(
                         outer_class_info_index == 0,
-                        "Expected field outer_class_info_index of entry n.{} to be 0 since inner_class_info_index was zero, but it was {}.",
-                        i,
-                        outer_class_info_index
+                        "Expected field outer_class_info_index of entry n.{i} to be 0 since inner_class_info_index was zero, but it was {outer_class_info_index}.",
                     );
                 } else {
                     assert_valid_and_type!(cp, inner_class_info_index, ConstantPoolTag::Class);
                     assert!(
                         inner_class_info_index != outer_class_info_index,
-                        "Expected field outer_class_info_index of entry n.{} to be different from inner_class_info_index ({}) but it was.",
-                        i,
-                        inner_class_info_index
+                        "Expected field outer_class_info_index of entry n.{i} to be different from inner_class_info_index ({inner_class_info_index}) but it was.",
                     );
                     if outer_class_info_index != 0 {
                         assert_valid_and_type!(cp, outer_class_info_index, ConstantPoolTag::Class);

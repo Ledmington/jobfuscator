@@ -67,7 +67,7 @@ fn decode_generic_arg(it: &mut Peekable<Chars>) -> String {
         }
 
         // forbid everything else inside generics
-        _ => panic!("Invalid generic argument type: '{}'.", ch),
+        _ => panic!("Invalid generic argument type: '{ch}'."),
     }
 }
 
@@ -138,7 +138,7 @@ fn decode_type_it(it: &mut Peekable<Chars>) -> String {
 
         TYPE_VAR_START => decode_type_variable(it),
 
-        _ => panic!("Unexpected '{}' at the start of type.", ch),
+        _ => panic!("Unexpected '{ch}' at the start of type."),
     }
 }
 
@@ -239,8 +239,8 @@ fn parse_generic_type_bounds(it: &mut Peekable<Chars>) -> Vec<GenericTypeBound> 
 fn expect(it: &mut Peekable<Chars>, expected: char) {
     let x = it
         .next()
-        .unwrap_or_else(|| panic!("Expected '{}' but found end of input.", expected));
-    assert_eq!(expected, x, "Expected '{}' but was '{}'.", expected, x);
+        .unwrap_or_else(|| panic!("Expected '{expected}' but found end of input."));
+    assert_eq!(expected, x, "Expected '{expected}' but was '{x}'.");
 }
 
 fn format_generic_bound(gtb: &GenericTypeBound) -> String {
@@ -295,7 +295,7 @@ fn split_class_name(it: &mut Peekable<Chars>) -> String {
             END_GENERIC => {
                 depth = depth
                     .checked_sub(1)
-                    .unwrap_or_else(|| panic!("Unexpected '{}' in class name.", END_GENERIC))
+                    .unwrap_or_else(|| panic!("Unexpected '{END_GENERIC}' in class name."))
             }
             _ => {}
         }
@@ -460,8 +460,7 @@ mod tests {
         let actual = decode_type(input);
         assert_eq!(
             expected, actual,
-            "Expected '{}' to be decoded into '{}' but was '{}'.",
-            input, expected, actual
+            "Expected '{input}' to be decoded into '{expected}' but was '{actual}'."
         );
     }
 
@@ -479,8 +478,7 @@ mod tests {
         let result = std::panic::catch_unwind(|| decode_type(input));
         assert!(
             result.is_err(),
-            "Parsing of '{}' should have panicked but did not.",
-            input
+            "Parsing of '{input}' should have panicked but did not.",
         );
     }
 
@@ -556,8 +554,7 @@ mod tests {
         let actual = decode_class_signature(input);
         assert_eq!(
             expected, actual,
-            "Expected class signature '{}' to be decoded into '{:?}' but was '{:?}'.",
-            input, expected, actual
+            "Expected class signature '{input}' to be decoded into '{expected:?}' but was '{actual:?}'."
         );
     }
 }
