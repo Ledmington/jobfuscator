@@ -2,10 +2,7 @@
 
 use binary_reader::BinaryReader;
 
-use crate::access_flags::{
-    InnerClassAccessFlag, MethodParameterAccessFlag, parse_inner_class_access_flags,
-    parse_method_parameter_access_flags,
-};
+use crate::access_flags::{InnerClassAccessFlags, MethodParameterAccessFlags};
 use crate::assert_valid_and_type;
 use crate::bytecode::{BytecodeInstruction, parse_bytecode};
 use crate::constant_pool::{ConstantPool, ConstantPoolTag};
@@ -45,7 +42,7 @@ pub enum AttributeInfo {
     },
     InnerClasses {
         name_index: u16,
-        classes: Vec<Class>,
+        classes: Vec<InnerClassInfo>,
     },
     MethodParameters {
         name_index: u16,
@@ -201,7 +198,7 @@ pub struct RecordComponentInfo {
 
 pub struct MethodParameter {
     pub name_index: u16,
-    pub access_flags: Vec<MethodParameterAccessFlag>,
+    pub access_flags: MethodParameterAccessFlags,
 }
 
 pub struct ExceptionTableEntry {
@@ -281,12 +278,28 @@ pub struct BootstrapMethod {
     pub bootstrap_arguments: Vec<u16>,
 }
 
-// TODO: find a better name
-pub struct Class {
+pub struct InnerClassInfo {
     pub inner_class_info_index: u16,
     pub outer_class_info_index: u16,
     pub inner_name_index: u16,
-    pub inner_class_access_flags: Vec<InnerClassAccessFlag>,
+    pub inner_class_access_flags: InnerClassAccessFlags,
+}
+
+impl InnerClassInfo {
+    /// Indicates whether this inner class is anonymous, meaning that it has no simple name.
+    pub fn is_anonymous(&self) -> bool {
+        self.inner_name_index == 0
+    }
+
+    /// Indicates whether this inner class is local, meaning that this class has a simple name and no enclosing class entry.
+    pub fn is_local(&self) -> bool {
+        self.inner_name_index != 0 && self.outer_class_info_index == 0
+    }
+
+    /// Indicates whether this inner class is member, meaning that this class has both a simple name and an enclosing class entry.
+    pub fn is_member(&self) -> bool {
+        self.inner_name_index != 0 && self.outer_class_info_index != 0
+    }
 }
 
 pub fn parse_class_attributes(
@@ -357,7 +370,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                 expected_attribute_length,
                 attribute_length
             );
-            let mut classes: Vec<Class> = Vec::with_capacity(number_of_classes.into());
+            let mut classes: Vec<InnerClassInfo> = Vec::with_capacity(number_of_classes.into());
             for i in 0..number_of_classes {
                 let inner_class_info_index = reader.read_u16().unwrap();
                 let outer_class_info_index = reader.read_u16().unwrap();
@@ -385,9 +398,9 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                     // The inner class is not anonymous
                     assert_valid_and_type!(cp, inner_name_index, ConstantPoolTag::Utf8);
                 }
-                let inner_class_access_flags =
-                    parse_inner_class_access_flags(reader.read_u16().unwrap());
-                classes.push(Class {
+                let inner_class_access_flags: InnerClassAccessFlags =
+                    InnerClassAccessFlags::from(reader.read_u16().unwrap());
+                classes.push(InnerClassInfo {
                     inner_class_info_index,
                     outer_class_info_index,
                     inner_name_index,
@@ -597,9 +610,8 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             let mut parameters: Vec<MethodParameter> = Vec::with_capacity(parameters_count.into());
             for _ in 0..parameters_count {
                 let name_index: u16 = reader.read_u16().unwrap();
-                let raw_access_flags: u16 = reader.read_u16().unwrap();
-                let access_flags: Vec<MethodParameterAccessFlag> =
-                    parse_method_parameter_access_flags(raw_access_flags);
+                let access_flags: MethodParameterAccessFlags =
+                    MethodParameterAccessFlags::from(reader.read_u16().unwrap());
                 parameters.push(MethodParameter {
                     name_index,
                     access_flags,

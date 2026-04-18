@@ -2,7 +2,7 @@
 
 use binary_reader::BinaryReader;
 
-use crate::access_flags::{ClassAccessFlag, parse_class_access_flags};
+use crate::access_flags::ClassAccessFlags;
 use crate::assert_valid_and_type;
 use crate::attributes::{AttributeInfo, parse_class_attributes};
 use crate::constant_pool::{
@@ -18,7 +18,7 @@ pub struct ClassFile {
     pub minor_version: u16,
     pub major_version: u16,
     pub constant_pool: ConstantPool,
-    pub access_flags: Vec<ClassAccessFlag>,
+    pub access_flags: ClassAccessFlags,
     pub this_class: u16,
     pub super_class: u16,
     pub interfaces: Vec<u16>,
@@ -56,7 +56,7 @@ pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
     let cp_count: u16 = reader.read_u16().unwrap();
     let constant_pool: ConstantPool = parse_constant_pool(reader, (cp_count - 1).into());
 
-    let access_flags: Vec<ClassAccessFlag> = parse_class_access_flags(reader.read_u16().unwrap());
+    let access_flags: ClassAccessFlags = ClassAccessFlags::from(reader.read_u16().unwrap());
 
     let this_class: u16 = reader.read_u16().unwrap();
     assert_valid_and_type!(&constant_pool, this_class, ConstantPoolTag::Class);

@@ -16,8 +16,8 @@ use classfile::constant_pool::{self, ConstantPool, ConstantPoolInfo};
 use classfile::descriptor::{ClassSignature, decode_class_signature, decode_type};
 use classfile::fields::FieldInfo;
 use classfile::methods::MethodInfo;
+use classfile::reference_kind;
 use classfile::utils::absolute_no_symlinks;
-use classfile::{access_flags, reference_kind};
 use date::Date;
 
 use crate::line_writer::LineWriter;
@@ -121,7 +121,7 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         .get_class_name(cf.this_class)
         .replace('/', ".");
 
-    lw.print(&access_flags::modifier_repr_vec(&cf.access_flags))
+    lw.print(&cf.access_flags.modifier_repr())
         .print(" ")
         .print(&this_class_name);
 
@@ -130,7 +130,7 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         signature_index, ..
     }) = this_class_signature
     {
-        let is_interface: bool = cf.access_flags.contains(&ClassAccessFlag::Interface);
+        let is_interface: bool = cf.access_flags.contains(ClassAccessFlag::Interface);
         let decoded: ClassSignature =
             decode_class_signature(&cf.constant_pool.get_utf8_content(*signature_index));
 
@@ -155,7 +155,7 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         }
     }
 
-    let is_enum: bool = cf.access_flags.contains(&ClassAccessFlag::Enum);
+    let is_enum: bool = cf.access_flags.contains(ClassAccessFlag::Enum);
 
     let super_class_name = cf.constant_pool.get_class_name(cf.super_class);
     if is_enum {
@@ -176,9 +176,9 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         .print("major version: ")
         .println(&cf.major_version.to_string())
         .print("flags: (")
-        .print(&format!("0x{:04x}", access_flags::to_u16(&cf.access_flags)))
+        .print(&format!("0x{:04x}", cf.access_flags.to_u16()))
         .print(") ")
-        .println(&access_flags::java_repr_vec(&cf.access_flags));
+        .println(&cf.access_flags.java_repr());
     lw.print("this_class: #")
         .print(&cf.this_class.to_string())
         .tab()
@@ -365,7 +365,7 @@ fn print_fields(lw: &mut LineWriter, cp: &ConstantPool, fields: &[FieldInfo]) {
             find_attribute(&field.attributes, AttributeKind::Signature);
         lw.println(&format!(
             "{} {} {};",
-            access_flags::modifier_repr_vec(&field.access_flags),
+            field.access_flags.modifier_repr(),
             match signature {
                 Some(AttributeInfo::Signature {
                     signature_index, ..
@@ -381,8 +381,8 @@ fn print_fields(lw: &mut LineWriter, cp: &ConstantPool, fields: &[FieldInfo]) {
         lw.println(&format!("descriptor: {descriptor}"));
         lw.println(&format!(
             "flags: (0x{:04x}) {}",
-            access_flags::to_u16(&field.access_flags),
-            access_flags::java_repr_vec(&field.access_flags)
+            field.access_flags.to_u16(),
+            field.access_flags.java_repr()
         ));
         print_field_attributes(lw, cp, field);
 
@@ -439,20 +439,17 @@ fn print_methods(
         if i > 0 {
             lw.println("");
         }
-        lw.print(&format!(
-            "{} ",
-            access_flags::modifier_repr_vec(&method.access_flags)
-        ));
+        lw.print(&format!("{} ", method.access_flags.modifier_repr()));
 
         let is_class_initializer: bool = method_name == "<clinit>";
 
         // This obscure condition has been copied from the original javap source code
         // https://github.com/openjdk/jdk/blob/08b25611f688ae85c05242afc4cee5b538db4f67/src/jdk.jdeps/share/classes/com/sun/tools/javap/ClassWriter.java#L493
-        if cf.access_flags.contains(&ClassAccessFlag::Interface)
-            && !method.access_flags.contains(&MethodAccessFlag::Abstract)
+        if cf.access_flags.contains(ClassAccessFlag::Interface)
+            && !method.access_flags.contains(MethodAccessFlag::Abstract)
             && !is_class_initializer
-            && !method.access_flags.contains(&MethodAccessFlag::Static)
-            && !method.access_flags.contains(&MethodAccessFlag::Private)
+            && !method.access_flags.contains(MethodAccessFlag::Static)
+            && !method.access_flags.contains(MethodAccessFlag::Private)
         {
             lw.print("default ");
         }
@@ -468,7 +465,7 @@ fn print_methods(
             let mut arguments_string: String =
                 parsed_descriptor[first_bracket_index..parsed_descriptor.len()].to_owned();
 
-            if method.access_flags.contains(&MethodAccessFlag::Varargs) {
+            if method.access_flags.contains(MethodAccessFlag::Varargs) {
                 // replace last '[]' with '...'
                 arguments_string =
                     arguments_string[..arguments_string.len() - 3].to_owned() + "...)";
@@ -491,8 +488,8 @@ fn print_methods(
         lw.println(&format!("descriptor: {raw_descriptor}"));
         lw.println(&format!(
             "flags: (0x{:04x}) {}",
-            access_flags::to_u16(&method.access_flags),
-            access_flags::java_repr_vec(&method.access_flags)
+            method.access_flags.to_u16(),
+            method.access_flags.java_repr()
         ));
 
         print_method_attributes(lw, cp, this_class, method);
@@ -1307,7 +1304,7 @@ fn get_number_of_arguments(cp: &ConstantPool, method: &MethodInfo) -> u8 {
         }
     }
 
-    if !method.access_flags.contains(&MethodAccessFlag::Static) {
+    if !method.access_flags.contains(MethodAccessFlag::Static) {
         // if the method is not static, there is the implicit 'this' argument
         args += 1;
     }
@@ -1384,10 +1381,10 @@ fn print_method_attributes(
                         &cp.get_utf8_content(param.name_index)
                     };
                     print!("      {name}");
-                    if !param.access_flags.is_empty() {
+                    if param.access_flags.to_u16() != 0 {
                         print!(
                             "                      {}",
-                            access_flags::modifier_repr_vec(&param.access_flags)
+                            param.access_flags.modifier_repr()
                         );
                     }
                     println!();
@@ -1593,20 +1590,40 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                 lw.println("InnerClasses:");
                 lw.indent(1);
                 for class in classes.iter() {
-                    lw.print(&format!(
-                        "{} #{}= #{} of #{};",
-                        access_flags::modifier_repr_vec(&class.inner_class_access_flags),
-                        class.inner_name_index,
-                        class.inner_class_info_index,
-                        class.outer_class_info_index
-                    ))
-                    .tab()
-                    .println(&format!(
-                        "// {}=class {} of class {}",
-                        cp.get_utf8_content(class.inner_name_index),
-                        cp.get_class_name(class.inner_class_info_index),
-                        cp.get_class_name(class.outer_class_info_index),
-                    ));
+                    let modifiers = class.inner_class_access_flags.modifier_repr();
+
+                    if class.is_anonymous() {
+                        lw.print(&format!("#{};", class.inner_class_info_index))
+                            .tab()
+                            .println(&format!(
+                                "// class {}",
+                                cp.get_class_name(class.inner_class_info_index)
+                            ));
+                    } else if class.is_local() {
+                        lw.print(&format!("#{};", class.inner_class_info_index))
+                            .tab()
+                            .println(&format!(
+                                "// class {}",
+                                cp.get_class_name(class.inner_class_info_index)
+                            ));
+                    } else if class.is_member() {
+                        lw.print(&format!(
+                            "{} #{}= #{} of #{};",
+                            modifiers,
+                            class.inner_name_index,
+                            class.inner_class_info_index,
+                            class.outer_class_info_index
+                        ))
+                        .tab()
+                        .println(&format!(
+                            "// {}=class {} of class {}",
+                            cp.get_utf8_content(class.inner_name_index),
+                            cp.get_class_name(class.inner_class_info_index),
+                            cp.get_class_name(class.outer_class_info_index),
+                        ));
+                    } else {
+                        unreachable!();
+                    }
                 }
                 lw.indent(-1);
             }

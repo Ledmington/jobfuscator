@@ -3,7 +3,6 @@
 use binary_writer::{BinaryWriter, Endianness};
 
 use crate::{
-    access_flags,
     attributes::{Annotation, AttributeInfo, ElementValue, StackMapFrame, VerificationTypeInfo},
     bytecode::{get_instruction_length, write_instruction},
     classfile::ClassFile,
@@ -22,7 +21,7 @@ pub fn write_class_file(cf: &ClassFile) -> Vec<u8> {
     w.write_u16((cf.constant_pool.len() + 1).try_into().unwrap());
     write_constant_pool(&mut w, &cf.constant_pool);
 
-    w.write_u16(access_flags::to_u16(&cf.access_flags));
+    w.write_u16(cf.access_flags.to_u16());
 
     w.write_u16(cf.this_class);
     w.write_u16(cf.super_class);
@@ -120,7 +119,7 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
 
 fn write_fields(w: &mut BinaryWriter, fields: &[FieldInfo]) {
     for field in fields.iter() {
-        w.write_u16(access_flags::to_u16(&field.access_flags));
+        w.write_u16(field.access_flags.to_u16());
         w.write_u16(field.name_index);
         w.write_u16(field.descriptor_index);
         w.write_u16(field.attributes.len().try_into().unwrap());
@@ -130,7 +129,7 @@ fn write_fields(w: &mut BinaryWriter, fields: &[FieldInfo]) {
 
 fn write_methods(w: &mut BinaryWriter, methods: &[MethodInfo]) {
     for method in methods.iter() {
-        w.write_u16(access_flags::to_u16(&method.access_flags));
+        w.write_u16(method.access_flags.to_u16());
         w.write_u16(method.name_index);
         w.write_u16(method.descriptor_index);
         w.write_u16(method.attributes.len().try_into().unwrap());
@@ -362,7 +361,7 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                     w.write_u16(inner_class.inner_class_info_index);
                     w.write_u16(inner_class.outer_class_info_index);
                     w.write_u16(inner_class.inner_name_index);
-                    w.write_u16(access_flags::to_u16(&inner_class.inner_class_access_flags));
+                    w.write_u16(inner_class.inner_class_access_flags.to_u16());
                 }
             }
             AttributeInfo::MethodParameters { .. } => todo!(),

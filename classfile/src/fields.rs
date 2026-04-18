@@ -3,14 +3,14 @@
 use binary_reader::BinaryReader;
 
 use crate::{
-    access_flags::{FieldAccessFlag, parse_field_access_flags},
+    access_flags::FieldAccessFlags,
     assert_valid_and_type,
     attributes::{AttributeInfo, parse_field_attributes},
     constant_pool::{ConstantPool, ConstantPoolTag},
 };
 
 pub struct FieldInfo {
-    pub access_flags: Vec<FieldAccessFlag>,
+    pub access_flags: FieldAccessFlags,
     pub name_index: u16,
     pub descriptor_index: u16,
     pub attributes: Vec<AttributeInfo>,
@@ -23,7 +23,7 @@ pub fn parse_fields(
 ) -> Vec<FieldInfo> {
     let mut fields: Vec<FieldInfo> = Vec::with_capacity(num_fields);
     for _ in 0..num_fields {
-        let access_flags = parse_field_access_flags(reader.read_u16().unwrap());
+        let access_flags: FieldAccessFlags = FieldAccessFlags::from(reader.read_u16().unwrap());
         let name_index: u16 = reader.read_u16().unwrap();
         assert_valid_and_type!(cp, name_index, ConstantPoolTag::Utf8);
         let descriptor_index: u16 = reader.read_u16().unwrap();
