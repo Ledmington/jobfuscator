@@ -780,6 +780,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
             default,
             low,
             offsets,
+            ..
         } => {
             "tableswitch   { // ".to_owned()
                 + &low.to_string()
