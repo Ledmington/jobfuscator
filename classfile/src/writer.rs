@@ -3,7 +3,6 @@
 use binary_writer::{BinaryWriter, Endianness};
 
 use crate::{
-    access_flags,
     attributes::{Annotation, AttributeInfo, ElementValue, StackMapFrame, VerificationTypeInfo},
     bytecode::{get_instruction_length, write_instruction},
     classfile::ClassFile,
@@ -22,7 +21,7 @@ pub fn write_class_file(cf: &ClassFile) -> Vec<u8> {
     w.write_u16((cf.constant_pool.len() + 1).try_into().unwrap());
     write_constant_pool(&mut w, &cf.constant_pool);
 
-    w.write_u16(access_flags::to_u16(&cf.access_flags));
+    w.write_u16(cf.access_flags.to_u16());
 
     w.write_u16(cf.this_class);
     w.write_u16(cf.super_class);
@@ -112,15 +111,27 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
             ConstantPoolInfo::MethodType { descriptor_index } => {
                 w.write_u16(*descriptor_index);
             }
-            ConstantPoolInfo::MethodHandle { .. } => todo!(),
-            ConstantPoolInfo::InvokeDynamic { .. } => todo!(),
+            ConstantPoolInfo::MethodHandle {
+                reference_kind,
+                reference_index,
+            } => {
+                w.write_u8(*reference_kind as u8);
+                w.write_u16(*reference_index);
+            }
+            ConstantPoolInfo::InvokeDynamic {
+                bootstrap_method_attr_index,
+                name_and_type_index,
+            } => {
+                w.write_u16(*bootstrap_method_attr_index);
+                w.write_u16(*name_and_type_index);
+            }
         }
     }
 }
 
 fn write_fields(w: &mut BinaryWriter, fields: &[FieldInfo]) {
     for field in fields.iter() {
-        w.write_u16(access_flags::to_u16(&field.access_flags));
+        w.write_u16(field.access_flags.to_u16());
         w.write_u16(field.name_index);
         w.write_u16(field.descriptor_index);
         w.write_u16(field.attributes.len().try_into().unwrap());
@@ -130,7 +141,7 @@ fn write_fields(w: &mut BinaryWriter, fields: &[FieldInfo]) {
 
 fn write_methods(w: &mut BinaryWriter, methods: &[MethodInfo]) {
     for method in methods.iter() {
-        w.write_u16(access_flags::to_u16(&method.access_flags));
+        w.write_u16(method.access_flags.to_u16());
         w.write_u16(method.name_index);
         w.write_u16(method.descriptor_index);
         w.write_u16(method.attributes.len().try_into().unwrap());
@@ -170,7 +181,10 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
             local_variable_table,
             ..
         } => 2 + (2 * 5) * (local_variable_table.len() as u32),
-        AttributeInfo::LocalVariableTypeTable { .. } => todo!(),
+        AttributeInfo::LocalVariableTypeTable {
+            local_variable_type_table,
+            ..
+        } => 2 + (2 * 5) * (local_variable_type_table.len() as u32),
         AttributeInfo::StackMapTable {
             stack_map_table, ..
         } => {
@@ -180,7 +194,12 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
                 .sum::<u32>()
         }
         AttributeInfo::SourceFile { .. } => 2,
-        AttributeInfo::BootstrapMethods { .. } => todo!(),
+        AttributeInfo::BootstrapMethods { methods, .. } => {
+            2 + methods
+                .iter()
+                .map(|m| 2 + 2 + 2 * (m.bootstrap_arguments.len() as u32))
+                .sum::<u32>()
+        }
         AttributeInfo::InnerClasses { classes, .. } => 2 + (2 * 4) * (classes.len() as u32),
         AttributeInfo::MethodParameters { .. } => todo!(),
         AttributeInfo::Record { .. } => todo!(),
@@ -330,7 +349,21 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                     w.write_u16(entry.index);
                 }
             }
-            AttributeInfo::LocalVariableTypeTable { .. } => todo!(),
+            AttributeInfo::LocalVariableTypeTable {
+                name_index,
+                local_variable_type_table,
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(local_variable_type_table.len().try_into().unwrap());
+                for entry in local_variable_type_table {
+                    w.write_u16(entry.start_pc);
+                    w.write_u16(entry.length);
+                    w.write_u16(entry.name_index);
+                    w.write_u16(entry.descriptor_index);
+                    w.write_u16(entry.index);
+                }
+            }
             AttributeInfo::StackMapTable {
                 name_index,
                 stack_map_table,
@@ -350,7 +383,19 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u32(get_attribute_length(attribute));
                 w.write_u16(*source_file_index);
             }
-            AttributeInfo::BootstrapMethods { .. } => todo!(),
+            AttributeInfo::BootstrapMethods {
+                name_index,
+                methods,
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(methods.len().try_into().unwrap());
+                for m in methods {
+                    w.write_u16(m.bootstrap_method_ref);
+                    w.write_u16(m.bootstrap_arguments.len().try_into().unwrap());
+                    w.write_u16_vec(&m.bootstrap_arguments);
+                }
+            }
             AttributeInfo::InnerClasses {
                 name_index,
                 classes,
@@ -362,7 +407,7 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                     w.write_u16(inner_class.inner_class_info_index);
                     w.write_u16(inner_class.outer_class_info_index);
                     w.write_u16(inner_class.inner_name_index);
-                    w.write_u16(access_flags::to_u16(&inner_class.inner_class_access_flags));
+                    w.write_u16(inner_class.inner_class_access_flags.to_u16());
                 }
             }
             AttributeInfo::MethodParameters { .. } => todo!(),

@@ -8,3 +8,4 @@ binary_reader = { path = "../binary_reader" }
 binary_writer = { path = "../binary_writer" }
 
 [dev-dependencies]
+rstest = "0.26.1"

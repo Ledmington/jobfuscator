@@ -2,12 +2,10 @@
 
 use binary_reader::BinaryReader;
 
-use crate::access_flags::{
-    InnerClassAccessFlag, MethodParameterAccessFlag, parse_inner_class_access_flags,
-    parse_method_parameter_access_flags,
-};
+use crate::access_flags::{InnerClassAccessFlags, MethodParameterAccessFlags};
+use crate::assert_valid_and_type;
 use crate::bytecode::{BytecodeInstruction, parse_bytecode};
-use crate::constant_pool::{ConstantPool, ConstantPoolTag, assert_valid_and_type};
+use crate::constant_pool::{ConstantPool, ConstantPoolTag};
 
 pub enum AttributeInfo {
     Code {
@@ -44,7 +42,7 @@ pub enum AttributeInfo {
     },
     InnerClasses {
         name_index: u16,
-        classes: Vec<Class>,
+        classes: Vec<InnerClassInfo>,
     },
     MethodParameters {
         name_index: u16,
@@ -200,7 +198,7 @@ pub struct RecordComponentInfo {
 
 pub struct MethodParameter {
     pub name_index: u16,
-    pub access_flags: Vec<MethodParameterAccessFlag>,
+    pub access_flags: MethodParameterAccessFlags,
 }
 
 pub struct ExceptionTableEntry {
@@ -280,12 +278,28 @@ pub struct BootstrapMethod {
     pub bootstrap_arguments: Vec<u16>,
 }
 
-// TODO: find a better name
-pub struct Class {
+pub struct InnerClassInfo {
     pub inner_class_info_index: u16,
     pub outer_class_info_index: u16,
     pub inner_name_index: u16,
-    pub inner_class_access_flags: Vec<InnerClassAccessFlag>,
+    pub inner_class_access_flags: InnerClassAccessFlags,
+}
+
+impl InnerClassInfo {
+    /// Indicates whether this inner class is anonymous, meaning that it has no simple name.
+    pub fn is_anonymous(&self) -> bool {
+        self.inner_name_index == 0
+    }
+
+    /// Indicates whether this inner class is local, meaning that this class has a simple name and no enclosing class entry.
+    pub fn is_local(&self) -> bool {
+        self.inner_name_index != 0 && self.outer_class_info_index == 0
+    }
+
+    /// Indicates whether this inner class is member, meaning that this class has both a simple name and an enclosing class entry.
+    pub fn is_member(&self) -> bool {
+        self.inner_name_index != 0 && self.outer_class_info_index != 0
+    }
 }
 
 pub fn parse_class_attributes(
@@ -311,7 +325,7 @@ pub fn parse_class_attributes(
 
 fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -321,26 +335,52 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                 "The attribute_length field of SourceFile must be 2 but was {attribute_length}.",
             );
             let source_file_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type(cp, source_file_index, ConstantPoolTag::Utf8);
+            assert_valid_and_type!(cp, source_file_index, ConstantPoolTag::Utf8);
             AttributeInfo::SourceFile {
                 name_index: attribute_name_index,
                 source_file_index,
             }
         }
         "BootstrapMethods" => {
+            let mut running_length: u32 = 0;
             let num_bootstrap_methods: u16 = reader.read_u16().unwrap();
+            running_length += 2;
             let mut methods: Vec<BootstrapMethod> =
                 Vec::with_capacity(num_bootstrap_methods.into());
             for _ in 0..num_bootstrap_methods {
                 let bootstrap_method_ref: u16 = reader.read_u16().unwrap();
+                assert_valid_and_type!(cp, bootstrap_method_ref, ConstantPoolTag::MethodHandle);
                 let num_bootstrap_arguments: u16 = reader.read_u16().unwrap();
                 let bootstrap_arguments: Vec<u16> =
                     reader.read_u16_vec(num_bootstrap_arguments.into()).unwrap();
+                for index in bootstrap_arguments.iter() {
+                    assert_valid_and_type!(
+                        cp,
+                        *index,
+                        ConstantPoolTag::Integer,
+                        ConstantPoolTag::Float,
+                        ConstantPoolTag::Long,
+                        ConstantPoolTag::Double,
+                        ConstantPoolTag::Class,
+                        ConstantPoolTag::String,
+                        ConstantPoolTag::MethodHandle,
+                        ConstantPoolTag::MethodType,
+                        ConstantPoolTag::Dynamic
+                    );
+                }
+                running_length += 2 + 2 + 2 * (bootstrap_arguments.len() as u32);
                 methods.push(BootstrapMethod {
                     bootstrap_method_ref,
                     bootstrap_arguments,
                 });
             }
+            assert!(
+                attribute_length == running_length,
+                "Expected length of attribute BootstrapMethods (with {} methods) to be {} bytes but was {}.",
+                methods.len(),
+                attribute_length,
+                running_length
+            );
             AttributeInfo::BootstrapMethods {
                 name_index: attribute_name_index,
                 methods,
@@ -348,15 +388,42 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
         }
         "InnerClasses" => {
             let number_of_classes: u16 = reader.read_u16().unwrap();
-            let mut classes: Vec<Class> = Vec::with_capacity(number_of_classes.into());
-            for _ in 0..number_of_classes {
-                classes.push(Class {
-                    inner_class_info_index: reader.read_u16().unwrap(),
-                    outer_class_info_index: reader.read_u16().unwrap(),
-                    inner_name_index: reader.read_u16().unwrap(),
-                    inner_class_access_flags: parse_inner_class_access_flags(
-                        reader.read_u16().unwrap(),
-                    ),
+            let expected_attribute_length: u32 = 2 + (2 * 4) * (number_of_classes as u32);
+            assert!(
+                attribute_length == expected_attribute_length,
+                "Expected length of attribute InnerClasses (with {number_of_classes} inner classes) to be {expected_attribute_length} bytes but was {attribute_length}.",
+            );
+            let mut classes: Vec<InnerClassInfo> = Vec::with_capacity(number_of_classes.into());
+            for i in 0..number_of_classes {
+                let inner_class_info_index = reader.read_u16().unwrap();
+                let outer_class_info_index = reader.read_u16().unwrap();
+                if inner_class_info_index == 0 {
+                    assert!(
+                        outer_class_info_index == 0,
+                        "Expected field outer_class_info_index of entry n.{i} to be 0 since inner_class_info_index was zero, but it was {outer_class_info_index}.",
+                    );
+                } else {
+                    assert_valid_and_type!(cp, inner_class_info_index, ConstantPoolTag::Class);
+                    assert!(
+                        inner_class_info_index != outer_class_info_index,
+                        "Expected field outer_class_info_index of entry n.{i} to be different from inner_class_info_index ({inner_class_info_index}) but it was.",
+                    );
+                    if outer_class_info_index != 0 {
+                        assert_valid_and_type!(cp, outer_class_info_index, ConstantPoolTag::Class);
+                    }
+                }
+                let inner_name_index = reader.read_u16().unwrap();
+                if inner_name_index != 0 {
+                    // The inner class is not anonymous
+                    assert_valid_and_type!(cp, inner_name_index, ConstantPoolTag::Utf8);
+                }
+                let inner_class_access_flags: InnerClassAccessFlags =
+                    InnerClassAccessFlags::from(reader.read_u16().unwrap());
+                classes.push(InnerClassInfo {
+                    inner_class_info_index,
+                    outer_class_info_index,
+                    inner_name_index,
+                    inner_class_access_flags,
                 });
             }
             AttributeInfo::InnerClasses {
@@ -441,7 +508,7 @@ fn check_attribute_length(
 
 fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -490,7 +557,7 @@ pub fn parse_method_attributes(
 
 fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -536,7 +603,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
                 );
                 let catch_type: u16 = reader.read_u16().unwrap();
                 if catch_type != 0 {
-                    assert_valid_and_type(cp, catch_type, ConstantPoolTag::Class);
+                    assert_valid_and_type!(cp, catch_type, ConstantPoolTag::Class);
                 }
                 exception_table.push(ExceptionTableEntry {
                     start_pc,
@@ -547,7 +614,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             }
             let attribute_count: u16 = reader.read_u16().unwrap();
             let attributes: Vec<AttributeInfo> =
-                parse_code_attributes(reader, cp, attribute_count.into(), &code);
+                parse_code_attributes(reader, cp, attribute_count.into(), &code, code_length);
             AttributeInfo::Code {
                 name_index: attribute_name_index,
                 max_stack,
@@ -562,9 +629,8 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             let mut parameters: Vec<MethodParameter> = Vec::with_capacity(parameters_count.into());
             for _ in 0..parameters_count {
                 let name_index: u16 = reader.read_u16().unwrap();
-                let raw_access_flags: u16 = reader.read_u16().unwrap();
-                let access_flags: Vec<MethodParameterAccessFlag> =
-                    parse_method_parameter_access_flags(raw_access_flags);
+                let access_flags: MethodParameterAccessFlags =
+                    MethodParameterAccessFlags::from(reader.read_u16().unwrap());
                 parameters.push(MethodParameter {
                     name_index,
                     access_flags,
@@ -578,7 +644,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
         "Signature" => {
             check_attribute_length(attribute_length, 2, attribute_name);
             let signature_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type(cp, signature_index, ConstantPoolTag::Utf8);
+            assert_valid_and_type!(cp, signature_index, ConstantPoolTag::Utf8);
             AttributeInfo::Signature {
                 name_index: attribute_name_index,
                 signature_index,
@@ -603,13 +669,13 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
 
 fn parse_annotation(cp: &ConstantPool, reader: &mut BinaryReader) -> Annotation {
     let type_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, type_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, type_index, ConstantPoolTag::Utf8);
     let num_element_value_pairs: u16 = reader.read_u16().unwrap();
     let mut element_value_pairs: Vec<ElementValuePair> =
         Vec::with_capacity(num_element_value_pairs.into());
     for _ in 0..num_element_value_pairs {
         let element_name_index: u16 = reader.read_u16().unwrap();
-        assert_valid_and_type(cp, element_name_index, ConstantPoolTag::Utf8);
+        assert_valid_and_type!(cp, element_name_index, ConstantPoolTag::Utf8);
         let value: ElementValue = parse_element_value(cp, reader);
         element_value_pairs.push(ElementValuePair {
             element_name_index,
@@ -679,10 +745,11 @@ fn parse_code_attributes(
     cp: &ConstantPool,
     num_attributes: usize,
     code: &[(u32, BytecodeInstruction)],
+    code_length: u32,
 ) -> Vec<AttributeInfo> {
     let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(num_attributes);
     for i in 0..num_attributes {
-        attributes.push(parse_code_attribute(cp, reader, code));
+        attributes.push(parse_code_attribute(cp, reader, code, code_length));
         for j in 0..i {
             assert!(
                 attributes[i].kind() != attributes[j].kind(),
@@ -700,9 +767,10 @@ fn parse_code_attribute(
     cp: &ConstantPool,
     reader: &mut BinaryReader,
     code: &[(u32, BytecodeInstruction)],
+    code_length: u32,
 ) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -735,13 +803,31 @@ fn parse_code_attribute(
         }
         "LocalVariableTable" => {
             let local_variable_table_length: u16 = reader.read_u16().unwrap();
+            let expected_attribute_length: u32 = 2 + (2 * 5) * (local_variable_table_length as u32);
+            assert!(
+                attribute_length == expected_attribute_length,
+                "The field attribute_length for LocalVariableTable (with {local_variable_table_length} entries) must be {expected_attribute_length} but was {attribute_length}."
+            );
             let mut local_variable_table: Vec<LocalVariableTableEntry> =
                 Vec::with_capacity(local_variable_table_length.into());
-            for _ in 0..local_variable_table_length {
+            for i in 0..local_variable_table_length {
                 let start_pc: u16 = reader.read_u16().unwrap();
+                assert!(
+                    code.iter()
+                        .any(|(position, _)| *position == (start_pc as u32)),
+                    "LocalVariableTable entry {i} has start_pc ({start_pc}) which does not correspond to a valid instruction.",
+                );
                 let length: u16 = reader.read_u16().unwrap();
+                assert!(
+                    code.iter()
+                        .any(|(position, _)| *position == ((start_pc + length) as u32))
+                        || ((start_pc + length) as u32) == code_length,
+                    "LocalVariableTable entry {i} has start_pc + length ({start_pc} + {length}) which does not correspond to a valid instruction.",
+                );
                 let name_index: u16 = reader.read_u16().unwrap();
+                assert_valid_and_type!(cp, name_index, ConstantPoolTag::Utf8);
                 let descriptor_index: u16 = reader.read_u16().unwrap();
+                assert_valid_and_type!(cp, descriptor_index, ConstantPoolTag::Utf8);
                 let index: u16 = reader.read_u16().unwrap();
                 local_variable_table.push(LocalVariableTableEntry {
                     start_pc,
@@ -758,13 +844,32 @@ fn parse_code_attribute(
         }
         "LocalVariableTypeTable" => {
             let local_variable_type_table_length: u16 = reader.read_u16().unwrap();
+            let expected_attribute_length: u32 =
+                2 + (2 * 5) * (local_variable_type_table_length as u32);
+            assert!(
+                attribute_length == expected_attribute_length,
+                "The field attribute_length for LocalVariableTypeTable (with {local_variable_type_table_length} entries) must be {expected_attribute_length} but was {attribute_length}."
+            );
             let mut local_variable_type_table: Vec<LocalVariableTypeTableEntry> =
                 Vec::with_capacity(local_variable_type_table_length.into());
-            for _ in 0..local_variable_type_table_length {
+            for i in 0..local_variable_type_table_length {
                 let start_pc: u16 = reader.read_u16().unwrap();
+                assert!(
+                    code.iter()
+                        .any(|(position, _)| *position == (start_pc as u32)),
+                    "LocalVariableTypeTable entry {i} has start_pc ({start_pc}) which does not correspond to a valid instruction.",
+                );
                 let length: u16 = reader.read_u16().unwrap();
+                assert!(
+                    code.iter()
+                        .any(|(position, _)| *position == ((start_pc + length) as u32))
+                        || ((start_pc + length) as u32) == code_length,
+                    "LocalVariableTypeTable entry {i} has start_pc + length ({start_pc} + {length}) which does not correspond to a valid instruction.",
+                );
                 let name_index: u16 = reader.read_u16().unwrap();
+                assert_valid_and_type!(cp, name_index, ConstantPoolTag::Utf8);
                 let descriptor_index: u16 = reader.read_u16().unwrap();
+                assert_valid_and_type!(cp, descriptor_index, ConstantPoolTag::Utf8);
                 let index: u16 = reader.read_u16().unwrap();
                 local_variable_type_table.push(LocalVariableTypeTableEntry {
                     start_pc,
