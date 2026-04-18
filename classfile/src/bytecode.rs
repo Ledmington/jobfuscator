@@ -1064,7 +1064,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u16(*constant_pool_index);
         }
         BytecodeInstruction::IInc { index, constant } => {
-            w.write_u8(0xb4);
+            w.write_u8(0x84);
             w.write_u8(*index);
             w.write_i8(*constant);
         }
