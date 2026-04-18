@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 
-use clap::Parser;
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
@@ -11,6 +10,7 @@ use classfile::{
     classfile::{ClassFile, parse_class_file},
     writer::write_class_file,
 };
+use cli_parser::CommandLineParser;
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::FileOptions};
 
 fn is_class_file(bytes: &[u8]) -> bool {
@@ -55,7 +55,7 @@ macro_rules! log {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
+    let args = CommandLineParser::new().parse(&std::env::args());
 
     let input_filename = args.input;
     let output_filename = args.output;
