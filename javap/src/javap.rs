@@ -465,8 +465,14 @@ fn print_methods(
         } else {
             let first_bracket_index = parsed_descriptor.find('(').unwrap();
             let return_type: String = parsed_descriptor[0..first_bracket_index].to_owned();
-            let arguments_string: String =
+            let mut arguments_string: String =
                 parsed_descriptor[first_bracket_index..parsed_descriptor.len()].to_owned();
+
+            if method.access_flags.contains(&MethodAccessFlag::Varargs) {
+                // replace last '[]' with '...'
+                arguments_string =
+                    arguments_string[..arguments_string.len() - 3].to_owned() + "...)";
+            }
 
             if is_constructor {
                 // this is a constructor of the class
@@ -1223,11 +1229,36 @@ fn get_comment(
         BytecodeInstruction::InvokeInterface {
             constant_pool_index,
             ..
-        } => Some(
-            get_method_type(&cp[constant_pool_index - 1])
-                + " "
-                + &cp.get_method_ref(*constant_pool_index),
-        ),
+        } => {
+            let method_entry = &cp[constant_pool_index - 1];
+            Some(
+                get_method_type(method_entry)
+                    + " "
+                    + &match method_entry {
+                        ConstantPoolInfo::MethodRef {
+                            class_index,
+                            name_and_type_index,
+                        } => {
+                            if *class_index == this_class {
+                                cp.get_name_and_type(*name_and_type_index)
+                            } else {
+                                cp.get_method_ref(*constant_pool_index)
+                            }
+                        }
+                        ConstantPoolInfo::InterfaceMethodRef {
+                            class_index,
+                            name_and_type_index,
+                        } => {
+                            if *class_index == this_class {
+                                cp.get_name_and_type(*name_and_type_index)
+                            } else {
+                                cp.get_method_ref(*constant_pool_index)
+                            }
+                        }
+                        _ => unreachable!(),
+                    },
+            )
+        }
     }
 }
 
