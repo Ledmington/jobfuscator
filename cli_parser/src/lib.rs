@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::env::Args;
+use std::{env::Args, iter::Map};
 
 pub struct CommandLineParser {
     program_name: String,
@@ -19,6 +19,11 @@ pub struct CommandLineOption {
 pub enum CommandLineType {
     Boolean { default_value: Option<bool> },
     String { default_value: Option<String> },
+}
+
+pub enum CommandLineValue {
+    Boolean { value: bool },
+    String { value: String },
 }
 
 impl CommandLineOption {
@@ -41,6 +46,14 @@ impl CommandLineOption {
             long_name,
             option_type,
         }
+    }
+
+    fn matches(&self, arg: &String) -> Result<CommandLineValue, String> {
+        let value: CommandLineValue = match &self.option_type {
+            CommandLineType::Boolean { default_value } => todo!(),
+            CommandLineType::String { default_value } => todo!(),
+        };
+        Ok(value)
     }
 }
 
@@ -83,11 +96,33 @@ impl CommandLineParser {
     }
 
     pub fn parse(&self, args: &Args) -> Arguments {
-        todo!()
+        let mut args_str: Vec<String> = Vec::with_capacity(args.len());
+        for arg in args.skip(0) {
+            args_str.push(arg);
+        }
+        self.parse_str(&args_str)
+    }
+
+    pub fn parse_str(&self, args: &[String]) -> Arguments {
+        for arg in args {
+            for option in self.options {
+                let result = option.matches(arg);
+                if result.is_ok() {}
+            }
+        }
+        Arguments {}
     }
 }
 
-pub struct Arguments {}
+pub struct Arguments {
+    values: Map<String, CommandLineValue>,
+}
+
+impl Arguments {
+    pub fn get(&self, name: &str) -> Argument {
+        todo!()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -119,7 +154,7 @@ mod tests {
             "--quiet=1",
             "--quiet=true",
         ] {
-            let args = parser.parse(Args);
+            let args = parser.parse_str(&[input.to_owned()]);
         }
     }
 }
