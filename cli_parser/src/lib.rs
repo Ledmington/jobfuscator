@@ -67,19 +67,22 @@ impl CommandLineOption {
         description: String,
         option_type: CommandLineType,
     ) -> Self {
-        if short_name.is_none() && long_name.is_none() {
+        let has_short_name = short_name.is_some();
+        let has_long_name = long_name.is_some();
+
+        if !has_short_name && !has_long_name {
             panic!("A command line option must have at least a short name or a long name.");
         }
-        if short_name.is_some() && long_name.is_some() && short_name == long_name {
+        if has_short_name && has_long_name && short_name == long_name {
             panic!(
                 "This command line option has identical short name and long name: '{}'.",
                 short_name.unwrap()
             );
         }
-        if short_name.is_some() && short_name.clone().unwrap().contains('=') {
+        if has_short_name && short_name.clone().unwrap().contains('=') {
             panic!("A command line option's short name can not contain '='.");
         }
-        if long_name.is_some() && long_name.clone().unwrap().contains('=') {
+        if has_long_name && long_name.clone().unwrap().contains('=') {
             panic!("A command line option's long name can not contain '='.");
         }
         CommandLineOption {
@@ -196,7 +199,7 @@ impl CommandLineParser {
 
         for option in self.options.iter() {
             match &option.short_name {
-                Some(sn) => write!(out, " -{:<max_short_name_length$}", sn).unwrap(),
+                Some(sn) => write!(out, " -{sn:<max_short_name_length$}").unwrap(),
                 None => write!(out, "  {:<max_short_name_length$}", "").unwrap(),
             }
 
@@ -207,7 +210,7 @@ impl CommandLineParser {
                     } else {
                         " "
                     };
-                    write!(out, "{} --{:<max_long_name_length$}", sep, ln).unwrap();
+                    write!(out, "{sep} --{ln:<max_long_name_length$}").unwrap();
                 }
                 None => {
                     write!(out, "  {:<max_long_name_length$}  ", "").unwrap();
@@ -242,7 +245,7 @@ impl CommandLineParser {
             }
         }
 
-        return values;
+        values
     }
 
     // On CommandLineParser:
@@ -251,7 +254,7 @@ impl CommandLineParser {
         self.parse_or_exit(&args_str)
     }
 
-    pub fn parse_or_exit(&self, args: &Vec<String>) -> Arguments {
+    pub fn parse_or_exit(&self, args: &[String]) -> Arguments {
         match self.parse_str(args) {
             Ok(arguments) => arguments,
             Err(e) => {
@@ -262,26 +265,26 @@ impl CommandLineParser {
         }
     }
 
-    pub fn parse_str(&self, args: &Vec<String>) -> Result<Arguments, String> {
+    pub fn parse_str(&self, args: &[String]) -> Result<Arguments, String> {
         let mut values = self.load_defaults();
 
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
 
-            let (argument_name, argument_value) = if arg.starts_with("--") {
+            let (argument_name, argument_value) = if let Some(stripped) = arg.strip_prefix("--") {
                 if let Some(eq) = arg.find('=') {
                     (&arg[2..eq], Some(&arg[eq + 1..]))
                 } else {
                     i += 1;
-                    (&arg[2..], args.get(i).map(String::as_str))
+                    (stripped, args.get(i).map(String::as_str))
                 }
-            } else if arg.starts_with('-') {
+            } else if let Some(stripped) = arg.strip_prefix('-') {
                 if let Some(eq) = arg.find('=') {
                     (&arg[1..eq], Some(&arg[eq + 1..]))
                 } else {
                     i += 1;
-                    (&arg[1..], args.get(i).map(String::as_str))
+                    (stripped, args.get(i).map(String::as_str))
                 }
             } else {
                 return Err(format!("Expected an option but found '{arg}'."));
@@ -322,11 +325,11 @@ impl CommandLineParser {
                 let present = option
                     .short_name
                     .as_ref()
-                    .map_or(false, |n| values.contains_key(n))
+                    .is_some_and(|n| values.contains_key(n))
                     || option
                         .long_name
                         .as_ref()
-                        .map_or(false, |n| values.contains_key(n));
+                        .is_some_and(|n| values.contains_key(n));
                 if !present {
                     let name = option
                         .long_name
@@ -389,9 +392,9 @@ mod tests {
             }],
         );
 
-        let args = parser.parse_str(&vec![]).unwrap();
-        assert_eq!(false, args.get("q").unwrap().as_bool());
-        assert_eq!(false, args.get("quiet").unwrap().as_bool());
+        let args = parser.parse_str(&[]).unwrap();
+        assert!(!args.get("q").unwrap().as_bool());
+        assert!(!args.get("quiet").unwrap().as_bool());
     }
 
     #[rstest]
@@ -421,8 +424,8 @@ mod tests {
 
         let string_args: Vec<String> = input.iter().map(|s| s.to_string()).collect();
         let args = parser.parse_str(&string_args).unwrap();
-        assert_eq!(true, args.get("q").unwrap().as_bool());
-        assert_eq!(true, args.get("quiet").unwrap().as_bool());
+        assert!(args.get("q").unwrap().as_bool());
+        assert!(args.get("quiet").unwrap().as_bool());
     }
 
     #[rstest]
@@ -450,8 +453,8 @@ mod tests {
 
         let string_args: Vec<String> = input.iter().map(|s| s.to_string()).collect();
         let args = parser.parse_str(&string_args).unwrap();
-        assert_eq!(false, args.get("q").unwrap().as_bool());
-        assert_eq!(false, args.get("quiet").unwrap().as_bool());
+        assert!(!args.get("q").unwrap().as_bool());
+        assert!(!args.get("quiet").unwrap().as_bool());
     }
 
     #[rstest]
@@ -512,7 +515,7 @@ mod tests {
             ],
         );
 
-        let expected_message: String = vec![
+        let expected_message: String = [
             "",
             " test-parser - A parser for testing",
             "",
@@ -530,8 +533,7 @@ mod tests {
         let text = String::from_utf8(out).unwrap();
         assert_eq!(
             expected_message, text,
-            "Expected help message to be '''\n{}\n''' but was '''\n{}\n'''",
-            expected_message, text
+            "Expected help message to be '''\n{expected_message}\n''' but was '''\n{text}\n'''",
         );
     }
 }

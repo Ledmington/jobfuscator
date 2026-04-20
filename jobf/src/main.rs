@@ -40,6 +40,13 @@ macro_rules! log {
     };
 }
 
+macro_rules! die {
+    ($($arg:tt)*) => {{
+        eprintln!($($arg)*);
+        std::process::exit(1);
+    }};
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let parser = CommandLineParser::new(
         "jobf",
@@ -78,8 +85,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_filename = args.get("output").unwrap().as_str();
     let quiet = args.get("quiet").unwrap().as_bool();
 
-    let mut file =
-        File::open(&input_filename).expect(&format!("Could not open file '{}'.", input_filename));
+    let mut file = File::open(&input_filename)
+        .unwrap_or_else(|err| die!("Could not open file '{}' due to: {}.", input_filename, err));
 
     // Read first few bytes to detect file type
     let mut header = [0u8; 4];
@@ -101,8 +108,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             file_bytes.len()
         );
 
-        let mut out_file = File::create(&output_filename)
-            .expect(&format!("Could not create file '{}'.", output_filename));
+        let mut out_file = File::create(&output_filename).unwrap_or_else(|err| {
+            die!(
+                "Could not create file '{}' due to: {}.",
+                output_filename,
+                err
+            )
+        });
         out_file.write_all(&out_bytes)?;
 
         log!(quiet, "Wrote output to {}", &output_filename);
