@@ -78,7 +78,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_filename = args.get("output").unwrap().as_str();
     let quiet = args.get("quiet").unwrap().as_bool();
 
-    let mut file = File::open(&input_filename)?;
+    let mut file =
+        File::open(&input_filename).expect(&format!("Could not open file '{}'.", input_filename));
 
     // Read first few bytes to detect file type
     let mut header = [0u8; 4];
@@ -100,7 +101,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             file_bytes.len()
         );
 
-        let mut out_file = File::create(&output_filename)?;
+        let mut out_file = File::create(&output_filename)
+            .expect(&format!("Could not create file '{}'.", output_filename));
         out_file.write_all(&out_bytes)?;
 
         log!(quiet, "Wrote output to {}", &output_filename);

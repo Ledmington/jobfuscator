@@ -90,6 +90,13 @@ impl CommandLineOption {
         }
     }
 
+    fn is_mandatory(&self) -> bool {
+        match &self.option_type {
+            CommandLineType::Boolean { default_value } => default_value.is_none(),
+            CommandLineType::String { default_value } => default_value.is_none(),
+        }
+    }
+
     fn try_match(
         &self,
         argument_name: &str,
@@ -103,7 +110,7 @@ impl CommandLineOption {
             return None;
         }
 
-        match self.option_type {
+        match &self.option_type {
             CommandLineType::Boolean { default_value } => match argument_value {
                 Some("0") | Some("false") => Some(CommandLineValue::Boolean(false)),
                 Some("1") | Some("true") => Some(CommandLineValue::Boolean(true)),
@@ -113,9 +120,16 @@ impl CommandLineOption {
                     argument_value.unwrap()
                 ),
             },
-            CommandLineType::String { .. } => {
-                Some(CommandLineValue::String(argument_value.unwrap().to_owned()))
-            }
+            CommandLineType::String { default_value } => match argument_value {
+                Some(s) => Some(CommandLineValue::String(s.to_owned())),
+                None => match default_value {
+                    Some(dv) => Some(CommandLineValue::String(dv.to_owned())),
+                    None => panic!(
+                        "Mandatory option '{}' expected a value but none was provided.",
+                        argument_name
+                    ),
+                },
+            },
         }
     }
 }
@@ -323,6 +337,27 @@ impl CommandLineParser {
         if matches!(values.get("help"), Some(CommandLineValue::Boolean(true))) {
             self.print_help(&mut io::stdout());
             std::process::exit(0);
+        }
+
+        // Every mandatory option must have a value here
+        for option in self.options.iter() {
+            if option.is_mandatory()
+                && (option.short_name.is_some()
+                    && !values.contains_key(&option.short_name.clone().unwrap()))
+                && (option.long_name.is_some()
+                    && !values.contains_key(&option.long_name.clone().unwrap()))
+            {
+                eprintln!(
+                    "Error: option '{}' is mandatory but did not have a value.",
+                    if option.long_name.is_some() {
+                        "--".to_owned() + &option.long_name.clone().unwrap()
+                    } else {
+                        "-".to_owned() + &option.short_name.clone().unwrap()
+                    }
+                );
+                self.print_help(&mut io::stdout());
+                std::process::exit(1);
+            }
         }
 
         Arguments { values }
