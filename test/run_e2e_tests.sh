@@ -56,6 +56,7 @@ run_javap_tests() {
     run_javap_test "Math"       || exit_code=1
     run_javap_test "Stream"     || exit_code=1
     run_javap_test "List"       || exit_code=1
+    run_javap_test "TimeUnit"   || exit_code=1
     set -e
 
     if [ "$exit_code" -ne 0 ]; then
@@ -111,6 +112,7 @@ run_roundtrip_tests() {
     run_roundtrip_test "Math"       || exit_code=1
     run_roundtrip_test "Stream"     || exit_code=1
     run_roundtrip_test "List"       || exit_code=1
+    run_roundtrip_test "TimeUnit"   || exit_code=1
     set -e
 
     if [ "$exit_code" -ne 0 ]; then
