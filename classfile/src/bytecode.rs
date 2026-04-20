@@ -71,6 +71,7 @@ pub enum BytecodeInstruction {
     DStore {
         local_variable_index: u8,
     },
+    IaLoad {},
     AaLoad {},
     BaLoad {},
     AaStore {},
@@ -432,6 +433,7 @@ pub fn parse_bytecode(
             0x2d => BytecodeInstruction::ALoad {
                 local_variable_index: 3,
             },
+            0x2e => BytecodeInstruction::IaLoad {},
             0x32 => BytecodeInstruction::AaLoad {},
             0x33 => BytecodeInstruction::BaLoad {},
             0x36 => BytecodeInstruction::IStore {
@@ -878,6 +880,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0x39);
             w.write_u8(*local_variable_index);
         }
+        BytecodeInstruction::IaLoad {} => w.write_u8(0x2e),
         BytecodeInstruction::AaLoad {} => w.write_u8(0x32),
         BytecodeInstruction::BaLoad {} => w.write_u8(0x33),
         BytecodeInstruction::AaStore {} => w.write_u8(0x53),
@@ -1188,6 +1191,7 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
             _ => 2,
         },
         BytecodeInstruction::DStore { .. } => 2,
+        BytecodeInstruction::IaLoad {} => 1,
         BytecodeInstruction::AaLoad {} => 1,
         BytecodeInstruction::BaLoad {} => 1,
         BytecodeInstruction::AaStore {} => 1,

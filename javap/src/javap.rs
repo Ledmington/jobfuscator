@@ -645,6 +645,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                 "dstore        ".to_owned() + &local_variable_index.to_string()
             }
         }
+        BytecodeInstruction::IaLoad {} => "iaload".to_owned(),
         BytecodeInstruction::AaLoad {} => "aaload".to_owned(),
         BytecodeInstruction::BaLoad {} => "baload".to_owned(),
         BytecodeInstruction::AaStore {} => "aastore".to_owned(),
@@ -961,6 +962,7 @@ fn get_comment(
         | BytecodeInstruction::FStore { .. }
         | BytecodeInstruction::DLoad { .. }
         | BytecodeInstruction::DStore { .. }
+        | BytecodeInstruction::IaLoad {}
         | BytecodeInstruction::AaLoad {}
         | BytecodeInstruction::BaLoad {}
         | BytecodeInstruction::AaStore {}
