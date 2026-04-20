@@ -6,6 +6,7 @@ members = [
     "classfile",
     "sha",
     "javap",
+    "cli_parser",
     "jobf",
 ]
 resolver = "3"

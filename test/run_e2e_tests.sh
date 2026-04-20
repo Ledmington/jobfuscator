@@ -76,7 +76,7 @@ run_roundtrip_test() {
     ACTUAL_HEX=$(mktemp)
     DIFF_OUTPUT=$(mktemp)
 
-    "${JOBF}" --quiet "${TEST_FILE}" "${OUTPUT}"
+    "${JOBF}" --input "${TEST_FILE}" --output "${OUTPUT}" --quiet
 
     xxd "${TEST_FILE}" > "${EXPECTED_HEX}"
     xxd "${OUTPUT}" > "${ACTUAL_HEX}"

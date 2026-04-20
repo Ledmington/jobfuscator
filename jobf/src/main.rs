@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 
-use clap::Parser;
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
@@ -11,6 +10,7 @@ use classfile::{
     classfile::{ClassFile, parse_class_file},
     writer::write_class_file,
 };
+use cli_parser::{CommandLineOption, CommandLineParser, CommandLineType};
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::FileOptions};
 
 fn is_class_file(bytes: &[u8]) -> bool {
@@ -32,20 +32,6 @@ fn parse_and_rewrite(reader: &mut BinaryReader) -> Vec<u8> {
     write_class_file(out_cf)
 }
 
-#[derive(Parser, Debug)]
-#[command(name = "jobf")]
-struct Args {
-    /// Input file
-    input: String,
-
-    /// Output file
-    output: String,
-
-    /// Suppress all output to stdout
-    #[arg(short, long)]
-    quiet: bool,
-}
-
 macro_rules! log {
     ($quiet:expr, $($arg:tt)*) => {
         if !$quiet {
@@ -54,14 +40,53 @@ macro_rules! log {
     };
 }
 
+macro_rules! die {
+    ($($arg:tt)*) => {{
+        eprintln!($($arg)*);
+        std::process::exit(1);
+    }};
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
+    let parser = CommandLineParser::new(
+        "jobf",
+        Some("The java class file obfuscator.".to_owned()),
+        vec![
+            CommandLineOption::new(
+                Some("i".to_owned()),
+                Some("input".to_owned()),
+                "The file to read from.".to_owned(),
+                CommandLineType::String {
+                    default_value: None,
+                },
+            ),
+            CommandLineOption::new(
+                Some("o".to_owned()),
+                Some("output".to_owned()),
+                "The file to write to.".to_owned(),
+                CommandLineType::String {
+                    default_value: None,
+                },
+            ),
+            CommandLineOption::new(
+                Some("q".to_owned()),
+                Some("quiet".to_owned()),
+                "Avoids printing on stdout.".to_owned(),
+                CommandLineType::Boolean {
+                    default_value: Some(false),
+                },
+            ),
+        ],
+    );
 
-    let input_filename = args.input;
-    let output_filename = args.output;
-    let quiet = args.quiet;
+    let args = parser.parse(std::env::args());
 
-    let mut file = File::open(&input_filename)?;
+    let input_filename = args.get("input").unwrap().as_str();
+    let output_filename = args.get("output").unwrap().as_str();
+    let quiet = args.get("quiet").unwrap().as_bool();
+
+    let mut file = File::open(&input_filename)
+        .unwrap_or_else(|err| die!("Could not open file '{}' due to: {}.", input_filename, err));
 
     // Read first few bytes to detect file type
     let mut header = [0u8; 4];
@@ -83,7 +108,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             file_bytes.len()
         );
 
-        let mut out_file = File::create(&output_filename)?;
+        let mut out_file = File::create(&output_filename).unwrap_or_else(|err| {
+            die!(
+                "Could not create file '{}' due to: {}.",
+                output_filename,
+                err
+            )
+        });
         out_file.write_all(&out_bytes)?;
 
         log!(quiet, "Wrote output to {}", &output_filename);
