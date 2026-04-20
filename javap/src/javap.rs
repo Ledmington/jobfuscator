@@ -514,6 +514,7 @@ where
 fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruction) -> String {
     match instruction {
         BytecodeInstruction::Dup {} => "dup".to_owned(),
+        BytecodeInstruction::Dup2 {} => "dup2".to_owned(),
         BytecodeInstruction::AConstNull {} => "aconst_null".to_owned(),
         BytecodeInstruction::IConst { constant } => {
             if *constant == -1 {
@@ -944,6 +945,7 @@ fn get_comment(
 ) -> Option<String> {
     match instruction {
         BytecodeInstruction::Dup {}
+        | BytecodeInstruction::Dup2 {}
         | BytecodeInstruction::AConstNull {}
         | BytecodeInstruction::IConst { .. }
         | BytecodeInstruction::LConst { .. }

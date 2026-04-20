@@ -18,6 +18,7 @@ use crate::{
  */
 pub enum BytecodeInstruction {
     Dup {},
+    Dup2 {},
     AConstNull {},
     IConst {
         constant: i32,
@@ -491,6 +492,7 @@ pub fn parse_bytecode(
             0x57 => BytecodeInstruction::Pop {},
             0x58 => BytecodeInstruction::Pop2 {},
             0x59 => BytecodeInstruction::Dup {},
+            0x5c => BytecodeInstruction::Dup2 {},
             0x60 => BytecodeInstruction::IAdd {},
             0x61 => BytecodeInstruction::LAdd {},
             0x62 => BytecodeInstruction::FAdd {},
@@ -727,6 +729,7 @@ pub fn parse_bytecode(
 pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction) {
     match instruction {
         BytecodeInstruction::Dup {} => w.write_u8(0x59),
+        BytecodeInstruction::Dup2 {} => w.write_u8(0x5c),
         BytecodeInstruction::AConstNull {} => todo!(),
         BytecodeInstruction::IConst { constant } => match constant {
             -1 => w.write_u8(0x02),
@@ -1126,6 +1129,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
 pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
     match instruction {
         BytecodeInstruction::Dup {} => 1,
+        BytecodeInstruction::Dup2 {} => 1,
         BytecodeInstruction::AConstNull {} => 1,
         BytecodeInstruction::IConst { .. } => 1,
         BytecodeInstruction::LConst { .. } => 1,
