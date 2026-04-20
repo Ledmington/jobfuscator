@@ -97,40 +97,35 @@ impl CommandLineOption {
         }
     }
 
+    /// Tries to match this option with the given value. Returns:
+    ///  - `None`, if this option didn't match at all.
+    ///  - `Some(Ok(...))`, if this option matched with a value.
+    ///  - `Some(Err(msg))`, if an error occurred during matching of this option, like no value for a mandatory option or invalid value parsing.
     fn try_match(
         &self,
         argument_name: &str,
         argument_value: Option<&str>,
-    ) -> Option<CommandLineValue> {
-        let matches_short_name: bool =
-            self.short_name.is_some() && self.short_name.clone().unwrap() == argument_name;
-        let matches_long_name: bool =
-            self.long_name.is_some() && self.long_name.clone().unwrap() == argument_name;
+    ) -> Option<Result<CommandLineValue, String>> {
+        let matches_short_name = self.short_name.as_deref() == Some(argument_name);
+        let matches_long_name = self.long_name.as_deref() == Some(argument_name);
         if !matches_short_name && !matches_long_name {
-            return None;
+            return None; // didn't match this option at all
         }
 
-        match &self.option_type {
+        Some(match &self.option_type {
             CommandLineType::Boolean { default_value } => match argument_value {
-                Some("0") | Some("false") => Some(CommandLineValue::Boolean(false)),
-                Some("1") | Some("true") => Some(CommandLineValue::Boolean(true)),
-                None => Some(CommandLineValue::Boolean(!default_value.unwrap())),
-                _ => panic!(
-                    "'{}' is not a valid boolean value.",
-                    argument_value.unwrap()
-                ),
+                Some("0") | Some("false") => Ok(CommandLineValue::Boolean(false)),
+                Some("1") | Some("true") => Ok(CommandLineValue::Boolean(true)),
+                None => Ok(CommandLineValue::Boolean(!default_value.unwrap())),
+                Some(other) => Err(format!(
+                    "'{other}' is not a valid value for '{argument_name}'."
+                )),
             },
-            CommandLineType::String { default_value } => match argument_value {
-                Some(s) => Some(CommandLineValue::String(s.to_owned())),
-                None => match default_value {
-                    Some(dv) => Some(CommandLineValue::String(dv.to_owned())),
-                    None => panic!(
-                        "Mandatory option '{}' expected a value but none was provided.",
-                        argument_name
-                    ),
-                },
+            CommandLineType::String { .. } => match argument_value {
+                Some(s) => Ok(CommandLineValue::String(s.to_owned())),
+                None => Err(format!("Option '{argument_name}' requires a value.")),
             },
-        }
+        })
     }
 }
 
@@ -250,85 +245,68 @@ impl CommandLineParser {
         return values;
     }
 
+    // On CommandLineParser:
     pub fn parse(&self, args: Args) -> Arguments {
         let args_str: Vec<String> = args.skip(1).collect();
-        self.parse_str(&args_str)
+        self.parse_or_exit(&args_str)
     }
 
-    pub fn parse_str(&self, args: &Vec<String>) -> Arguments {
-        let mut values: HashMap<String, CommandLineValue> = self.load_defaults();
+    pub fn parse_or_exit(&self, args: &Vec<String>) -> Arguments {
+        match self.parse_str(args) {
+            Ok(arguments) => arguments,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                self.print_help(&mut io::stdout());
+                std::process::exit(1);
+            }
+        }
+    }
+
+    pub fn parse_str(&self, args: &Vec<String>) -> Result<Arguments, String> {
+        let mut values = self.load_defaults();
 
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
 
-            let argument_name: &str;
-            let argument_value: Option<&str>;
-
-            if arg.starts_with("--") {
-                if let Some(equals_pos) = arg.find('=') {
-                    argument_name = &arg[2..equals_pos];
-                    argument_value = Some(&arg[(equals_pos + 1)..]);
+            let (argument_name, argument_value) = if arg.starts_with("--") {
+                if let Some(eq) = arg.find('=') {
+                    (&arg[2..eq], Some(&arg[eq + 1..]))
                 } else {
-                    argument_name = &arg[2..];
-                    argument_value = if i + 1 < args.len() {
-                        Some(&args[i + 1])
-                    } else {
-                        None
-                    };
                     i += 1;
+                    (&arg[2..], args.get(i).map(String::as_str))
                 }
             } else if arg.starts_with('-') {
-                if let Some(equals_pos) = arg.find('=') {
-                    argument_name = &arg[1..equals_pos];
-                    argument_value = Some(&arg[(equals_pos + 1)..]);
+                if let Some(eq) = arg.find('=') {
+                    (&arg[1..eq], Some(&arg[eq + 1..]))
                 } else {
-                    argument_name = &arg[1..];
-                    argument_value = if i + 1 < args.len() {
-                        Some(&args[i + 1])
-                    } else {
-                        None
-                    };
                     i += 1;
+                    (&arg[1..], args.get(i).map(String::as_str))
                 }
             } else {
-                eprintln!("Error: expected an option but found '{arg}'.");
-                self.print_help(&mut io::stdout());
-                std::process::exit(1);
-            }
+                return Err(format!("Expected an option but found '{arg}'."));
+            };
 
             let mut matched = false;
             for option in &self.options {
                 match option.try_match(argument_name, argument_value) {
-                    Some(parsed_value) => {
+                    Some(Ok(parsed_value)) => {
                         if let Some(sn) = &option.short_name {
-                            values.insert(sn.to_string(), parsed_value.clone());
+                            values.insert(sn.clone(), parsed_value.clone());
                         }
                         if let Some(ln) = &option.long_name {
-                            values.insert(ln.to_string(), parsed_value.clone());
+                            values.insert(ln.clone(), parsed_value.clone());
                         }
                         matched = true;
                         break;
                     }
-                    None if option.short_name.as_deref() == Some(argument_name)
-                        || option.long_name.as_deref() == Some(argument_name) =>
-                    {
-                        // The option matched by name but the value was invalid.
-                        eprintln!(
-                            "Error: '{}' is not a valid value for '{argument_name}'.",
-                            argument_value.unwrap_or("")
-                        );
-                        self.print_help(&mut io::stdout());
-                        std::process::exit(1);
-                    }
+                    Some(Err(e)) => return Err(e),
                     None => {}
                 }
             }
 
             if !matched {
-                eprintln!("Error: unrecognized option '{argument_name}'.");
-                self.print_help(&mut io::stdout());
-                std::process::exit(1);
+                return Err(format!("Unrecognized option '{argument_name}'."));
             }
 
             i += 1;
@@ -339,28 +317,31 @@ impl CommandLineParser {
             std::process::exit(0);
         }
 
-        // Every mandatory option must have a value here
-        for option in self.options.iter() {
-            if option.is_mandatory()
-                && (option.short_name.is_some()
-                    && !values.contains_key(&option.short_name.clone().unwrap()))
-                && (option.long_name.is_some()
-                    && !values.contains_key(&option.long_name.clone().unwrap()))
-            {
-                eprintln!(
-                    "Error: option '{}' is mandatory but did not have a value.",
-                    if option.long_name.is_some() {
-                        "--".to_owned() + &option.long_name.clone().unwrap()
-                    } else {
-                        "-".to_owned() + &option.short_name.clone().unwrap()
-                    }
-                );
-                self.print_help(&mut io::stdout());
-                std::process::exit(1);
+        for option in &self.options {
+            if option.is_mandatory() {
+                let present = option
+                    .short_name
+                    .as_ref()
+                    .map_or(false, |n| values.contains_key(n))
+                    || option
+                        .long_name
+                        .as_ref()
+                        .map_or(false, |n| values.contains_key(n));
+                if !present {
+                    let name = option
+                        .long_name
+                        .as_ref()
+                        .map(|n| format!("--{n}"))
+                        .or_else(|| option.short_name.as_ref().map(|n| format!("-{n}")))
+                        .unwrap();
+                    return Err(format!(
+                        "Option '{name}' is mandatory but was not provided."
+                    ));
+                }
             }
         }
 
-        Arguments { values }
+        Ok(Arguments { values })
     }
 }
 
@@ -408,7 +389,7 @@ mod tests {
             }],
         );
 
-        let args = parser.parse_str(&vec![]);
+        let args = parser.parse_str(&vec![]).unwrap();
         assert_eq!(false, args.get("q").unwrap().as_bool());
         assert_eq!(false, args.get("quiet").unwrap().as_bool());
     }
@@ -439,7 +420,7 @@ mod tests {
         );
 
         let string_args: Vec<String> = input.iter().map(|s| s.to_string()).collect();
-        let args = parser.parse_str(&string_args);
+        let args = parser.parse_str(&string_args).unwrap();
         assert_eq!(true, args.get("q").unwrap().as_bool());
         assert_eq!(true, args.get("quiet").unwrap().as_bool());
     }
@@ -468,7 +449,7 @@ mod tests {
         );
 
         let string_args: Vec<String> = input.iter().map(|s| s.to_string()).collect();
-        let args = parser.parse_str(&string_args);
+        let args = parser.parse_str(&string_args).unwrap();
         assert_eq!(false, args.get("q").unwrap().as_bool());
         assert_eq!(false, args.get("quiet").unwrap().as_bool());
     }
@@ -493,7 +474,7 @@ mod tests {
         );
 
         let string_args: Vec<String> = input.iter().map(|s| s.to_string()).collect();
-        let args = parser.parse_str(&string_args);
+        let args = parser.parse_str(&string_args).unwrap();
         assert_eq!("input.txt", args.get("i").unwrap().as_str());
         assert_eq!("input.txt", args.get("input").unwrap().as_str());
     }
