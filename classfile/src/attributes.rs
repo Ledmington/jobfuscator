@@ -68,6 +68,10 @@ pub enum AttributeInfo {
         name_index: u16,
         constant_value_index: u16,
     },
+    Exceptions {
+        name_index: u16,
+        exception_indices: Vec<u16>,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -86,6 +90,7 @@ pub enum AttributeKind {
     NestMembers,
     RuntimeVisibleAnnotations,
     ConstantValue,
+    Exceptions,
 }
 
 impl std::fmt::Display for AttributeKind {
@@ -113,6 +118,7 @@ impl AttributeInfo {
                 AttributeKind::RuntimeVisibleAnnotations
             }
             AttributeInfo::ConstantValue { .. } => AttributeKind::ConstantValue,
+            AttributeInfo::Exceptions { .. } => AttributeKind::Exceptions,
         }
     }
 }
@@ -659,6 +665,17 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             AttributeInfo::RuntimeVisibleAnnotations {
                 name_index: attribute_name_index,
                 annotations,
+            }
+        }
+        "Exceptions" => {
+            let num_exceptions: u16 = reader.read_u16().unwrap();
+            let exception_indices = reader.read_u16_vec(num_exceptions.into()).unwrap();
+            for exception_index in exception_indices.iter() {
+                assert_valid_and_type!(cp, *exception_index, ConstantPoolTag::Class);
+            }
+            AttributeInfo::Exceptions {
+                name_index: attribute_name_index,
+                exception_indices,
             }
         }
         _ => panic!(
