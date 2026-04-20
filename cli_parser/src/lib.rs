@@ -73,13 +73,6 @@ impl CommandLineOption {
         }
     }
 
-    fn canonical_name(&self) -> &str {
-        self.long_name
-            .as_deref()
-            .or(self.short_name.as_deref())
-            .unwrap()
-    }
-
     fn usage_names(&self) -> String {
         match (&self.short_name, &self.long_name) {
             (Some(s), Some(l)) => format!("{s}, {l}"),
@@ -172,19 +165,23 @@ impl CommandLineParser {
 
         // Load defaults
         for option in &self.options {
-            let key = option.canonical_name().to_string();
-            match &option.option_type {
+            let value: Option<CommandLineValue> = match &option.option_type {
                 CommandLineType::Boolean {
                     default_value: Some(v),
-                } => {
-                    values.insert(key, CommandLineValue::Boolean(*v));
-                }
+                } => Some(CommandLineValue::Boolean(*v)),
                 CommandLineType::String {
                     default_value: Some(v),
-                } => {
-                    values.insert(key, CommandLineValue::String(v.clone()));
+                } => Some(CommandLineValue::String(v.clone())),
+                _ => None,
+            };
+
+            if value.is_some() {
+                if option.short_name.is_some() {
+                    values.insert(option.short_name.clone().unwrap(), value.clone().unwrap());
                 }
-                _ => {}
+                if option.long_name.is_some() {
+                    values.insert(option.long_name.clone().unwrap(), value.clone().unwrap());
+                }
             }
         }
 
