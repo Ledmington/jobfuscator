@@ -1362,28 +1362,30 @@ fn print_method_attributes(
                         ));
                     }
                 }
-                print_code_attributes(cp, attributes);
+                print_code_attributes(lw, cp, attributes);
 
                 lw.indent(-1);
             }
             AttributeInfo::MethodParameters { parameters, .. } => {
-                println!("    MethodParameters:");
-                println!("      Name                           Flags");
+                lw.println("MethodParameters:");
+                lw.indent(1);
+                lw.println("Name                           Flags");
                 for param in parameters.iter() {
                     let name = if param.name_index == 0 {
                         "<no name>"
                     } else {
                         &cp.get_utf8_content(param.name_index)
                     };
-                    print!("      {name}");
+                    lw.print(name);
                     if param.access_flags.to_u16() != 0 {
-                        print!(
+                        lw.print(&format!(
                             "                      {}",
-                            param.access_flags.modifier_repr()
-                        );
+                            param.access_flags.modifier_repr(),
+                        ));
                     }
-                    println!();
+                    lw.println("");
                 }
+                lw.indent(-1);
             }
             AttributeInfo::Signature {
                 signature_index, ..
@@ -1424,105 +1426,121 @@ fn print_method_attributes(
     }
 }
 
-fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
+fn print_code_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[AttributeInfo]) {
     for attribute in attributes.iter() {
         match attribute {
             AttributeInfo::LineNumberTable {
                 line_number_table, ..
             } => {
-                println!("      LineNumberTable:");
+                lw.println("LineNumberTable:");
+                lw.indent(1);
                 for entry in line_number_table.iter() {
-                    println!("        line {}: {}", entry.line_number, entry.start_pc);
+                    lw.println(&format!("line {}: {}", entry.line_number, entry.start_pc));
                 }
+                lw.indent(-1);
             }
             AttributeInfo::LocalVariableTable {
                 local_variable_table,
                 ..
             } => {
-                println!("      LocalVariableTable:");
-                println!("        Start  Length  Slot  Name   Signature");
+                lw.println("LocalVariableTable:");
+                lw.indent(1);
+                lw.println("Start  Length  Slot  Name   Signature");
                 for entry in local_variable_table.iter() {
-                    println!(
-                        "         {:4}    {:4}    {:2} {:>5}   {}",
+                    lw.println(&format!(
+                        " {:4}    {:4}    {:2} {:>5}   {}",
                         entry.start_pc,
                         entry.length,
                         entry.index,
                         cp.get_utf8_content(entry.name_index),
                         cp.get_utf8_content(entry.descriptor_index)
-                    );
+                    ));
                 }
+                lw.indent(-1);
             }
             AttributeInfo::LocalVariableTypeTable {
                 local_variable_type_table,
                 ..
             } => {
-                println!("      LocalVariableTypeTable:");
-                println!("        Start  Length  Slot  Name   Signature");
+                lw.println("LocalVariableTypeTable:");
+                lw.indent(1);
+                lw.println("Start  Length  Slot  Name   Signature");
                 for entry in local_variable_type_table.iter() {
-                    println!(
-                        "         {:4}    {:4}    {:2} {:>5}   {}",
+                    lw.println(&format!(
+                        " {:4}    {:4}    {:2} {:>5}   {}",
                         entry.start_pc,
                         entry.length,
                         entry.index,
                         cp.get_utf8_content(entry.name_index),
                         cp.get_utf8_content(entry.descriptor_index)
-                    );
+                    ));
                 }
+                lw.indent(-1);
             }
             AttributeInfo::StackMapTable {
                 stack_map_table, ..
             } => {
-                println!(
-                    "      StackMapTable: number_of_entries = {}",
-                    stack_map_table.len()
-                );
+                lw.println(&format!(
+                    "StackMapTable: number_of_entries = {}",
+                    stack_map_table.len(),
+                ));
+                lw.indent(1);
                 for frame in stack_map_table.iter() {
                     match frame {
                         StackMapFrame::SameFrame { frame_type } => {
-                            println!("        frame_type = {frame_type} /* same */")
+                            lw.println(&format!("frame_type = {frame_type} /* same */"));
                         }
                         StackMapFrame::SameLocals1StackItemFrame { frame_type, stack } => {
-                            println!(
-                                "        frame_type = {frame_type} /* same_locals_1_stack_item */"
-                            );
-                            println!(
-                                "          stack = [ {} ]",
+                            lw.println(&format!(
+                                "frame_type = {frame_type} /* same_locals_1_stack_item */"
+                            ));
+                            lw.indent(1);
+                            lw.println(&format!(
+                                "stack = [ {} ]",
                                 get_verification_type_info_string(cp, stack)
-                            );
+                            ));
+                            lw.indent(-1);
                         }
                         StackMapFrame::SameLocals1StackItemFrameExtended {
                             offset_delta,
                             stack,
                         } => {
-                            println!(
-                                "        frame_type = 247 /* same_locals_1_stack_item_frame_extended */"
-                            );
-                            println!("          offset_delta = {offset_delta}");
-                            println!(
-                                "          stack = [ {} ]",
+                            lw.println(&format!(
+                                "frame_type = 247 /* same_locals_1_stack_item_frame_extended */"
+                            ));
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.println(&format!(
+                                "stack = [ {} ]",
                                 get_verification_type_info_string(cp, stack)
-                            );
+                            ));
+                            lw.indent(-1);
                         }
                         StackMapFrame::ChopFrame {
                             frame_type,
                             offset_delta,
                         } => {
-                            println!("        frame_type = {frame_type} /* chop */");
-                            println!("          offset_delta = {offset_delta}");
+                            lw.println(&format!("frame_type = {frame_type} /* chop */"));
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.indent(-1);
                         }
                         StackMapFrame::SameFrameExtended { offset_delta } => {
-                            println!("        frame_type = 251 /* same_frame_extended */");
-                            println!("          offset_delta = {offset_delta}");
+                            lw.println(&format!("frame_type = 251 /* same_frame_extended */"));
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.indent(-1);
                         }
                         StackMapFrame::AppendFrame {
                             frame_type,
                             offset_delta,
                             locals,
                         } => {
-                            println!("        frame_type = {frame_type} /* append */");
-                            println!("          offset_delta = {offset_delta}");
-                            println!(
-                                "          locals = {}",
+                            lw.println(&format!("frame_type = {frame_type} /* append */"));
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.println(&format!(
+                                "locals = {}",
                                 if locals.is_empty() {
                                     "[]".to_owned()
                                 } else {
@@ -1534,17 +1552,19 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                                             .join(", ")
                                         + " ]"
                                 }
-                            );
+                            ));
+                            lw.indent(-1);
                         }
                         StackMapFrame::FullFrame {
                             offset_delta,
                             locals,
                             stack,
                         } => {
-                            println!("        frame_type = 255 /* full_frame */");
-                            println!("          offset_delta = {offset_delta}");
-                            println!(
-                                "          locals = {}",
+                            lw.println(&format!("frame_type = 255 /* full_frame */"));
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.println(&format!(
+                                "locals = {}",
                                 if locals.is_empty() {
                                     "[]".to_owned()
                                 } else {
@@ -1556,9 +1576,9 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                                             .join(", ")
                                         + " ]"
                                 }
-                            );
-                            println!(
-                                "          stack = {}",
+                            ));
+                            lw.println(&format!(
+                                "stack = {}",
                                 if stack.is_empty() {
                                     "[]".to_owned()
                                 } else {
@@ -1570,10 +1590,12 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                                             .join(", ")
                                         + " ]"
                                 }
-                            );
+                            ));
+                            lw.indent(-1);
                         }
                     }
                 }
+                lw.indent(-1);
             }
             _ => unreachable!(),
         }
