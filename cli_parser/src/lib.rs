@@ -82,7 +82,11 @@ impl CommandLineOption {
         }
     }
 
-    fn try_match(&self, argument_name: &str, argument_value: &str) -> Option<CommandLineValue> {
+    fn try_match(
+        &self,
+        argument_name: &str,
+        argument_value: Option<&str>,
+    ) -> Option<CommandLineValue> {
         let matches_short_name: bool =
             self.short_name.is_some() && self.short_name.clone().unwrap() == argument_name;
         let matches_long_name: bool =
@@ -92,13 +96,17 @@ impl CommandLineOption {
         }
 
         match self.option_type {
-            CommandLineType::Boolean { .. } => match argument_value {
-                "0" | "false" => Some(CommandLineValue::Boolean(false)),
-                "1" | "true" => Some(CommandLineValue::Boolean(true)),
-                _ => panic!("'{}' is not a valid boolean value.", argument_value),
+            CommandLineType::Boolean { default_value } => match argument_value {
+                Some("0") | Some("false") => Some(CommandLineValue::Boolean(false)),
+                Some("1") | Some("true") => Some(CommandLineValue::Boolean(true)),
+                None => Some(CommandLineValue::Boolean(!default_value.unwrap())),
+                _ => panic!(
+                    "'{}' is not a valid boolean value.",
+                    argument_value.unwrap()
+                ),
             },
             CommandLineType::String { .. } => {
-                Some(CommandLineValue::String(argument_value.to_owned()))
+                Some(CommandLineValue::String(argument_value.unwrap().to_owned()))
             }
         }
     }
@@ -195,40 +203,36 @@ impl CommandLineParser {
             let arg = &args[i];
 
             let argument_name: &str;
-            let argument_value: &str;
+            let argument_value: Option<&str>;
 
-            if arg.starts_with('-') {
-                let contains_equals: bool = arg.contains('=');
-                if contains_equals {
-                    let equals_pos = arg.find('=').unwrap();
-                    argument_name = &arg[1..equals_pos];
-                    argument_value = &arg[(equals_pos + 1)..];
-                } else {
-                    if i + 1 >= args.len() {
-                        panic!(
-                            "Option '{}' expected an argument but found end of input.",
-                            arg
-                        );
-                    }
-                    argument_name = &arg[1..];
-                    argument_value = &args[i + 1];
-                    i += 1;
-                }
-            } else if arg.starts_with("--") {
+            if arg.starts_with("--") {
                 let contains_equals: bool = arg.contains('=');
                 if contains_equals {
                     let equals_pos = arg.find('=').unwrap();
                     argument_name = &arg[2..equals_pos];
-                    argument_value = &arg[(equals_pos + 1)..];
+                    argument_value = Some(&arg[(equals_pos + 1)..]);
                 } else {
-                    if i + 1 >= args.len() {
-                        panic!(
-                            "Option '{}' expected an argument but found end of input.",
-                            arg
-                        );
-                    }
                     argument_name = &arg[2..];
-                    argument_value = &args[i + 1];
+                    if i + 1 < args.len() {
+                        argument_value = Some(&args[i + 1]);
+                    } else {
+                        argument_value = None;
+                    }
+                    i += 1;
+                }
+            } else if arg.starts_with('-') {
+                let contains_equals: bool = arg.contains('=');
+                if contains_equals {
+                    let equals_pos = arg.find('=').unwrap();
+                    argument_name = &arg[1..equals_pos];
+                    argument_value = Some(&arg[(equals_pos + 1)..]);
+                } else {
+                    argument_name = &arg[1..];
+                    if i + 1 < args.len() {
+                        argument_value = Some(&args[i + 1]);
+                    } else {
+                        argument_value = None;
+                    }
                     i += 1;
                 }
             } else {
