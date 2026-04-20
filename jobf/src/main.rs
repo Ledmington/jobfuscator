@@ -48,6 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             CommandLineOption::new(
                 Some("i".to_owned()),
                 Some("input".to_owned()),
+                "The file to read from.".to_owned(),
                 CommandLineType::String {
                     default_value: None,
                 },
@@ -55,6 +56,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             CommandLineOption::new(
                 Some("o".to_owned()),
                 Some("output".to_owned()),
+                "The file to write to.".to_owned(),
                 CommandLineType::String {
                     default_value: None,
                 },
@@ -62,6 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             CommandLineOption::new(
                 Some("q".to_owned()),
                 Some("quiet".to_owned()),
+                "Avoids printing on stdout.".to_owned(),
                 CommandLineType::Boolean {
                     default_value: Some(false),
                 },

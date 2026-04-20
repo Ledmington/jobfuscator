@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::cmp::max;
-use std::io::{self, Write};
+use std::io::{self};
 use std::{collections::HashMap, env::Args, fmt};
 
 pub struct CommandLineParser {
@@ -14,6 +13,7 @@ pub struct CommandLineParser {
 pub struct CommandLineOption {
     short_name: Option<String>,
     long_name: Option<String>,
+    description: String,
     option_type: CommandLineType,
 }
 
@@ -64,6 +64,7 @@ impl CommandLineOption {
     pub fn new(
         short_name: Option<String>,
         long_name: Option<String>,
+        description: String,
         option_type: CommandLineType,
     ) -> Self {
         if short_name.is_none() && long_name.is_none() {
@@ -75,19 +76,17 @@ impl CommandLineOption {
                 short_name.unwrap()
             );
         }
+        if short_name.is_some() && short_name.clone().unwrap().contains('=') {
+            panic!("A command line option's short name can not contain '='.");
+        }
+        if long_name.is_some() && long_name.clone().unwrap().contains('=') {
+            panic!("A command line option's long name can not contain '='.");
+        }
         CommandLineOption {
             short_name,
             long_name,
+            description,
             option_type,
-        }
-    }
-
-    fn usage_names(&self) -> String {
-        match (&self.short_name, &self.long_name) {
-            (Some(s), Some(l)) => format!("{s}, {l}"),
-            (Some(s), None) => s.clone(),
-            (None, Some(l)) => l.clone(),
-            (None, None) => unreachable!(),
         }
     }
 
@@ -127,15 +126,20 @@ impl CommandLineParser {
         description: Option<String>,
         options: Vec<CommandLineOption>,
     ) -> Self {
-        let mut actual_options = options;
+        let mut actual_options = Vec::with_capacity(options.len() + 1);
 
         actual_options.push(CommandLineOption {
             short_name: Some("h".to_string()),
             long_name: Some("help".to_string()),
+            description: "Prints this message and exits.".to_owned(),
             option_type: CommandLineType::Boolean {
                 default_value: Some(false),
             },
         });
+
+        for opt in options {
+            actual_options.push(opt);
+        }
 
         for i in 0..actual_options.len() {
             for j in (i + 1)..actual_options.len() {
@@ -163,49 +167,45 @@ impl CommandLineParser {
         if let Some(desc) = &self.description {
             write!(out, " - {desc}").unwrap();
         }
-
         write!(out, "\n\nOptions:\n").unwrap();
 
-        let mut max_short_name_length = 0;
-        let mut max_long_name_length = 0;
-        for option in self.options.iter() {
-            if option.short_name.is_some() {
-                max_short_name_length = max(
-                    max_short_name_length,
-                    option.short_name.clone().unwrap().len(),
-                );
-            }
-            if option.long_name.is_some() {
-                max_long_name_length = max(
-                    max_long_name_length,
-                    option.long_name.clone().unwrap().len(),
-                );
-            }
-        }
+        let max_short_name_length = self
+            .options
+            .iter()
+            .filter_map(|o| o.short_name.as_deref())
+            .map(|s| s.len())
+            .max()
+            .unwrap_or(0);
+
+        let max_long_name_length = self
+            .options
+            .iter()
+            .filter_map(|o| o.long_name.as_deref())
+            .map(|s| s.len())
+            .max()
+            .unwrap_or(0);
 
         for option in self.options.iter() {
-            if option.short_name.is_some() {
-                write!(
-                    out,
-                    " -{:<max_short_name_length$}",
-                    option.short_name.clone().unwrap()
-                )
-                .unwrap();
-            } else {
-                write!(out, "  {:<max_short_name_length$}", "").unwrap();
+            match &option.short_name {
+                Some(sn) => write!(out, " -{:<max_short_name_length$}", sn).unwrap(),
+                None => write!(out, "  {:<max_short_name_length$}", "").unwrap(),
             }
-            if option.long_name.is_some() {
-                if option.short_name.is_some() {
-                    write!(out, ",").unwrap();
+
+            match &option.long_name {
+                Some(ln) => {
+                    let sep = if option.short_name.is_some() {
+                        ","
+                    } else {
+                        " "
+                    };
+                    write!(out, "{} --{:<max_long_name_length$}", sep, ln).unwrap();
                 }
-                write!(
-                    out,
-                    " --{:<max_long_name_length$}",
-                    option.long_name.clone().unwrap()
-                )
-                .unwrap();
+                None => {
+                    write!(out, "  {:<max_long_name_length$}  ", "").unwrap();
+                }
             }
-            writeln!(out).unwrap();
+
+            writeln!(out, "  {}", option.description).unwrap();
         }
     }
 
@@ -306,7 +306,7 @@ impl CommandLineParser {
             i += 1;
         }
 
-        if matches!(values.get("--help"), Some(CommandLineValue::Boolean(true))) {
+        if matches!(values.get("help"), Some(CommandLineValue::Boolean(true))) {
             self.print_help(&mut io::stdout());
             std::process::exit(0);
         }
@@ -352,6 +352,7 @@ mod tests {
             vec![CommandLineOption {
                 short_name: Some("q".to_string()),
                 long_name: Some("quiet".to_string()),
+                description: "Does not print anything on stdout.".to_owned(),
                 option_type: CommandLineType::Boolean {
                     default_value: Some(false),
                 },
@@ -381,6 +382,7 @@ mod tests {
             vec![CommandLineOption {
                 short_name: Some("q".to_string()),
                 long_name: Some("quiet".to_string()),
+                description: "Does not print anything on stdout.".to_owned(),
                 option_type: CommandLineType::Boolean {
                     default_value: Some(false),
                 },
@@ -409,6 +411,7 @@ mod tests {
             vec![CommandLineOption {
                 short_name: Some("q".to_string()),
                 long_name: Some("quiet".to_string()),
+                description: "Does not print anything on stdout.".to_owned(),
                 option_type: CommandLineType::Boolean {
                     default_value: Some(false),
                 },
@@ -433,6 +436,7 @@ mod tests {
             vec![CommandLineOption {
                 short_name: Some("i".to_string()),
                 long_name: Some("input".to_string()),
+                description: "The input file to read from.".to_owned(),
                 option_type: CommandLineType::String {
                     default_value: None,
                 },
@@ -454,6 +458,7 @@ mod tests {
                 CommandLineOption {
                     short_name: Some("i".to_string()),
                     long_name: Some("input".to_string()),
+                    description: "The input file to read from.".to_owned(),
                     option_type: CommandLineType::String {
                         default_value: None,
                     },
@@ -461,6 +466,7 @@ mod tests {
                 CommandLineOption {
                     short_name: None,
                     long_name: Some("output".to_string()),
+                    description: "The output file to write to.".to_owned(),
                     option_type: CommandLineType::String {
                         default_value: None,
                     },
@@ -468,6 +474,7 @@ mod tests {
                 CommandLineOption {
                     short_name: Some("v".to_string()),
                     long_name: None,
+                    description: "Prints verbose messages.".to_owned(),
                     option_type: CommandLineType::String {
                         default_value: None,
                     },
@@ -475,22 +482,26 @@ mod tests {
             ],
         );
 
+        let expected_message: String = vec![
+            "",
+            " test-parser - A parser for testing",
+            "",
+            "Options:",
+            " -h, --help    Prints this message and exits.",
+            " -i, --input   The input file to read from.",
+            "     --output  The output file to write to.",
+            " -v            Prints verbose messages.",
+            "",
+        ]
+        .join("\n");
+
         let mut out: Vec<u8> = Vec::new();
         parser.print_help(&mut out);
         let text = String::from_utf8(out).unwrap();
         assert_eq!(
-            vec![
-                "",
-                " test-parser - A parser for testing",
-                "",
-                "Options:",
-                " -i, --input",
-                "     --output",
-                " -v",
-                ""
-            ]
-            .join("\n"),
-            text
+            expected_message, text,
+            "Expected help message to be '''\n{}\n''' but was '''\n{}\n'''",
+            expected_message, text
         );
     }
 }
