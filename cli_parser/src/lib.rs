@@ -49,6 +49,13 @@ impl CommandLineValue {
             _ => panic!("This value is not a boolean."),
         }
     }
+
+    pub fn as_str(&self) -> String {
+        match self {
+            CommandLineValue::String(value) => value.to_string(),
+            _ => panic!("This value is not a boolean."),
+        }
+    }
 }
 
 impl CommandLineOption {
@@ -373,5 +380,29 @@ mod tests {
         let args = parser.parse_str(&string_args);
         assert_eq!(false, args.get("q").unwrap().as_bool());
         assert_eq!(false, args.get("quiet").unwrap().as_bool());
+    }
+
+    #[rstest]
+    #[case(vec!["-i", "input.txt"])]
+    #[case(vec!["-i=input.txt"])]
+    #[case(vec!["--input", "input.txt"])]
+    #[case(vec!["--input=input.txt"])]
+    fn parse_string_option(#[case] input: Vec<&str>) {
+        let parser = CommandLineParser::new(
+            "test-parser",
+            Some("A parser for testing".to_string()),
+            vec![CommandLineOption {
+                short_name: Some("i".to_string()),
+                long_name: Some("input".to_string()),
+                option_type: CommandLineType::String {
+                    default_value: None,
+                },
+            }],
+        );
+
+        let string_args: Vec<String> = input.iter().map(|s| s.to_string()).collect();
+        let args = parser.parse_str(&string_args);
+        assert_eq!("input.txt", args.get("i").unwrap().as_str());
+        assert_eq!("input.txt", args.get("input").unwrap().as_str());
     }
 }
