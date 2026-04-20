@@ -53,7 +53,7 @@ impl ClassAccessFlags {
             (ClassAccessFlag::Abstract, ""),
             (ClassAccessFlag::Synthetic, "synthetic"),
             (ClassAccessFlag::Annotation, "annotation"),
-            (ClassAccessFlag::Enum, "enum"),
+            (ClassAccessFlag::Enum, ""),
             (ClassAccessFlag::Module, "module"),
         ]
         .iter()
@@ -109,7 +109,7 @@ impl InnerClassAccessFlags {
             (InnerClassAccessFlag::Final, "final"),
             (InnerClassAccessFlag::Interface, ""),
             (InnerClassAccessFlag::Abstract, "abstract"),
-            (InnerClassAccessFlag::Synthetic, "synthetic"),
+            (InnerClassAccessFlag::Synthetic, ""),
             (InnerClassAccessFlag::Annotation, "annotation"),
             (InnerClassAccessFlag::Enum, ""),
         ]

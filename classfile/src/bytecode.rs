@@ -612,6 +612,7 @@ pub fn parse_bytecode(
                 let default: i32 = reader.read_i32().unwrap();
                 let low: i32 = reader.read_i32().unwrap();
                 let high: i32 = reader.read_i32().unwrap();
+                assert!(low <= high);
                 let offsets: Vec<i32> = reader
                     .read_i32_vec((high - low + 1).try_into().unwrap())
                     .unwrap();
