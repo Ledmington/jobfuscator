@@ -167,7 +167,7 @@ impl CommandLineParser {
         self.parse_str(&args_str)
     }
 
-    pub fn parse_str(&self, args: &[String]) -> Arguments {
+    pub fn parse_str(&self, args: &Vec<String>) -> Arguments {
         let mut values: HashMap<String, CommandLineValue> = HashMap::new();
 
         // Load defaults
@@ -312,17 +312,17 @@ mod tests {
     }
 
     #[rstest]
-    #[case("-q")]
-    #[case("-q 1")]
-    #[case("-q true")]
-    #[case("-q=1")]
-    #[case("-q=true")]
-    #[case("--quiet")]
-    #[case("--quiet 1")]
-    #[case("--quiet true")]
-    #[case("--quiet=1")]
-    #[case("--quiet=true")]
-    fn parse_boolean_option_true(#[case] input: &str) {
+    #[case(vec!["-q"])]
+    #[case(vec!["-q", "1"])]
+    #[case(vec!["-q", "true"])]
+    #[case(vec!["-q=1"])]
+    #[case(vec!["-q=true"])]
+    #[case(vec!["--quiet"])]
+    #[case(vec!["--quiet", "1"])]
+    #[case(vec!["--quiet", "true"])]
+    #[case(vec!["--quiet=1"])]
+    #[case(vec!["--quiet=true"])]
+    fn parse_boolean_option_true(#[case] input: Vec<&str>) {
         let parser = CommandLineParser::new(
             "test-parser",
             Some("A parser for testing".to_string()),
@@ -335,21 +335,22 @@ mod tests {
             }],
         );
 
-        let args = parser.parse_str(&[input.to_owned()]);
+        let string_args: Vec<String> = input.iter().map(|s| s.to_string()).collect();
+        let args = parser.parse_str(&string_args);
         assert_eq!(true, args.get("q").unwrap().as_bool());
         assert_eq!(true, args.get("quiet").unwrap().as_bool());
     }
 
     #[rstest]
-    #[case("-q 0")]
-    #[case("-q false")]
-    #[case("-q=0")]
-    #[case("-q=false")]
-    #[case("--quiet 0")]
-    #[case("--quiet false")]
-    #[case("--quiet=0")]
-    #[case("--quiet=false")]
-    fn parse_boolean_option_false(#[case] input: &str) {
+    #[case(vec!["-q", "0"])]
+    #[case(vec!["-q", "false"])]
+    #[case(vec!["-q=0"])]
+    #[case(vec!["-q=false"])]
+    #[case(vec!["--quiet", "0"])]
+    #[case(vec!["--quiet", "false"])]
+    #[case(vec!["--quiet=0"])]
+    #[case(vec!["--quiet=false"])]
+    fn parse_boolean_option_false(#[case] input: Vec<&str>) {
         let parser = CommandLineParser::new(
             "test-parser",
             Some("A parser for testing".to_string()),
@@ -362,7 +363,8 @@ mod tests {
             }],
         );
 
-        let args = parser.parse_str(&[input.to_owned()]);
+        let string_args: Vec<String> = input.iter().map(|s| s.to_string()).collect();
+        let args = parser.parse_str(&string_args);
         assert_eq!(false, args.get("q").unwrap().as_bool());
         assert_eq!(false, args.get("quiet").unwrap().as_bool());
     }
