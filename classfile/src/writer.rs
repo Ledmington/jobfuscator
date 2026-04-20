@@ -201,7 +201,9 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
                 .sum::<u32>()
         }
         AttributeInfo::InnerClasses { classes, .. } => 2 + (2 * 4) * (classes.len() as u32),
-        AttributeInfo::MethodParameters { .. } => todo!(),
+        AttributeInfo::MethodParameters { parameters, .. } => {
+            2 + (2 * 2) * (parameters.len() as u32)
+        }
         AttributeInfo::Record { .. } => todo!(),
         AttributeInfo::Signature { .. } => 2,
         AttributeInfo::NestMembers { classes, .. } => 2 + 2 * (classes.len() as u32),
@@ -413,7 +415,18 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                     w.write_u16(inner_class.inner_class_access_flags.to_u16());
                 }
             }
-            AttributeInfo::MethodParameters { .. } => todo!(),
+            AttributeInfo::MethodParameters {
+                name_index,
+                parameters,
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(parameters.len().try_into().unwrap());
+                for param in parameters {
+                    w.write_u16(param.name_index);
+                    w.write_u16(param.access_flags.to_u16());
+                }
+            }
             AttributeInfo::Record { .. } => todo!(),
             AttributeInfo::Signature {
                 name_index,

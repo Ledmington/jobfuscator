@@ -89,10 +89,10 @@ pub enum BytecodeInstruction {
         constant_pool_index: u16,
     },
     BiPush {
-        immediate: u8,
+        immediate: i8,
     },
     SiPush {
-        immediate: u16,
+        immediate: i16,
     },
     Pop {},
     Pop2 {},
@@ -344,10 +344,10 @@ pub fn parse_bytecode(
             0x0e => BytecodeInstruction::DConst { constant: 0.0 },
             0x0f => BytecodeInstruction::DConst { constant: 1.0 },
             0x10 => BytecodeInstruction::BiPush {
-                immediate: reader.read_u8().unwrap(),
+                immediate: reader.read_i8().unwrap(),
             },
             0x11 => BytecodeInstruction::SiPush {
-                immediate: reader.read_u16().unwrap(),
+                immediate: reader.read_i16().unwrap(),
             },
             0x12 => BytecodeInstruction::Ldc {
                 constant_pool_index: reader.read_u8().unwrap(),
@@ -907,11 +907,11 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         }
         BytecodeInstruction::BiPush { immediate } => {
             w.write_u8(0x10);
-            w.write_u8(*immediate);
+            w.write_i8(*immediate);
         }
         BytecodeInstruction::SiPush { immediate } => {
             w.write_u8(0x11);
-            w.write_u16(*immediate);
+            w.write_i16(*immediate);
         }
         BytecodeInstruction::Pop {} => w.write_u8(0x57),
         BytecodeInstruction::Pop2 {} => w.write_u8(0x58),
@@ -929,8 +929,14 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0xb3);
             w.write_u16(*field_ref_index);
         }
-        BytecodeInstruction::GetField { .. } => todo!(),
-        BytecodeInstruction::PutField { .. } => todo!(),
+        BytecodeInstruction::GetField { field_ref_index } => {
+            w.write_u8(0xb4);
+            w.write_u16(*field_ref_index);
+        }
+        BytecodeInstruction::PutField { field_ref_index } => {
+            w.write_u8(0xb5);
+            w.write_u16(*field_ref_index);
+        }
         BytecodeInstruction::InvokeSpecial { method_ref_index } => {
             w.write_u8(0xb7);
             w.write_u16(*method_ref_index);
@@ -967,8 +973,14 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         BytecodeInstruction::FCmpG {} => w.write_u8(0x96),
         BytecodeInstruction::DCmpL {} => w.write_u8(0x97),
         BytecodeInstruction::DCmpG {} => w.write_u8(0x98),
-        BytecodeInstruction::IfAcmpEq { .. } => todo!(),
-        BytecodeInstruction::IfAcmpNe { .. } => todo!(),
+        BytecodeInstruction::IfAcmpEq { offset } => {
+            w.write_u8(0xa5);
+            w.write_i16(*offset);
+        }
+        BytecodeInstruction::IfAcmpNe { offset } => {
+            w.write_u8(0xa6);
+            w.write_i16(*offset);
+        }
         BytecodeInstruction::IfIcmpEq { offset } => {
             w.write_u8(0x9f);
             w.write_i16(*offset);
