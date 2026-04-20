@@ -10,7 +10,7 @@ use classfile::{
     classfile::{ClassFile, parse_class_file},
     writer::write_class_file,
 };
-use cli_parser::CommandLineParser;
+use cli_parser::{CommandLineOption, CommandLineParser, CommandLineType};
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::FileOptions};
 
 fn is_class_file(bytes: &[u8]) -> bool {
@@ -32,20 +32,6 @@ fn parse_and_rewrite(reader: &mut BinaryReader) -> Vec<u8> {
     write_class_file(out_cf)
 }
 
-#[derive(Parser, Debug)]
-#[command(name = "jobf")]
-struct Args {
-    /// Input file
-    input: String,
-
-    /// Output file
-    output: String,
-
-    /// Suppress all output to stdout
-    #[arg(short, long)]
-    quiet: bool,
-}
-
 macro_rules! log {
     ($quiet:expr, $($arg:tt)*) => {
         if !$quiet {
@@ -55,11 +41,39 @@ macro_rules! log {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = CommandLineParser::new().parse(&std::env::args());
+    let parser = CommandLineParser::new(
+        "jobf",
+        Some("The java class file obfuscator.".to_owned()),
+        vec![
+            CommandLineOption::new(
+                Some("i".to_owned()),
+                Some("input".to_owned()),
+                CommandLineType::String {
+                    default_value: None,
+                },
+            ),
+            CommandLineOption::new(
+                Some("o".to_owned()),
+                Some("output".to_owned()),
+                CommandLineType::String {
+                    default_value: None,
+                },
+            ),
+            CommandLineOption::new(
+                Some("q".to_owned()),
+                Some("quiet".to_owned()),
+                CommandLineType::Boolean {
+                    default_value: Some(false),
+                },
+            ),
+        ],
+    );
 
-    let input_filename = args.input;
-    let output_filename = args.output;
-    let quiet = args.quiet;
+    let args = parser.parse(std::env::args());
+
+    let input_filename = args.get("input").unwrap().as_str();
+    let output_filename = args.get("output").unwrap().as_str();
+    let quiet = args.get("quiet").unwrap().as_bool();
 
     let mut file = File::open(&input_filename)?;
 
