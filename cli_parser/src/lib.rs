@@ -113,8 +113,8 @@ impl CommandLineParser {
         let mut actual_options = options;
 
         actual_options.push(CommandLineOption {
-            short_name: Some("-h".to_string()),
-            long_name: Some("--help".to_string()),
+            short_name: Some("h".to_string()),
+            long_name: Some("help".to_string()),
             option_type: CommandLineType::Boolean {
                 default_value: Some(false),
             },
@@ -160,10 +160,9 @@ impl CommandLineParser {
         self.parse_str(&args_str)
     }
 
-    pub fn parse_str(&self, args: &Vec<String>) -> Arguments {
+    fn load_defaults(&self) -> HashMap<String, CommandLineValue> {
         let mut values: HashMap<String, CommandLineValue> = HashMap::new();
 
-        // Load defaults
         for option in &self.options {
             let value: Option<CommandLineValue> = match &option.option_type {
                 CommandLineType::Boolean {
@@ -184,6 +183,12 @@ impl CommandLineParser {
                 }
             }
         }
+
+        return values;
+    }
+
+    pub fn parse_str(&self, args: &Vec<String>) -> Arguments {
+        let mut values: HashMap<String, CommandLineValue> = self.load_defaults();
 
         let mut i = 0;
         while i < args.len() {
@@ -295,8 +300,8 @@ mod tests {
             "test-parser",
             Some("A parser for testing".to_string()),
             vec![CommandLineOption {
-                short_name: Some("-q".to_string()),
-                long_name: Some("--quiet".to_string()),
+                short_name: Some("q".to_string()),
+                long_name: Some("quiet".to_string()),
                 option_type: CommandLineType::Boolean {
                     default_value: Some(false),
                 },
@@ -324,8 +329,8 @@ mod tests {
             "test-parser",
             Some("A parser for testing".to_string()),
             vec![CommandLineOption {
-                short_name: Some("-q".to_string()),
-                long_name: Some("--quiet".to_string()),
+                short_name: Some("q".to_string()),
+                long_name: Some("quiet".to_string()),
                 option_type: CommandLineType::Boolean {
                     default_value: Some(false),
                 },
@@ -352,8 +357,8 @@ mod tests {
             "test-parser",
             Some("A parser for testing".to_string()),
             vec![CommandLineOption {
-                short_name: Some("-q".to_string()),
-                long_name: Some("--quiet".to_string()),
+                short_name: Some("q".to_string()),
+                long_name: Some("quiet".to_string()),
                 option_type: CommandLineType::Boolean {
                     default_value: Some(false),
                 },
