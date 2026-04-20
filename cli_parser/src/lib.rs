@@ -209,11 +209,6 @@ impl CommandLineParser {
         }
     }
 
-    pub fn parse(&self, args: Args) -> Arguments {
-        let args_str: Vec<String> = args.skip(1).collect();
-        self.parse_str(&args_str)
-    }
-
     fn load_defaults(&self) -> HashMap<String, CommandLineValue> {
         let mut values: HashMap<String, CommandLineValue> = HashMap::new();
 
@@ -241,6 +236,11 @@ impl CommandLineParser {
         return values;
     }
 
+    pub fn parse(&self, args: Args) -> Arguments {
+        let args_str: Vec<String> = args.skip(1).collect();
+        self.parse_str(&args_str)
+    }
+
     pub fn parse_str(&self, args: &Vec<String>) -> Arguments {
         let mut values: HashMap<String, CommandLineValue> = self.load_defaults();
 
@@ -252,55 +252,69 @@ impl CommandLineParser {
             let argument_value: Option<&str>;
 
             if arg.starts_with("--") {
-                let contains_equals: bool = arg.contains('=');
-                if contains_equals {
-                    let equals_pos = arg.find('=').unwrap();
+                if let Some(equals_pos) = arg.find('=') {
                     argument_name = &arg[2..equals_pos];
                     argument_value = Some(&arg[(equals_pos + 1)..]);
                 } else {
                     argument_name = &arg[2..];
-                    if i + 1 < args.len() {
-                        argument_value = Some(&args[i + 1]);
+                    argument_value = if i + 1 < args.len() {
+                        Some(&args[i + 1])
                     } else {
-                        argument_value = None;
-                    }
+                        None
+                    };
                     i += 1;
                 }
             } else if arg.starts_with('-') {
-                let contains_equals: bool = arg.contains('=');
-                if contains_equals {
-                    let equals_pos = arg.find('=').unwrap();
+                if let Some(equals_pos) = arg.find('=') {
                     argument_name = &arg[1..equals_pos];
                     argument_value = Some(&arg[(equals_pos + 1)..]);
                 } else {
                     argument_name = &arg[1..];
-                    if i + 1 < args.len() {
-                        argument_value = Some(&args[i + 1]);
+                    argument_value = if i + 1 < args.len() {
+                        Some(&args[i + 1])
                     } else {
-                        argument_value = None;
-                    }
+                        None
+                    };
                     i += 1;
                 }
             } else {
-                panic!("Expected an argument but found '{}'.", arg);
+                eprintln!("Error: expected an option but found '{arg}'.");
+                self.print_help(&mut io::stdout());
+                std::process::exit(1);
             }
 
             let mut matched = false;
             for option in &self.options {
-                if let Some(parsed_value) = option.try_match(argument_name, argument_value) {
-                    if let Some(sn) = &option.short_name {
-                        values.insert(sn.to_string(), parsed_value.clone());
+                match option.try_match(argument_name, argument_value) {
+                    Some(parsed_value) => {
+                        if let Some(sn) = &option.short_name {
+                            values.insert(sn.to_string(), parsed_value.clone());
+                        }
+                        if let Some(ln) = &option.long_name {
+                            values.insert(ln.to_string(), parsed_value.clone());
+                        }
+                        matched = true;
+                        break;
                     }
-                    if let Some(ln) = &option.long_name {
-                        values.insert(ln.to_string(), parsed_value.clone());
+                    None if option.short_name.as_deref() == Some(argument_name)
+                        || option.long_name.as_deref() == Some(argument_name) =>
+                    {
+                        // The option matched by name but the value was invalid.
+                        eprintln!(
+                            "Error: '{}' is not a valid value for '{argument_name}'.",
+                            argument_value.unwrap_or("")
+                        );
+                        self.print_help(&mut io::stdout());
+                        std::process::exit(1);
                     }
-                    matched = true;
-                    break;
+                    None => {}
                 }
             }
 
             if !matched {
-                eprintln!("Warning: unrecognized argument '{argument_name}'");
+                eprintln!("Error: unrecognized option '{argument_name}'.");
+                self.print_help(&mut io::stdout());
+                std::process::exit(1);
             }
 
             i += 1;
