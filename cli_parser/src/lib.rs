@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+use std::cmp::max;
+use std::io::{self, Write};
 use std::{collections::HashMap, env::Args, fmt};
 
 pub struct CommandLineParser {
@@ -156,17 +158,54 @@ impl CommandLineParser {
         }
     }
 
-    fn print_help(&self) {
-        println!("Usage: {}", self.program_name);
-
+    fn print_help(&self, out: &mut impl io::Write) {
+        write!(out, "\n {}", self.program_name).unwrap();
         if let Some(desc) = &self.description {
-            println!("{desc}");
+            write!(out, " - {desc}").unwrap();
         }
 
-        println!("\nOptions:");
+        write!(out, "\n\nOptions:\n").unwrap();
 
-        for option in &self.options {
-            println!("  {:<24} {}", option.usage_names(), option.option_type);
+        let mut max_short_name_length = 0;
+        let mut max_long_name_length = 0;
+        for option in self.options.iter() {
+            if option.short_name.is_some() {
+                max_short_name_length = max(
+                    max_short_name_length,
+                    option.short_name.clone().unwrap().len(),
+                );
+            }
+            if option.long_name.is_some() {
+                max_long_name_length = max(
+                    max_long_name_length,
+                    option.long_name.clone().unwrap().len(),
+                );
+            }
+        }
+
+        for option in self.options.iter() {
+            if option.short_name.is_some() {
+                write!(
+                    out,
+                    " -{:<max_short_name_length$}",
+                    option.short_name.clone().unwrap()
+                )
+                .unwrap();
+            } else {
+                write!(out, "  {:<max_short_name_length$}", "").unwrap();
+            }
+            if option.long_name.is_some() {
+                if option.short_name.is_some() {
+                    write!(out, ",").unwrap();
+                }
+                write!(
+                    out,
+                    " --{:<max_long_name_length$}",
+                    option.long_name.clone().unwrap()
+                )
+                .unwrap();
+            }
+            writeln!(out).unwrap();
         }
     }
 
@@ -268,7 +307,7 @@ impl CommandLineParser {
         }
 
         if matches!(values.get("--help"), Some(CommandLineValue::Boolean(true))) {
-            self.print_help();
+            self.print_help(&mut io::stdout());
             std::process::exit(0);
         }
 
@@ -404,5 +443,54 @@ mod tests {
         let args = parser.parse_str(&string_args);
         assert_eq!("input.txt", args.get("i").unwrap().as_str());
         assert_eq!("input.txt", args.get("input").unwrap().as_str());
+    }
+
+    #[test]
+    fn help_message() {
+        let parser = CommandLineParser::new(
+            "test-parser",
+            Some("A parser for testing".to_string()),
+            vec![
+                CommandLineOption {
+                    short_name: Some("i".to_string()),
+                    long_name: Some("input".to_string()),
+                    option_type: CommandLineType::String {
+                        default_value: None,
+                    },
+                },
+                CommandLineOption {
+                    short_name: None,
+                    long_name: Some("output".to_string()),
+                    option_type: CommandLineType::String {
+                        default_value: None,
+                    },
+                },
+                CommandLineOption {
+                    short_name: Some("v".to_string()),
+                    long_name: None,
+                    option_type: CommandLineType::String {
+                        default_value: None,
+                    },
+                },
+            ],
+        );
+
+        let mut out: Vec<u8> = Vec::new();
+        parser.print_help(&mut out);
+        let text = String::from_utf8(out).unwrap();
+        assert_eq!(
+            vec![
+                "",
+                " test-parser - A parser for testing",
+                "",
+                "Options:",
+                " -i, --input",
+                "     --output",
+                " -v",
+                ""
+            ]
+            .join("\n"),
+            text
+        );
     }
 }
