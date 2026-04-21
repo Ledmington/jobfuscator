@@ -202,7 +202,7 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
         }
         AttributeInfo::InnerClasses { classes, .. } => 2 + (2 * 4) * (classes.len() as u32),
         AttributeInfo::MethodParameters { parameters, .. } => {
-            2 + (2 * 2) * (parameters.len() as u32)
+            1 + (2 * 2) * (parameters.len() as u32)
         }
         AttributeInfo::Record { .. } => todo!(),
         AttributeInfo::Signature { .. } => 2,
@@ -217,7 +217,7 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
     }
 }
 
-fn get_stack_map_entry_length(entry: &StackMapFrame) -> u32 {
+pub(crate) fn get_stack_map_entry_length(entry: &StackMapFrame) -> u32 {
     match entry {
         StackMapFrame::SameFrame { .. } => 1,
         StackMapFrame::SameLocals1StackItemFrame { stack, .. } => {
@@ -265,7 +265,7 @@ fn get_verification_type_info_length(type_info: &VerificationTypeInfo) -> u32 {
     }
 }
 
-fn get_annotation_length(annotation: &Annotation) -> u32 {
+pub(crate) fn get_annotation_length(annotation: &Annotation) -> u32 {
     2 + 2
         + annotation
             .element_value_pairs
@@ -421,7 +421,7 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
             } => {
                 w.write_u16(*name_index);
                 w.write_u32(get_attribute_length(attribute));
-                w.write_u16(parameters.len().try_into().unwrap());
+                w.write_u8(parameters.len().try_into().unwrap());
                 for param in parameters {
                     w.write_u16(param.name_index);
                     w.write_u16(param.access_flags.to_u16());
