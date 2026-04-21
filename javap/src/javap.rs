@@ -656,10 +656,10 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
             constant_pool_index,
         } => "new           #".to_owned() + &constant_pool_index.to_string(),
         BytecodeInstruction::BiPush { immediate } => {
-            "bipush        ".to_owned() + &(*immediate as i8).to_string()
+            "bipush        ".to_owned() + &immediate.to_string()
         }
         BytecodeInstruction::SiPush { immediate } => {
-            "sipush        ".to_owned() + &(*immediate as i16).to_string()
+            "sipush        ".to_owned() + &immediate.to_string()
         }
         BytecodeInstruction::Pop {} => "pop".to_owned(),
         BytecodeInstruction::Pop2 {} => "pop2".to_owned(),
@@ -1505,9 +1505,9 @@ fn print_code_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[A
                             offset_delta,
                             stack,
                         } => {
-                            lw.println(&format!(
-                                "frame_type = 247 /* same_locals_1_stack_item_frame_extended */"
-                            ));
+                            lw.println(
+                                "frame_type = 247 /* same_locals_1_stack_item_frame_extended */",
+                            );
                             lw.indent(1);
                             lw.println(&format!("offset_delta = {offset_delta}"));
                             lw.println(&format!(
@@ -1526,7 +1526,7 @@ fn print_code_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[A
                             lw.indent(-1);
                         }
                         StackMapFrame::SameFrameExtended { offset_delta } => {
-                            lw.println(&format!("frame_type = 251 /* same_frame_extended */"));
+                            lw.println("frame_type = 251 /* same_frame_extended */");
                             lw.indent(1);
                             lw.println(&format!("offset_delta = {offset_delta}"));
                             lw.indent(-1);
@@ -1560,7 +1560,7 @@ fn print_code_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[A
                             locals,
                             stack,
                         } => {
-                            lw.println(&format!("frame_type = 255 /* full_frame */"));
+                            lw.println("frame_type = 255 /* full_frame */");
                             lw.indent(1);
                             lw.println(&format!("offset_delta = {offset_delta}"));
                             lw.println(&format!(

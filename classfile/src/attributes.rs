@@ -668,10 +668,8 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             for _ in 0..num_annotations {
                 annotations.push(parse_annotation(cp, reader));
             }
-            let expected_attribute_length = 2 + annotations
-                .iter()
-                .map(|ann| get_annotation_length(ann))
-                .sum::<u32>();
+            let expected_attribute_length =
+                2 + annotations.iter().map(get_annotation_length).sum::<u32>();
             check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
             AttributeInfo::RuntimeVisibleAnnotations {
                 name_index: attribute_name_index,
@@ -914,7 +912,7 @@ fn parse_code_attribute(
             }
             let expected_attribute_length = 2 + stack_map_table
                 .iter()
-                .map(|smf| get_stack_map_entry_length(smf))
+                .map(get_stack_map_entry_length)
                 .sum::<u32>();
             check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
             AttributeInfo::StackMapTable {
