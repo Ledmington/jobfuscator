@@ -1621,7 +1621,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
 
                     if class.is_anonymous() || class.is_local() {
                         if class.inner_class_access_flags.to_u16() != 0 {
-                            lw.print(&format!("{} ", modifiers));
+                            lw.print(&format!("{modifiers} "));
                         }
                         lw.print(&format!("#{};", class.inner_class_info_index))
                             .tab()
