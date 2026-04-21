@@ -1,4 +1,5 @@
-use binary_reader::BinaryReader;
+
+use binary_reader::byte_reader::ByteReader;
 
 use crate::access_flags::ClassAccessFlags;
 use crate::assert_valid_and_type;
@@ -26,7 +27,7 @@ pub struct ClassFile {
     pub attributes: Vec<AttributeInfo>,
 }
 
-pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
+pub fn parse_class_file(reader: &mut ByteReader) -> ClassFile {
     let actual_magic_number: u32 = reader.read_u32().unwrap();
     const EXPECTED_MAGIC_NUMBER: u32 = 0xcafebabe;
     assert!(

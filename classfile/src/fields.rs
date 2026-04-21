@@ -1,4 +1,5 @@
-use binary_reader::BinaryReader;
+
+use binary_reader::byte_reader::ByteReader;
 
 use crate::{
     access_flags::FieldAccessFlags,
@@ -16,7 +17,7 @@ pub struct FieldInfo {
 }
 
 pub fn parse_fields(
-    reader: &mut BinaryReader,
+    reader: &mut ByteReader,
     cp: &ConstantPool,
     num_fields: usize,
 ) -> Vec<FieldInfo> {
