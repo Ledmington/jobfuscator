@@ -3,7 +3,7 @@ use std::{
     io::Result,
 };
 
-use binary_reader::BinaryReader;
+use binary_reader::byte_reader::ByteReader;
 use binary_writer::BinaryWriter;
 
 use crate::{
@@ -325,7 +325,7 @@ impl Display for ArrayType {
 }
 
 pub fn parse_bytecode(
-    reader: &mut BinaryReader,
+    reader: &mut ByteReader,
     cp: &ConstantPool,
 ) -> Vec<(u32, BytecodeInstruction)> {
     let mut instructions: Vec<(u32, BytecodeInstruction)> = Vec::new();
