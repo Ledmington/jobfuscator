@@ -11,7 +11,7 @@ use binary_reader::bit_reader::BitReader;
 
 use crate::{
     CentralDirectoryRecord, CompressionMethod, EndOfCentralDirectoryRecord, ExtraField,
-    ExtraFieldType, LocalFileHeader, MsDosDate, MsDosTime, OS, Version, ZipFile,
+    ExtraFieldType, LocalFileHeader, MsDosDate, MsDosTime, OS, Version, ZipEntry, ZipFile,
 };
 
 // Useful reference: https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
@@ -48,6 +48,7 @@ fn parse_local_file_header(reader: &mut BitReader) -> LocalFileHeader {
     let last_modification_date = parse_date(reader);
     assert_not_in_the_future(&last_modification_date, &last_modification_time);
 
+    // TODO: check CRC32
     let crc32 = reader.read_u32();
     if crc32 != 0 {
         panic!("Invalid CRC32: 0x{:08x}.", crc32);
@@ -88,7 +89,6 @@ fn parse_local_file_header(reader: &mut BitReader) -> LocalFileHeader {
         compression_method,
         last_modification_time,
         last_modification_date,
-        crc32,
         compressed_size,
         uncompressed_size,
         filename,
@@ -172,6 +172,7 @@ fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
         }
     }
 
+    let mut entries: Vec<ZipEntry> = Vec::with_capacity(central_directory.len());
     for cdr in central_directory {
         reader.set_byte_position(cdr.local_file_header_offset as usize);
         let lfh = parse_local_file_header(reader);
@@ -179,9 +180,13 @@ fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
         check_local_file_header(&cdr, &lfh);
 
         let compressed = reader.read_u8_vec(cdr.compressed_size as usize);
+
+        entries.push(ZipEntry {
+            filename: cdr.filename,
+        });
     }
 
-    ZipFile {}
+    ZipFile { entries }
 }
 
 fn parse_version(reader: &mut BitReader) -> Version {
@@ -350,10 +355,8 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
         compression_method,
         last_modification_time,
         last_modification_date,
-        crc32,
         compressed_size,
         uncompressed_size,
-        disk_where_file_starts,
         internal_file_attributes,
         external_file_attributes,
         local_file_header_offset,
@@ -404,7 +407,7 @@ fn parse_end_of_central_directory_record(reader: &mut BitReader) -> EndOfCentral
     let disk_of_central_directory = reader.read_u16();
     if disk_of_central_directory != 0 {
         panic!(
-            "Don't know what to do when disk of Central Directory is not 0: was {} (0x{:04x})",
+            "Don't know what to do when disk of Central Directory is not 0: was {} (0x{:04x}).",
             disk_of_central_directory, disk_of_central_directory
         );
     }
@@ -431,9 +434,6 @@ fn parse_end_of_central_directory_record(reader: &mut BitReader) -> EndOfCentral
     }
 
     EndOfCentralDirectoryRecord {
-        disk_number,
-        disk_of_central_directory,
-        n_central_directory_records_on_this_disk,
         total_central_directory_records,
         central_directory_size,
         central_directory_offset,
