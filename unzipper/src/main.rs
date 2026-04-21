@@ -10,6 +10,6 @@ pub fn main() {
     let file = parse_zip(&filename);
 
     for entry in file.entries() {
-        println!("{}", entry.name());
+        println!("{} {} bytes", entry.name(), entry.compressed_size());
     }
 }

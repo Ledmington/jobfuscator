@@ -31,7 +31,7 @@ impl<'a> BitReader<'a> {
         let byte_pos = self.bit_position / 8;
         let bit_pos = self.bit_position % 8;
         self.bit_position += 1;
-        Ok((self.buf[byte_pos] & (1 << 7 - bit_pos)) != 0)
+        Ok((self.buf[byte_pos] & (1 << (7 - bit_pos))) != 0)
     }
 
     pub fn read_u8(&mut self) -> Result<u8> {
