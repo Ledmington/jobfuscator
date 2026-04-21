@@ -18,6 +18,7 @@ use crate::{
  */
 pub enum BytecodeInstruction {
     Dup {},
+    Dup2 {},
     AConstNull {},
     IConst {
         constant: i32,
@@ -70,6 +71,7 @@ pub enum BytecodeInstruction {
     DStore {
         local_variable_index: u8,
     },
+    IaLoad {},
     AaLoad {},
     BaLoad {},
     AaStore {},
@@ -87,10 +89,10 @@ pub enum BytecodeInstruction {
         constant_pool_index: u16,
     },
     BiPush {
-        immediate: u8,
+        immediate: i8,
     },
     SiPush {
-        immediate: u16,
+        immediate: i16,
     },
     Pop {},
     Pop2 {},
@@ -342,10 +344,10 @@ pub fn parse_bytecode(
             0x0e => BytecodeInstruction::DConst { constant: 0.0 },
             0x0f => BytecodeInstruction::DConst { constant: 1.0 },
             0x10 => BytecodeInstruction::BiPush {
-                immediate: reader.read_u8().unwrap(),
+                immediate: reader.read_i8().unwrap(),
             },
             0x11 => BytecodeInstruction::SiPush {
-                immediate: reader.read_u16().unwrap(),
+                immediate: reader.read_i16().unwrap(),
             },
             0x12 => BytecodeInstruction::Ldc {
                 constant_pool_index: reader.read_u8().unwrap(),
@@ -431,6 +433,7 @@ pub fn parse_bytecode(
             0x2d => BytecodeInstruction::ALoad {
                 local_variable_index: 3,
             },
+            0x2e => BytecodeInstruction::IaLoad {},
             0x32 => BytecodeInstruction::AaLoad {},
             0x33 => BytecodeInstruction::BaLoad {},
             0x36 => BytecodeInstruction::IStore {
@@ -491,6 +494,7 @@ pub fn parse_bytecode(
             0x57 => BytecodeInstruction::Pop {},
             0x58 => BytecodeInstruction::Pop2 {},
             0x59 => BytecodeInstruction::Dup {},
+            0x5c => BytecodeInstruction::Dup2 {},
             0x60 => BytecodeInstruction::IAdd {},
             0x61 => BytecodeInstruction::LAdd {},
             0x62 => BytecodeInstruction::FAdd {},
@@ -608,6 +612,7 @@ pub fn parse_bytecode(
                 let default: i32 = reader.read_i32().unwrap();
                 let low: i32 = reader.read_i32().unwrap();
                 let high: i32 = reader.read_i32().unwrap();
+                assert!(low <= high);
                 let offsets: Vec<i32> = reader
                     .read_i32_vec((high - low + 1).try_into().unwrap())
                     .unwrap();
@@ -727,6 +732,7 @@ pub fn parse_bytecode(
 pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction) {
     match instruction {
         BytecodeInstruction::Dup {} => w.write_u8(0x59),
+        BytecodeInstruction::Dup2 {} => w.write_u8(0x5c),
         BytecodeInstruction::AConstNull {} => todo!(),
         BytecodeInstruction::IConst { constant } => match constant {
             -1 => w.write_u8(0x02),
@@ -875,6 +881,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0x39);
             w.write_u8(*local_variable_index);
         }
+        BytecodeInstruction::IaLoad {} => w.write_u8(0x2e),
         BytecodeInstruction::AaLoad {} => w.write_u8(0x32),
         BytecodeInstruction::BaLoad {} => w.write_u8(0x33),
         BytecodeInstruction::AaStore {} => w.write_u8(0x53),
@@ -900,11 +907,11 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         }
         BytecodeInstruction::BiPush { immediate } => {
             w.write_u8(0x10);
-            w.write_u8(*immediate);
+            w.write_i8(*immediate);
         }
         BytecodeInstruction::SiPush { immediate } => {
             w.write_u8(0x11);
-            w.write_u16(*immediate);
+            w.write_i16(*immediate);
         }
         BytecodeInstruction::Pop {} => w.write_u8(0x57),
         BytecodeInstruction::Pop2 {} => w.write_u8(0x58),
@@ -922,8 +929,14 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0xb3);
             w.write_u16(*field_ref_index);
         }
-        BytecodeInstruction::GetField { .. } => todo!(),
-        BytecodeInstruction::PutField { .. } => todo!(),
+        BytecodeInstruction::GetField { field_ref_index } => {
+            w.write_u8(0xb4);
+            w.write_u16(*field_ref_index);
+        }
+        BytecodeInstruction::PutField { field_ref_index } => {
+            w.write_u8(0xb5);
+            w.write_u16(*field_ref_index);
+        }
         BytecodeInstruction::InvokeSpecial { method_ref_index } => {
             w.write_u8(0xb7);
             w.write_u16(*method_ref_index);
@@ -960,8 +973,14 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
         BytecodeInstruction::FCmpG {} => w.write_u8(0x96),
         BytecodeInstruction::DCmpL {} => w.write_u8(0x97),
         BytecodeInstruction::DCmpG {} => w.write_u8(0x98),
-        BytecodeInstruction::IfAcmpEq { .. } => todo!(),
-        BytecodeInstruction::IfAcmpNe { .. } => todo!(),
+        BytecodeInstruction::IfAcmpEq { offset } => {
+            w.write_u8(0xa5);
+            w.write_i16(*offset);
+        }
+        BytecodeInstruction::IfAcmpNe { offset } => {
+            w.write_u8(0xa6);
+            w.write_i16(*offset);
+        }
         BytecodeInstruction::IfIcmpEq { offset } => {
             w.write_u8(0x9f);
             w.write_i16(*offset);
@@ -1126,6 +1145,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
 pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
     match instruction {
         BytecodeInstruction::Dup {} => 1,
+        BytecodeInstruction::Dup2 {} => 1,
         BytecodeInstruction::AConstNull {} => 1,
         BytecodeInstruction::IConst { .. } => 1,
         BytecodeInstruction::LConst { .. } => 1,
@@ -1184,6 +1204,7 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
             _ => 2,
         },
         BytecodeInstruction::DStore { .. } => 2,
+        BytecodeInstruction::IaLoad {} => 1,
         BytecodeInstruction::AaLoad {} => 1,
         BytecodeInstruction::BaLoad {} => 1,
         BytecodeInstruction::AaStore {} => 1,

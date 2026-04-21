@@ -201,7 +201,9 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
                 .sum::<u32>()
         }
         AttributeInfo::InnerClasses { classes, .. } => 2 + (2 * 4) * (classes.len() as u32),
-        AttributeInfo::MethodParameters { .. } => todo!(),
+        AttributeInfo::MethodParameters { parameters, .. } => {
+            1 + (2 * 2) * (parameters.len() as u32)
+        }
         AttributeInfo::Record { .. } => todo!(),
         AttributeInfo::Signature { .. } => 2,
         AttributeInfo::NestMembers { classes, .. } => 2 + 2 * (classes.len() as u32),
@@ -209,10 +211,13 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
             2 + annotations.iter().map(get_annotation_length).sum::<u32>()
         }
         AttributeInfo::ConstantValue { .. } => 2,
+        AttributeInfo::Exceptions {
+            exception_indices, ..
+        } => 2 + 2 * (exception_indices.len() as u32),
     }
 }
 
-fn get_stack_map_entry_length(entry: &StackMapFrame) -> u32 {
+pub(crate) fn get_stack_map_entry_length(entry: &StackMapFrame) -> u32 {
     match entry {
         StackMapFrame::SameFrame { .. } => 1,
         StackMapFrame::SameLocals1StackItemFrame { stack, .. } => {
@@ -260,7 +265,7 @@ fn get_verification_type_info_length(type_info: &VerificationTypeInfo) -> u32 {
     }
 }
 
-fn get_annotation_length(annotation: &Annotation) -> u32 {
+pub(crate) fn get_annotation_length(annotation: &Annotation) -> u32 {
     2 + 2
         + annotation
             .element_value_pairs
@@ -410,7 +415,18 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                     w.write_u16(inner_class.inner_class_access_flags.to_u16());
                 }
             }
-            AttributeInfo::MethodParameters { .. } => todo!(),
+            AttributeInfo::MethodParameters {
+                name_index,
+                parameters,
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u8(parameters.len().try_into().unwrap());
+                for param in parameters {
+                    w.write_u16(param.name_index);
+                    w.write_u16(param.access_flags.to_u16());
+                }
+            }
             AttributeInfo::Record { .. } => todo!(),
             AttributeInfo::Signature {
                 name_index,
@@ -444,6 +460,15 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u16(*name_index);
                 w.write_u32(get_attribute_length(attribute));
                 w.write_u16(*constant_value_index);
+            }
+            AttributeInfo::Exceptions {
+                name_index,
+                exception_indices,
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(exception_indices.len().try_into().unwrap());
+                w.write_u16_vec(exception_indices);
             }
         }
     }

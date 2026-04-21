@@ -88,17 +88,6 @@ pub(crate) fn print_class_file(filename: String) {
     print_class_attributes(&mut lw, &cf.constant_pool, &cf.attributes);
 }
 
-/**
- * Returns the index of the column (on the terminal) where the comments (the '//') start for the constant pool.
- */
-fn get_constant_pool_comment_start_index(cp: &ConstantPool) -> usize {
-    40 + num_digits(cp.len())
-}
-
-fn num_digits(n: usize) -> usize {
-    (n as f64).log10().floor() as usize
-}
-
 fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
     let source_file: String = cf
         .attributes
@@ -155,19 +144,7 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         }
     }
 
-    let is_enum: bool = cf.access_flags.contains(ClassAccessFlag::Enum);
-
-    let super_class_name = cf.constant_pool.get_class_name(cf.super_class);
-    if is_enum {
-        lw.print(" extends java.lang.Enum<")
-            .print(&this_class_name)
-            .println(">");
-    } else if super_class_name != "java/lang/Object" {
-        lw.print(" extends ")
-            .println(&super_class_name.replace('/', "."));
-    } else {
-        lw.println("");
-    }
+    lw.println("");
 
     lw.indent(1);
 
@@ -458,7 +435,7 @@ fn print_methods(
 
         if is_class_initializer {
             // this is the 'static {}' block of the class
-            lw.println("{};");
+            lw.print("{}");
         } else {
             let first_bracket_index = parsed_descriptor.find('(').unwrap();
             let return_type: String = parsed_descriptor[0..first_bracket_index].to_owned();
@@ -474,11 +451,27 @@ fn print_methods(
             if is_constructor {
                 // this is a constructor of the class
                 let this_class_name: String = cp.get_class_name(this_class).replace('/', ".");
-                lw.println(&format!("{this_class_name}{arguments_string};"));
+                lw.print(&format!("{this_class_name}{arguments_string}"));
             } else {
-                lw.println(&format!("{return_type} {method_name}{arguments_string};",));
+                lw.print(&format!("{return_type} {method_name}{arguments_string}"));
             }
         }
+
+        if let Some(AttributeInfo::Exceptions {
+            exception_indices, ..
+        }) = find_attribute(&method.attributes, AttributeKind::Exceptions)
+        {
+            lw.print(&format!(
+                " throws {}",
+                exception_indices
+                    .iter()
+                    .map(|exc_idx| cp.get_class_name(*exc_idx).replace('/', "."))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ));
+        }
+
+        lw.println(";");
 
         lw.indent(1);
 
@@ -514,6 +507,7 @@ where
 fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruction) -> String {
     match instruction {
         BytecodeInstruction::Dup {} => "dup".to_owned(),
+        BytecodeInstruction::Dup2 {} => "dup2".to_owned(),
         BytecodeInstruction::AConstNull {} => "aconst_null".to_owned(),
         BytecodeInstruction::IConst { constant } => {
             if *constant == -1 {
@@ -644,6 +638,7 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                 "dstore        ".to_owned() + &local_variable_index.to_string()
             }
         }
+        BytecodeInstruction::IaLoad {} => "iaload".to_owned(),
         BytecodeInstruction::AaLoad {} => "aaload".to_owned(),
         BytecodeInstruction::BaLoad {} => "baload".to_owned(),
         BytecodeInstruction::AaStore {} => "aastore".to_owned(),
@@ -661,10 +656,10 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
             constant_pool_index,
         } => "new           #".to_owned() + &constant_pool_index.to_string(),
         BytecodeInstruction::BiPush { immediate } => {
-            "bipush        ".to_owned() + &(*immediate as i8).to_string()
+            "bipush        ".to_owned() + &immediate.to_string()
         }
         BytecodeInstruction::SiPush { immediate } => {
-            "sipush        ".to_owned() + &(*immediate as i16).to_string()
+            "sipush        ".to_owned() + &immediate.to_string()
         }
         BytecodeInstruction::Pop {} => "pop".to_owned(),
         BytecodeInstruction::Pop2 {} => "pop2".to_owned(),
@@ -791,7 +786,11 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
                     .iter()
                     .enumerate()
                     .map(|(i, offset)| {
-                        format!("       {:>11}: {}", i, add_offset(*position, *offset))
+                        format!(
+                            "       {:>11}: {}",
+                            (*low as usize) + i,
+                            add_offset(*position, *offset)
+                        )
                     })
                     .collect::<Vec<String>>()
                     .join("\n")
@@ -944,6 +943,7 @@ fn get_comment(
 ) -> Option<String> {
     match instruction {
         BytecodeInstruction::Dup {}
+        | BytecodeInstruction::Dup2 {}
         | BytecodeInstruction::AConstNull {}
         | BytecodeInstruction::IConst { .. }
         | BytecodeInstruction::LConst { .. }
@@ -959,6 +959,7 @@ fn get_comment(
         | BytecodeInstruction::FStore { .. }
         | BytecodeInstruction::DLoad { .. }
         | BytecodeInstruction::DStore { .. }
+        | BytecodeInstruction::IaLoad {}
         | BytecodeInstruction::AaLoad {}
         | BytecodeInstruction::BaLoad {}
         | BytecodeInstruction::AaStore {}
@@ -1313,7 +1314,6 @@ fn print_method_attributes(
     this_class: u16,
     method: &MethodInfo,
 ) {
-    let comment_index: usize = get_constant_pool_comment_start_index(cp);
     for attribute in method.attributes.iter() {
         match attribute {
             AttributeInfo::Code {
@@ -1362,38 +1362,37 @@ fn print_method_attributes(
                         ));
                     }
                 }
-                print_code_attributes(cp, attributes);
+                print_code_attributes(lw, cp, attributes);
 
                 lw.indent(-1);
             }
             AttributeInfo::MethodParameters { parameters, .. } => {
-                println!("    MethodParameters:");
-                println!("      Name                           Flags");
+                lw.println("MethodParameters:");
+                lw.indent(1);
+                lw.println("Name                           Flags");
                 for param in parameters.iter() {
                     let name = if param.name_index == 0 {
                         "<no name>"
                     } else {
                         &cp.get_utf8_content(param.name_index)
                     };
-                    print!("      {name}");
+                    lw.print(name);
                     if param.access_flags.to_u16() != 0 {
-                        print!(
+                        lw.print(&format!(
                             "                      {}",
-                            param.access_flags.modifier_repr()
-                        );
+                            param.access_flags.modifier_repr(),
+                        ));
                     }
-                    println!();
+                    lw.println("");
                 }
+                lw.indent(-1);
             }
             AttributeInfo::Signature {
                 signature_index, ..
             } => {
-                println!(
-                    "{:<width$}// {}",
-                    format!("    Signature: #{}", signature_index),
-                    cp.get_utf8_content(*signature_index),
-                    width = comment_index + 2 // why?
-                );
+                lw.print(&format!("Signature: #{signature_index}"))
+                    .tab()
+                    .println(&format!("// {}", cp.get_utf8_content(*signature_index)));
             }
             AttributeInfo::RuntimeVisibleAnnotations { annotations, .. } => {
                 lw.println("RuntimeVisibleAnnotations:");
@@ -1409,110 +1408,139 @@ fn print_method_attributes(
                 }
                 lw.indent(-1);
             }
+            AttributeInfo::Exceptions {
+                exception_indices, ..
+            } => {
+                lw.println("Exceptions:");
+                lw.indent(1);
+                for exception_index in exception_indices {
+                    lw.println(&format!(
+                        "throws {}",
+                        cp.get_class_name(*exception_index).replace('/', ".")
+                    ));
+                }
+                lw.indent(-1);
+            }
             _ => unreachable!("Unknown method attribute {}.", attribute.kind()),
         }
     }
 }
 
-fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
+fn print_code_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[AttributeInfo]) {
     for attribute in attributes.iter() {
         match attribute {
             AttributeInfo::LineNumberTable {
                 line_number_table, ..
             } => {
-                println!("      LineNumberTable:");
+                lw.println("LineNumberTable:");
+                lw.indent(1);
                 for entry in line_number_table.iter() {
-                    println!("        line {}: {}", entry.line_number, entry.start_pc);
+                    lw.println(&format!("line {}: {}", entry.line_number, entry.start_pc));
                 }
+                lw.indent(-1);
             }
             AttributeInfo::LocalVariableTable {
                 local_variable_table,
                 ..
             } => {
-                println!("      LocalVariableTable:");
-                println!("        Start  Length  Slot  Name   Signature");
+                lw.println("LocalVariableTable:");
+                lw.indent(1);
+                lw.println("Start  Length  Slot  Name   Signature");
                 for entry in local_variable_table.iter() {
-                    println!(
-                        "         {:4}    {:4}    {:2} {:>5}   {}",
+                    lw.println(&format!(
+                        " {:4}    {:4}    {:2} {:>5}   {}",
                         entry.start_pc,
                         entry.length,
                         entry.index,
                         cp.get_utf8_content(entry.name_index),
                         cp.get_utf8_content(entry.descriptor_index)
-                    );
+                    ));
                 }
+                lw.indent(-1);
             }
             AttributeInfo::LocalVariableTypeTable {
                 local_variable_type_table,
                 ..
             } => {
-                println!("      LocalVariableTypeTable:");
-                println!("        Start  Length  Slot  Name   Signature");
+                lw.println("LocalVariableTypeTable:");
+                lw.indent(1);
+                lw.println("Start  Length  Slot  Name   Signature");
                 for entry in local_variable_type_table.iter() {
-                    println!(
-                        "         {:4}    {:4}    {:2} {:>5}   {}",
+                    lw.println(&format!(
+                        " {:4}    {:4}    {:2} {:>5}   {}",
                         entry.start_pc,
                         entry.length,
                         entry.index,
                         cp.get_utf8_content(entry.name_index),
                         cp.get_utf8_content(entry.descriptor_index)
-                    );
+                    ));
                 }
+                lw.indent(-1);
             }
             AttributeInfo::StackMapTable {
                 stack_map_table, ..
             } => {
-                println!(
-                    "      StackMapTable: number_of_entries = {}",
-                    stack_map_table.len()
-                );
+                lw.println(&format!(
+                    "StackMapTable: number_of_entries = {}",
+                    stack_map_table.len(),
+                ));
+                lw.indent(1);
                 for frame in stack_map_table.iter() {
                     match frame {
                         StackMapFrame::SameFrame { frame_type } => {
-                            println!("        frame_type = {frame_type} /* same */")
+                            lw.println(&format!("frame_type = {frame_type} /* same */"));
                         }
                         StackMapFrame::SameLocals1StackItemFrame { frame_type, stack } => {
-                            println!(
-                                "        frame_type = {frame_type} /* same_locals_1_stack_item */"
-                            );
-                            println!(
-                                "          stack = [ {} ]",
+                            lw.println(&format!(
+                                "frame_type = {frame_type} /* same_locals_1_stack_item */"
+                            ));
+                            lw.indent(1);
+                            lw.println(&format!(
+                                "stack = [ {} ]",
                                 get_verification_type_info_string(cp, stack)
-                            );
+                            ));
+                            lw.indent(-1);
                         }
                         StackMapFrame::SameLocals1StackItemFrameExtended {
                             offset_delta,
                             stack,
                         } => {
-                            println!(
-                                "        frame_type = 247 /* same_locals_1_stack_item_frame_extended */"
+                            lw.println(
+                                "frame_type = 247 /* same_locals_1_stack_item_frame_extended */",
                             );
-                            println!("          offset_delta = {offset_delta}");
-                            println!(
-                                "          stack = [ {} ]",
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.println(&format!(
+                                "stack = [ {} ]",
                                 get_verification_type_info_string(cp, stack)
-                            );
+                            ));
+                            lw.indent(-1);
                         }
                         StackMapFrame::ChopFrame {
                             frame_type,
                             offset_delta,
                         } => {
-                            println!("        frame_type = {frame_type} /* chop */");
-                            println!("          offset_delta = {offset_delta}");
+                            lw.println(&format!("frame_type = {frame_type} /* chop */"));
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.indent(-1);
                         }
                         StackMapFrame::SameFrameExtended { offset_delta } => {
-                            println!("        frame_type = 251 /* same_frame_extended */");
-                            println!("          offset_delta = {offset_delta}");
+                            lw.println("frame_type = 251 /* same_frame_extended */");
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.indent(-1);
                         }
                         StackMapFrame::AppendFrame {
                             frame_type,
                             offset_delta,
                             locals,
                         } => {
-                            println!("        frame_type = {frame_type} /* append */");
-                            println!("          offset_delta = {offset_delta}");
-                            println!(
-                                "          locals = {}",
+                            lw.println(&format!("frame_type = {frame_type} /* append */"));
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.println(&format!(
+                                "locals = {}",
                                 if locals.is_empty() {
                                     "[]".to_owned()
                                 } else {
@@ -1524,17 +1552,19 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                                             .join(", ")
                                         + " ]"
                                 }
-                            );
+                            ));
+                            lw.indent(-1);
                         }
                         StackMapFrame::FullFrame {
                             offset_delta,
                             locals,
                             stack,
                         } => {
-                            println!("        frame_type = 255 /* full_frame */");
-                            println!("          offset_delta = {offset_delta}");
-                            println!(
-                                "          locals = {}",
+                            lw.println("frame_type = 255 /* full_frame */");
+                            lw.indent(1);
+                            lw.println(&format!("offset_delta = {offset_delta}"));
+                            lw.println(&format!(
+                                "locals = {}",
                                 if locals.is_empty() {
                                     "[]".to_owned()
                                 } else {
@@ -1546,9 +1576,9 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                                             .join(", ")
                                         + " ]"
                                 }
-                            );
-                            println!(
-                                "          stack = {}",
+                            ));
+                            lw.println(&format!(
+                                "stack = {}",
                                 if stack.is_empty() {
                                     "[]".to_owned()
                                 } else {
@@ -1560,10 +1590,12 @@ fn print_code_attributes(cp: &ConstantPool, attributes: &[AttributeInfo]) {
                                             .join(", ")
                                         + " ]"
                                 }
-                            );
+                            ));
+                            lw.indent(-1);
                         }
                     }
                 }
+                lw.indent(-1);
             }
             _ => unreachable!(),
         }
@@ -1588,6 +1620,9 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                     let modifiers = class.inner_class_access_flags.modifier_repr();
 
                     if class.is_anonymous() || class.is_local() {
+                        if class.inner_class_access_flags.to_u16() != 0 {
+                            lw.print(&format!("{modifiers} "));
+                        }
                         lw.print(&format!("#{};", class.inner_class_info_index))
                             .tab()
                             .println(&format!(
@@ -1617,8 +1652,9 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
             }
             AttributeInfo::BootstrapMethods { methods, .. } => {
                 lw.println("BootstrapMethods:");
+                lw.indent(1);
                 for (i, method) in methods.iter().enumerate() {
-                    lw.print(&format!("  {}: #{} ", i, method.bootstrap_method_ref));
+                    lw.print(&format!("{}: #{} ", i, method.bootstrap_method_ref));
 
                     // TODO: can we merge this match-case with the one below?
                     match cp[method.bootstrap_method_ref - 1] {
@@ -1634,9 +1670,10 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                         }
                         _ => unreachable!(),
                     }
-                    lw.println("    Method arguments:");
+                    lw.indent(1);
+                    lw.println("Method arguments:");
                     for arg in method.bootstrap_arguments.iter() {
-                        lw.print(&format!("      #{arg} "));
+                        lw.print(&format!("  #{arg} "));
                         match cp[arg - 1] {
                             ConstantPoolInfo::String { string_index } => {
                                 lw.println(&cp.get_utf8_content(string_index));
@@ -1660,20 +1697,24 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                             _ => unreachable!(),
                         }
                     }
+                    lw.indent(-1);
                 }
+                lw.indent(-1);
             }
             AttributeInfo::Record { components, .. } => {
                 lw.println("Record:");
+                lw.indent(1);
                 for component in components.iter() {
                     let descriptor = cp.get_utf8_content(component.descriptor_index);
                     lw.println(&format!(
-                        "  {} {};",
+                        "{} {};",
                         decode_type(&descriptor),
                         cp.get_utf8_content(component.name_index)
                     ));
-                    lw.println(&format!("    descriptor: {descriptor}"));
+                    lw.println(&format!("  descriptor: {descriptor}"));
                     lw.println("");
                 }
+                lw.indent(-1);
             }
             AttributeInfo::Signature {
                 signature_index, ..

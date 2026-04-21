@@ -6,6 +6,7 @@ use crate::access_flags::{InnerClassAccessFlags, MethodParameterAccessFlags};
 use crate::assert_valid_and_type;
 use crate::bytecode::{BytecodeInstruction, parse_bytecode};
 use crate::constant_pool::{ConstantPool, ConstantPoolTag};
+use crate::writer::{get_annotation_length, get_stack_map_entry_length};
 
 pub enum AttributeInfo {
     Code {
@@ -68,6 +69,10 @@ pub enum AttributeInfo {
         name_index: u16,
         constant_value_index: u16,
     },
+    Exceptions {
+        name_index: u16,
+        exception_indices: Vec<u16>,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -86,6 +91,7 @@ pub enum AttributeKind {
     NestMembers,
     RuntimeVisibleAnnotations,
     ConstantValue,
+    Exceptions,
 }
 
 impl std::fmt::Display for AttributeKind {
@@ -113,6 +119,7 @@ impl AttributeInfo {
                 AttributeKind::RuntimeVisibleAnnotations
             }
             AttributeInfo::ConstantValue { .. } => AttributeKind::ConstantValue,
+            AttributeInfo::Exceptions { .. } => AttributeKind::Exceptions,
         }
     }
 }
@@ -626,9 +633,14 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
         }
         "MethodParameters" => {
             let parameters_count: u8 = reader.read_u8().unwrap();
+            let expected_attribute_length = 1 + (2 * 2) * (parameters_count as u32);
+            check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
             let mut parameters: Vec<MethodParameter> = Vec::with_capacity(parameters_count.into());
             for _ in 0..parameters_count {
                 let name_index: u16 = reader.read_u16().unwrap();
+                if name_index != 0 {
+                    assert_valid_and_type!(cp, name_index, ConstantPoolTag::Utf8);
+                }
                 let access_flags: MethodParameterAccessFlags =
                     MethodParameterAccessFlags::from(reader.read_u16().unwrap());
                 parameters.push(MethodParameter {
@@ -656,9 +668,25 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             for _ in 0..num_annotations {
                 annotations.push(parse_annotation(cp, reader));
             }
+            let expected_attribute_length =
+                2 + annotations.iter().map(get_annotation_length).sum::<u32>();
+            check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
             AttributeInfo::RuntimeVisibleAnnotations {
                 name_index: attribute_name_index,
                 annotations,
+            }
+        }
+        "Exceptions" => {
+            let num_exceptions: u16 = reader.read_u16().unwrap();
+            let expected_attribute_length = 2 + 2 * (num_exceptions as u32);
+            check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
+            let exception_indices = reader.read_u16_vec(num_exceptions.into()).unwrap();
+            for exception_index in exception_indices.iter() {
+                assert_valid_and_type!(cp, *exception_index, ConstantPoolTag::Class);
+            }
+            AttributeInfo::Exceptions {
+                name_index: attribute_name_index,
+                exception_indices,
             }
         }
         _ => panic!(
@@ -777,10 +805,7 @@ fn parse_code_attribute(
         "LineNumberTable" => {
             let line_number_table_length: u16 = reader.read_u16().unwrap();
             let expected_attribute_length: u32 = 2 + (2 * 2) * (line_number_table_length as u32);
-            assert!(
-                attribute_length == expected_attribute_length,
-                "The field attribute_length for LineNumberTable (with {line_number_table_length} entries) must be {expected_attribute_length} but was {attribute_length}.",
-            );
+            check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
             let mut line_number_table: Vec<LineNumberTableEntry> =
                 Vec::with_capacity(line_number_table_length.into());
             for i in 0..line_number_table_length {
@@ -804,10 +829,7 @@ fn parse_code_attribute(
         "LocalVariableTable" => {
             let local_variable_table_length: u16 = reader.read_u16().unwrap();
             let expected_attribute_length: u32 = 2 + (2 * 5) * (local_variable_table_length as u32);
-            assert!(
-                attribute_length == expected_attribute_length,
-                "The field attribute_length for LocalVariableTable (with {local_variable_table_length} entries) must be {expected_attribute_length} but was {attribute_length}."
-            );
+            check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
             let mut local_variable_table: Vec<LocalVariableTableEntry> =
                 Vec::with_capacity(local_variable_table_length.into());
             for i in 0..local_variable_table_length {
@@ -846,10 +868,7 @@ fn parse_code_attribute(
             let local_variable_type_table_length: u16 = reader.read_u16().unwrap();
             let expected_attribute_length: u32 =
                 2 + (2 * 5) * (local_variable_type_table_length as u32);
-            assert!(
-                attribute_length == expected_attribute_length,
-                "The field attribute_length for LocalVariableTypeTable (with {local_variable_type_table_length} entries) must be {expected_attribute_length} but was {attribute_length}."
-            );
+            check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
             let mut local_variable_type_table: Vec<LocalVariableTypeTableEntry> =
                 Vec::with_capacity(local_variable_type_table_length.into());
             for i in 0..local_variable_type_table_length {
@@ -891,6 +910,11 @@ fn parse_code_attribute(
             for _ in 0..number_of_entries {
                 stack_map_table.push(parse_stack_map_entry(reader));
             }
+            let expected_attribute_length = 2 + stack_map_table
+                .iter()
+                .map(get_stack_map_entry_length)
+                .sum::<u32>();
+            check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
             AttributeInfo::StackMapTable {
                 name_index: attribute_name_index,
                 stack_map_table,
