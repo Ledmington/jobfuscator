@@ -33,7 +33,7 @@ impl BinaryWriter {
     }
 
     pub fn write_i8(&mut self, x: i8) {
-        self.buf.push(x.try_into().unwrap());
+        self.buf.push(x as u8);
         self.pos += 1;
     }
 
