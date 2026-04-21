@@ -4,6 +4,7 @@ pub mod zip_parser;
 
 pub struct ZipFile {}
 
+#[derive(PartialEq)]
 #[repr(u8)]
 enum OS {
     MsDos = 0x00,
@@ -28,32 +29,32 @@ enum OS {
     OsxDarwin = 0x13,
 }
 
-// impl OS {
-//     pub fn description(&self) -> &'static str {
-//         match self {
-//             OS::MsDos => "MS-DOS and OS/2 (FAT / VFAT / FAT32 file systems)",
-//             OS::AMIGA => "Amiga",
-//             OS::OPENVMS => "OpenVMS",
-//             OS::UNIX => "UNIX",
-//             OS::VmCms => "VM/CMS",
-//             OS::AtariSt => "Atari ST",
-//             OS::Os2Hpfs => "OS/2 H.P.F.S.",
-//             OS::MACINTOSH => "Macintosh",
-//             OS::ZSystem => "Z-System",
-//             OS::CPM => "CP/M",
-//             OS::WindowsNtfs => "Windows NTFS",
-//             OS::MVS => "MVS (OS/390 - Z/OS)",
-//             OS::VSE => "VSE",
-//             OS::AcornRisc => "Acorn Risc",
-//             OS::VFAT => "VFAT",
-//             OS::AlternateMvs => "alternate MVS",
-//             OS::BEOS => "BeOS",
-//             OS::TANDEM => "Tandem",
-//             OS::OS400 => "OS/400",
-//             OS::OsxDarwin => "OS X (Darwin)",
-//         }
-//     }
-// }
+impl OS {
+    pub fn description(&self) -> &'static str {
+        match self {
+            OS::MsDos => "MS-DOS and OS/2 (FAT / VFAT / FAT32 file systems)",
+            OS::AMIGA => "Amiga",
+            OS::OPENVMS => "OpenVMS",
+            OS::UNIX => "UNIX",
+            OS::VmCms => "VM/CMS",
+            OS::AtariSt => "Atari ST",
+            OS::Os2Hpfs => "OS/2 H.P.F.S.",
+            OS::MACINTOSH => "Macintosh",
+            OS::ZSystem => "Z-System",
+            OS::CPM => "CP/M",
+            OS::WindowsNtfs => "Windows NTFS",
+            OS::MVS => "MVS (OS/390 - Z/OS)",
+            OS::VSE => "VSE",
+            OS::AcornRisc => "Acorn Risc",
+            OS::VFAT => "VFAT",
+            OS::AlternateMvs => "alternate MVS",
+            OS::BEOS => "BeOS",
+            OS::TANDEM => "Tandem",
+            OS::OS400 => "OS/400",
+            OS::OsxDarwin => "OS X (Darwin)",
+        }
+    }
+}
 
 impl TryFrom<u8> for OS {
     type Error = String;
@@ -85,12 +86,20 @@ impl TryFrom<u8> for OS {
     }
 }
 
+#[derive(PartialEq)]
 struct Version {
     os: OS,
     major: u32,
     minor: u32,
 }
 
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}.{}", self.os.description(), self.major, self.minor)
+    }
+}
+
+#[derive(PartialEq)]
 #[repr(u16)]
 enum CompressionMethod {
     NONE = 0x0000,
@@ -109,23 +118,69 @@ impl TryFrom<u16> for CompressionMethod {
     }
 }
 
+impl std::fmt::Display for CompressionMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompressionMethod::NONE => write!(f, "NONE"),
+            CompressionMethod::DEFLATE => write!(f, "DEFLATE"),
+        }
+    }
+}
+
+#[derive(PartialEq)]
 struct MsDosTime {
     hours: u16,
     minutes: u16,
     seconds: u16,
 }
 
+impl std::fmt::Display for MsDosTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:02}/{:02}/{:02}",
+            self.hours,
+            self.minutes,
+            self.seconds * 2
+        )
+    }
+}
+
+#[derive(PartialEq)]
 struct MsDosDate {
     year: u16,
     month: u16,
     day: u16,
 }
 
+impl std::fmt::Display for MsDosDate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:02}:{:02}:{}", self.day, self.month, self.year + 1980)
+    }
+}
+
+#[derive(PartialEq)]
 struct ExtraField {
     field_type: ExtraFieldType,
     data: Vec<u8>,
 }
 
+impl std::fmt::Display for ExtraField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut data_str = String::new();
+        for x in self.data.iter() {
+            data_str.push_str(&format!("{:02x}", x));
+        }
+        write!(
+            f,
+            "ExtraField {{ type : '{}', data : 0x{} }}",
+            self.field_type.description(),
+            data_str
+        )
+    }
+}
+
+#[derive(PartialEq)]
 #[repr(u16)]
 enum ExtraFieldType {
     ZIP64 = 0x0001,
@@ -134,16 +189,16 @@ enum ExtraFieldType {
     JAVA = 0xcafe,
 }
 
-// impl ExtraFieldType {
-//     pub fn description(&self) -> &'static str {
-//         match self {
-//             ExtraFieldType::ZIP64 => "ZIP64 extension",
-//             ExtraFieldType::UnixTimestamp => "UNIX Timestamp",
-//             ExtraFieldType::WinZipAes => "WinZIP AES encryption",
-//             ExtraFieldType::JAVA => "Java",
-//         }
-//     }
-// }
+impl ExtraFieldType {
+    pub fn description(&self) -> &'static str {
+        match self {
+            ExtraFieldType::ZIP64 => "ZIP64 extension",
+            ExtraFieldType::UnixTimestamp => "UNIX Timestamp",
+            ExtraFieldType::WinZipAes => "WinZIP AES encryption",
+            ExtraFieldType::JAVA => "Java",
+        }
+    }
+}
 
 impl TryFrom<u16> for ExtraFieldType {
     type Error = String;
@@ -157,6 +212,19 @@ impl TryFrom<u16> for ExtraFieldType {
             _ => Err(format!("Unknown extra field type id: 0x{:04x}.", value)),
         }
     }
+}
+
+struct LocalFileHeader {
+    minimum_version: Version,
+    bit_flags: u16,
+    compression_method: CompressionMethod,
+    last_modification_time: MsDosTime,
+    last_modification_date: MsDosDate,
+    crc32: u32,
+    compressed_size: u32,
+    uncompressed_size: u32,
+    filename: String,
+    extra_fields: Vec<ExtraField>,
 }
 
 struct CentralDirectoryRecord {

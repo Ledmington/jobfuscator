@@ -11,8 +11,10 @@ use binary_reader::bit_reader::BitReader;
 
 use crate::{
     CentralDirectoryRecord, CompressionMethod, EndOfCentralDirectoryRecord, ExtraField,
-    ExtraFieldType, MsDosDate, MsDosTime, OS, Version, ZipFile,
+    ExtraFieldType, LocalFileHeader, MsDosDate, MsDosTime, OS, Version, ZipFile,
 };
+
+// Useful reference: https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 
 pub fn parse_zip(filename: &str) -> ZipFile {
     let mut file = File::open(filename)
@@ -23,6 +25,131 @@ pub fn parse_zip(filename: &str) -> ZipFile {
     parse_zip_buf(&mut BitReader::new(&file_bytes))
 }
 
+fn parse_local_file_header(reader: &mut BitReader) -> LocalFileHeader {
+    {
+        const EXPECTED_SIGNATURE: u32 = 0x04034b50;
+        let signature = reader.read_u32();
+        if signature != EXPECTED_SIGNATURE {
+            panic!(
+                "Wrong Local File Header signature: expected 0x{:08x} but was 0x{:08x}.",
+                EXPECTED_SIGNATURE, signature
+            );
+        }
+    }
+
+    let minimum_version = parse_version(reader);
+
+    let bit_flags = reader.read_u16();
+
+    let compression_method = CompressionMethod::try_from(reader.read_u16())
+        .unwrap_or_else(|err| panic!("Error during parsing of compression method: {}.", err));
+
+    let last_modification_time = parse_time(reader);
+    let last_modification_date = parse_date(reader);
+    assert_not_in_the_future(&last_modification_date, &last_modification_time);
+
+    let crc32 = reader.read_u32();
+    if crc32 != 0 {
+        panic!("Invalid CRC32: 0x{:08x}.", crc32);
+    }
+
+    let compressed_size = reader.read_u32();
+    if compressed_size != 0 {
+        panic!("Invalid compressed size: {} bytes.", compressed_size);
+    }
+
+    let uncompressed_size = reader.read_u32();
+    if uncompressed_size != 0 {
+        panic!("Invalid uncompressed size: {} bytes.", uncompressed_size);
+    }
+
+    if matches!(compression_method, CompressionMethod::NONE) && compressed_size != uncompressed_size
+    {
+        panic!(
+            "Compression method was NONE but compressed size ({} bytes) and uncompressed size ({} bytes) were different.",
+            compressed_size, uncompressed_size
+        );
+    }
+
+    let file_name_length = reader.read_u16();
+
+    let extra_field_length = reader.read_u16();
+
+    let mut filename = String::new();
+    for _ in 0..file_name_length {
+        filename.push(reader.read_u8() as char);
+    }
+
+    let extra_fields: Vec<ExtraField> = parse_extra_fields(reader, extra_field_length);
+
+    LocalFileHeader {
+        minimum_version,
+        bit_flags,
+        compression_method,
+        last_modification_time,
+        last_modification_date,
+        crc32,
+        compressed_size,
+        uncompressed_size,
+        filename,
+        extra_fields,
+    }
+}
+
+fn check_local_file_header(cdr: &CentralDirectoryRecord, lfh: &LocalFileHeader) {
+    if cdr.minimum_version != lfh.minimum_version {
+        panic!(
+            "Different minimum versions in CDR ({}) and LFH ({}).",
+            cdr.minimum_version, lfh.minimum_version
+        );
+    }
+    if cdr.bit_flags != lfh.bit_flags {
+        panic!(
+            "Different bit flags in CDR (0x{:04x}) and LFH (0x{:04x}).",
+            cdr.bit_flags, lfh.bit_flags
+        );
+    }
+    if cdr.compression_method != lfh.compression_method {
+        panic!(
+            "Different compression methods in CDR ({}) and LFH ({}).",
+            cdr.compression_method, lfh.compression_method
+        );
+    }
+    if cdr.last_modification_time != lfh.last_modification_time {
+        panic!(
+            "Different last modification times in CDR ({}) and LFH ({}).",
+            cdr.last_modification_time, lfh.last_modification_time
+        );
+    }
+    if cdr.last_modification_date != lfh.last_modification_date {
+        panic!(
+            "Different last modification dates in CDR ({}) and LFH ({}).",
+            cdr.last_modification_date, lfh.last_modification_date
+        );
+    }
+    if cdr.filename != lfh.filename {
+        panic!(
+            "Different filenames in CDR ('{}') and LFH ('{}').",
+            cdr.filename, lfh.filename
+        );
+    }
+    if cdr.extra_fields.len() != lfh.extra_fields.len() {
+        panic!(
+            "Different number of extra fields in CDR ({}) and LFH ({}).",
+            cdr.extra_fields.len(),
+            lfh.extra_fields.len()
+        );
+    }
+    for i in 0..cdr.extra_fields.len() {
+        if cdr.extra_fields[i] != lfh.extra_fields[i] {
+            panic!(
+                "Different extra field at index {} in CDR ({}) and LFH ({}).",
+                i, cdr.extra_fields[i], lfh.extra_fields[i]
+            );
+        }
+    }
+}
+
 fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
     let eocdr = parse_end_of_central_directory_record(reader);
 
@@ -31,6 +158,27 @@ fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
         Vec::with_capacity(eocdr.total_central_directory_records as usize);
     for _ in 0..eocdr.total_central_directory_records {
         central_directory.push(parse_central_directory_record(reader));
+    }
+
+    {
+        // check that the central directory size is correct
+        let pos: u32 = reader.get_byte_position() as u32;
+        let actual_central_directory_size: u32 = pos - eocdr.central_directory_offset;
+        if eocdr.central_directory_size != actual_central_directory_size {
+            panic!(
+                "Wrong Central Directory size: expected {} bytes but was {} bytes.",
+                eocdr.central_directory_size, actual_central_directory_size
+            );
+        }
+    }
+
+    for cdr in central_directory {
+        reader.set_byte_position(cdr.local_file_header_offset as usize);
+        let lfh = parse_local_file_header(reader);
+
+        check_local_file_header(&cdr, &lfh);
+
+        let compressed = reader.read_u8_vec(cdr.compressed_size as usize);
     }
 
     ZipFile {}
@@ -96,13 +244,8 @@ fn assert_not_in_the_future(date: &MsDosDate, time: &MsDosTime) {
 
     if then > now {
         panic!(
-            "Last modification date+time is in the future: {:02}/{:02}/{} {:02}:{:02}:{:02}.",
-            date.day,
-            date.month,
-            date.year + 1980,
-            time.hours,
-            time.minutes,
-            time.seconds * 2
+            "Last modification date+time is in the future: {} {}.",
+            date, time
         );
     }
 }
@@ -150,6 +293,10 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
 
     // TODO: check CRC32
     let crc32 = reader.read_u32();
+    if crc32 != 0 {
+        panic!("Invalid CRC32: 0x{:08x}.", crc32);
+    }
+
     let compressed_size = reader.read_u32();
     let uncompressed_size = reader.read_u32();
 
