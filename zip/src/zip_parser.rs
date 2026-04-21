@@ -64,7 +64,7 @@ fn parse_local_file_header(reader: &mut BitReader) -> LocalFileHeader {
         panic!("Invalid uncompressed size: {} bytes.", uncompressed_size);
     }
 
-    if matches!(compression_method, CompressionMethod::NONE) && compressed_size != uncompressed_size
+    if matches!(compression_method, CompressionMethod::None) && compressed_size != uncompressed_size
     {
         panic!(
             "Compression method was NONE but compressed size ({} bytes) and uncompressed size ({} bytes) were different.",
@@ -179,11 +179,12 @@ fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
 
         check_local_file_header(&cdr, &lfh);
 
-        let compressed = reader.read_u8_vec(cdr.compressed_size as usize);
+        let compressed_content = reader.read_u8_vec(cdr.compressed_size as usize).unwrap();
 
         entries.push(ZipEntry {
             filename: cdr.filename,
-        });
+        compressed_content,
+		});
     }
 
     ZipFile { entries }
@@ -305,7 +306,7 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
     let compressed_size = reader.read_u32().unwrap();
     let uncompressed_size = reader.read_u32().unwrap();
 
-    if matches!(compression_method, CompressionMethod::NONE) && compressed_size != uncompressed_size
+    if matches!(compression_method, CompressionMethod::None) && compressed_size != uncompressed_size
     {
         panic!(
             "Compression method was NONE but compressed size ({} bytes) and uncompressed size ({} bytes) were different.",
