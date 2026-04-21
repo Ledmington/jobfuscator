@@ -28,7 +28,7 @@ pub fn parse_zip(filename: &str) -> ZipFile {
 fn parse_local_file_header(reader: &mut BitReader) -> LocalFileHeader {
     {
         const EXPECTED_SIGNATURE: u32 = 0x04034b50;
-        let signature = reader.read_u32();
+        let signature = reader.read_u32().unwrap();
         if signature != EXPECTED_SIGNATURE {
             panic!(
                 "Wrong Local File Header signature: expected 0x{:08x} but was 0x{:08x}.",
@@ -39,9 +39,9 @@ fn parse_local_file_header(reader: &mut BitReader) -> LocalFileHeader {
 
     let minimum_version = parse_version(reader);
 
-    let bit_flags = reader.read_u16();
+    let bit_flags = reader.read_u16().unwrap();
 
-    let compression_method = CompressionMethod::try_from(reader.read_u16())
+    let compression_method = CompressionMethod::try_from(reader.read_u16().unwrap())
         .unwrap_or_else(|err| panic!("Error during parsing of compression method: {}.", err));
 
     let last_modification_time = parse_time(reader);
@@ -49,17 +49,17 @@ fn parse_local_file_header(reader: &mut BitReader) -> LocalFileHeader {
     assert_not_in_the_future(&last_modification_date, &last_modification_time);
 
     // TODO: check CRC32
-    let crc32 = reader.read_u32();
+    let crc32 = reader.read_u32().unwrap();
     if crc32 != 0 {
         panic!("Invalid CRC32: 0x{:08x}.", crc32);
     }
 
-    let compressed_size = reader.read_u32();
+    let compressed_size = reader.read_u32().unwrap();
     if compressed_size != 0 {
         panic!("Invalid compressed size: {} bytes.", compressed_size);
     }
 
-    let uncompressed_size = reader.read_u32();
+    let uncompressed_size = reader.read_u32().unwrap();
     if uncompressed_size != 0 {
         panic!("Invalid uncompressed size: {} bytes.", uncompressed_size);
     }
@@ -72,13 +72,13 @@ fn parse_local_file_header(reader: &mut BitReader) -> LocalFileHeader {
         );
     }
 
-    let file_name_length = reader.read_u16();
+    let file_name_length = reader.read_u16().unwrap();
 
-    let extra_field_length = reader.read_u16();
+    let extra_field_length = reader.read_u16().unwrap();
 
     let mut filename = String::new();
     for _ in 0..file_name_length {
-        filename.push(reader.read_u8() as char);
+        filename.push(reader.read_u8().unwrap() as char);
     }
 
     let extra_fields: Vec<ExtraField> = parse_extra_fields(reader, extra_field_length);
@@ -190,7 +190,7 @@ fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
 }
 
 fn parse_version(reader: &mut BitReader) -> Version {
-    let id = reader.read_u16();
+    let id = reader.read_u16().unwrap();
     let os = OS::try_from((id >> 8) as u8)
         .unwrap_or_else(|err| panic!("Error during parsing of OS: {}.", err));
     let major: u32 = ((id & 0x00ffu16) / 10) as u32;
@@ -199,7 +199,7 @@ fn parse_version(reader: &mut BitReader) -> Version {
 }
 
 fn parse_time(reader: &mut BitReader) -> MsDosTime {
-    let time = reader.read_u16();
+    let time = reader.read_u16().unwrap();
 
     // Source: https://www.delorie.com/djgpp/doc/rbinter/it/65/16.html
     let hours: u16 = time >> 11;
@@ -213,7 +213,7 @@ fn parse_time(reader: &mut BitReader) -> MsDosTime {
 }
 
 fn parse_date(reader: &mut BitReader) -> MsDosDate {
-    let date = reader.read_u16();
+    let date = reader.read_u16().unwrap();
 
     // Source: https://www.delorie.com/djgpp/doc/rbinter/it/66/16.html
     let year: u16 = 1980 + (date >> 9);
@@ -260,12 +260,12 @@ fn parse_extra_fields(reader: &mut BitReader, num_extra_fields: u16) -> Vec<Extr
     let initial_position = reader.get_byte_position();
     // why?
     while reader.get_byte_position() < initial_position + (num_extra_fields as usize) {
-        let header_id = reader.read_u16();
+        let header_id = reader.read_u16().unwrap();
         let field_type = ExtraFieldType::try_from(header_id)
             .unwrap_or_else(|err| panic!("Error during parsing of extra field type: {}.", err));
 
-        let data_length = reader.read_u16();
-        let data: Vec<u8> = reader.read_u8_vec(data_length as usize);
+        let data_length = reader.read_u16().unwrap();
+        let data: Vec<u8> = reader.read_u8_vec(data_length as usize).unwrap();
         ef.push(ExtraField { field_type, data });
     }
 
@@ -275,7 +275,7 @@ fn parse_extra_fields(reader: &mut BitReader, num_extra_fields: u16) -> Vec<Extr
 fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRecord {
     {
         const EXPECTED_SIGNATURE: u32 = 0x02014b50;
-        let signature = reader.read_u32();
+        let signature = reader.read_u32().unwrap();
         if signature != EXPECTED_SIGNATURE {
             panic!(
                 "Wrong Central Directory Record signature: expected 0x{:08x} but was 0x{:08x}.",
@@ -287,9 +287,9 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
     let version_made_by = parse_version(reader);
     let minimum_version = parse_version(reader);
 
-    let bit_flags = reader.read_u16();
+    let bit_flags = reader.read_u16().unwrap();
 
-    let compression_method = CompressionMethod::try_from(reader.read_u16())
+    let compression_method = CompressionMethod::try_from(reader.read_u16().unwrap())
         .unwrap_or_else(|err| panic!("Error during parsing of compression method id: {}.", err));
 
     let last_modification_time = parse_time(reader);
@@ -297,13 +297,13 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
     assert_not_in_the_future(&last_modification_date, &last_modification_time);
 
     // TODO: check CRC32
-    let crc32 = reader.read_u32();
+    let crc32 = reader.read_u32().unwrap();
     if crc32 != 0 {
         panic!("Invalid CRC32: 0x{:08x}.", crc32);
     }
 
-    let compressed_size = reader.read_u32();
-    let uncompressed_size = reader.read_u32();
+    let compressed_size = reader.read_u32().unwrap();
+    let uncompressed_size = reader.read_u32().unwrap();
 
     if matches!(compression_method, CompressionMethod::NONE) && compressed_size != uncompressed_size
     {
@@ -313,11 +313,11 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
         );
     }
 
-    let file_name_length = reader.read_u16();
-    let extra_field_length = reader.read_u16();
-    let file_comment_length = reader.read_u16();
+    let file_name_length = reader.read_u16().unwrap();
+    let extra_field_length = reader.read_u16().unwrap();
+    let file_comment_length = reader.read_u16().unwrap();
 
-    let disk_where_file_starts = reader.read_u16();
+    let disk_where_file_starts = reader.read_u16().unwrap();
     if disk_where_file_starts != 0 {
         panic!(
             "Don't know what to do when when file is not on disk 0: was {} (0x{:04x}).",
@@ -325,10 +325,10 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
         );
     }
 
-    let internal_file_attributes = reader.read_u16();
-    let external_file_attributes = reader.read_u32();
+    let internal_file_attributes = reader.read_u16().unwrap();
+    let external_file_attributes = reader.read_u32().unwrap();
 
-    let local_file_header_offset = reader.read_u32();
+    let local_file_header_offset = reader.read_u32().unwrap();
     if (local_file_header_offset as usize) >= reader.size() {
         panic!(
             "Invalid local file header offset: {} bytes (0x{:08x}).",
@@ -338,14 +338,14 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
 
     let mut filename = String::new();
     for _ in 0..file_name_length {
-        filename.push(reader.read_u8() as char);
+        filename.push(reader.read_u8().unwrap() as char);
     }
 
     let extra_fields: Vec<ExtraField> = parse_extra_fields(reader, extra_field_length);
 
     let mut file_comment = String::new();
     for _ in 0..file_comment_length {
-        file_comment.push(reader.read_u8() as char);
+        file_comment.push(reader.read_u8().unwrap() as char);
     }
 
     CentralDirectoryRecord {
@@ -380,7 +380,7 @@ fn parse_end_of_central_directory_record(reader: &mut BitReader) -> EndOfCentral
         const EXPECTED_SIGNATURE: u32 = 0x06054b50;
         let mut found = false;
         while reader.get_byte_position() < reader.size() {
-            let signature = reader.read_u32();
+            let signature = reader.read_u32().unwrap();
             if signature == EXPECTED_SIGNATURE {
                 found = true;
                 break;
@@ -396,7 +396,7 @@ fn parse_end_of_central_directory_record(reader: &mut BitReader) -> EndOfCentral
         }
     }
 
-    let disk_number = reader.read_u16();
+    let disk_number = reader.read_u16().unwrap();
     if disk_number != 0 {
         panic!(
             "Don't know what to do when disk is not 0: was {} (0x{:04x}).",
@@ -404,7 +404,7 @@ fn parse_end_of_central_directory_record(reader: &mut BitReader) -> EndOfCentral
         );
     }
 
-    let disk_of_central_directory = reader.read_u16();
+    let disk_of_central_directory = reader.read_u16().unwrap();
     if disk_of_central_directory != 0 {
         panic!(
             "Don't know what to do when disk of Central Directory is not 0: was {} (0x{:04x}).",
@@ -412,9 +412,9 @@ fn parse_end_of_central_directory_record(reader: &mut BitReader) -> EndOfCentral
         );
     }
 
-    let n_central_directory_records_on_this_disk = reader.read_u16();
+    let n_central_directory_records_on_this_disk = reader.read_u16().unwrap();
 
-    let total_central_directory_records = reader.read_u16();
+    let total_central_directory_records = reader.read_u16().unwrap();
 
     if n_central_directory_records_on_this_disk != total_central_directory_records {
         panic!(
@@ -423,14 +423,14 @@ fn parse_end_of_central_directory_record(reader: &mut BitReader) -> EndOfCentral
         );
     }
 
-    let central_directory_size = reader.read_u32();
+    let central_directory_size = reader.read_u32().unwrap();
 
-    let central_directory_offset = reader.read_u32();
+    let central_directory_offset = reader.read_u32().unwrap();
 
-    let comment_length = reader.read_u16();
+    let comment_length = reader.read_u16().unwrap();
     let mut comment = String::new();
     for _ in 0..comment_length {
-        comment.push(reader.read_u8() as char);
+        comment.push(reader.read_u8().unwrap() as char);
     }
 
     EndOfCentralDirectoryRecord {
