@@ -2,8 +2,6 @@
 
 pub mod zip_parser;
 
-pub struct ZipFile {}
-
 #[derive(PartialEq)]
 #[repr(u8)]
 enum OS {
@@ -220,7 +218,6 @@ struct LocalFileHeader {
     compression_method: CompressionMethod,
     last_modification_time: MsDosTime,
     last_modification_date: MsDosDate,
-    crc32: u32,
     compressed_size: u32,
     uncompressed_size: u32,
     filename: String,
@@ -234,10 +231,8 @@ struct CentralDirectoryRecord {
     compression_method: CompressionMethod,
     last_modification_time: MsDosTime,
     last_modification_date: MsDosDate,
-    crc32: u32,
     compressed_size: u32,
     uncompressed_size: u32,
-    disk_where_file_starts: u16,
     internal_file_attributes: u16,
     external_file_attributes: u32,
     local_file_header_offset: u32,
@@ -247,11 +242,28 @@ struct CentralDirectoryRecord {
 }
 
 struct EndOfCentralDirectoryRecord {
-    disk_number: u16,
-    disk_of_central_directory: u16,
-    n_central_directory_records_on_this_disk: u16,
     total_central_directory_records: u16,
     central_directory_size: u32,
     central_directory_offset: u32,
     comment: String,
+}
+
+pub struct ZipFile {
+    entries: Vec<ZipEntry>,
+}
+
+impl ZipFile {
+    pub fn entries(&self) -> &Vec<ZipEntry> {
+        &self.entries
+    }
+}
+
+pub struct ZipEntry {
+    filename: String,
+}
+
+impl ZipEntry {
+    pub fn name(&self) -> &String {
+        &self.filename
+    }
 }
