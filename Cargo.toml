@@ -8,6 +8,7 @@ members = [
     "javap",
     "cli_parser",
     "zip",
+    "unzipper",
     "jobf",
     "e2e",
 ]
