@@ -1,5 +1,3 @@
-#![forbid(unsafe_code)]
-
 #[repr(u16)]
 #[derive(Copy, Clone, PartialEq)]
 pub enum ClassAccessFlag {

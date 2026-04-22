@@ -1,5 +1,3 @@
-#![forbid(unsafe_code)]
-
 use binary_reader::BinaryReader;
 
 use crate::access_flags::ClassAccessFlags;

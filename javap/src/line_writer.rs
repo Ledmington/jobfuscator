@@ -1,5 +1,3 @@
-#![forbid(unsafe_code)]
-
 const TAB_COLUMN: isize = 40;
 
 const INDENT_WIDTH: isize = 2;

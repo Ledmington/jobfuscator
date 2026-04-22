@@ -1,5 +1,3 @@
-#![forbid(unsafe_code)]
-
 use std::ops::Index;
 
 use binary_reader::BinaryReader;
