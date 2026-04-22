@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+mod transformations;
+
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
@@ -13,6 +15,8 @@ use classfile::{
 use cli_parser::{CommandLineOption, CommandLineParser, CommandLineType};
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::FileOptions};
 
+use crate::transformations::make_everything_public;
+
 fn is_class_file(bytes: &[u8]) -> bool {
     bytes.starts_with(&[0xCA, 0xFE, 0xBA, 0xBE])
 }
@@ -21,15 +25,14 @@ fn is_zip_file(bytes: &[u8]) -> bool {
     bytes.starts_with(&[0x50, 0x4B, 0x03, 0x04])
 }
 
-fn transform_class_file(cf: &ClassFile) -> &ClassFile {
-    // TODO
-    cf
+fn transform_class_file(cf: &ClassFile) -> ClassFile {
+    make_everything_public(cf)
 }
 
 fn parse_and_rewrite(reader: &mut BinaryReader) -> Vec<u8> {
     let in_cf: ClassFile = parse_class_file(reader);
     let out_cf = transform_class_file(&in_cf);
-    write_class_file(out_cf)
+    write_class_file(&out_cf)
 }
 
 macro_rules! log {

@@ -12,6 +12,7 @@ pub enum ClassAccessFlag {
     Module = 0x8000,
 }
 
+#[derive(Copy, Clone)]
 pub struct ClassAccessFlags(u16);
 
 impl ClassAccessFlags {
@@ -87,6 +88,7 @@ pub enum InnerClassAccessFlag {
     Enum = 0x4000,
 }
 
+#[derive(Copy, Clone)]
 pub struct InnerClassAccessFlags(u16);
 
 impl InnerClassAccessFlags {
@@ -151,6 +153,7 @@ pub enum FieldAccessFlag {
     Enum = 0x4000,
 }
 
+#[derive(Copy, Clone)]
 pub struct FieldAccessFlags(u16);
 
 impl FieldAccessFlags {
@@ -228,6 +231,7 @@ pub enum MethodAccessFlag {
     Synthetic = 0x1000,
 }
 
+#[derive(Copy, Clone)]
 pub struct MethodAccessFlags(u16);
 
 impl MethodAccessFlags {
@@ -302,6 +306,7 @@ pub enum MethodParameterAccessFlag {
     Mandated = 0x8000,
 }
 
+#[derive(Copy, Clone)]
 pub struct MethodParameterAccessFlags(u16);
 
 impl MethodParameterAccessFlags {

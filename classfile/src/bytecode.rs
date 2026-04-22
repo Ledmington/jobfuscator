@@ -14,6 +14,7 @@ use crate::{
 /**
  * Reference available at <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-6.html#jvms-6.5>
  */
+#[derive(Clone)]
 pub enum BytecodeInstruction {
     Dup {},
     Dup2 {},
@@ -264,6 +265,7 @@ pub enum BytecodeInstruction {
     DSub {},
 }
 
+#[derive(Clone)]
 pub struct LookupSwitchPair {
     pub match_value: i32,
     pub offset: i32,

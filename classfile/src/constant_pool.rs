@@ -7,6 +7,7 @@ use crate::{
     reference_kind::ReferenceKind,
 };
 
+#[derive(Clone)]
 pub struct ConstantPool {
     pub(crate) entries: Vec<ConstantPoolInfo>,
 }
@@ -154,6 +155,7 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
         .replace("\u{0001}", "\\u0001")
 }
 
+#[derive(Clone)]
 pub enum ConstantPoolInfo {
     /**
      * The type of constant pool entry which can be found right after a Long or Double one.
