@@ -29,7 +29,7 @@ fn make_class_flags_public(flags: ClassAccessFlags) -> ClassAccessFlags {
 }
 
 fn make_fields_public(fields: &[FieldInfo]) -> Vec<FieldInfo> {
-    fields.iter().map(|f| make_field_public(f)).collect()
+    fields.iter().map(make_field_public).collect()
 }
 
 fn make_field_public(f: &FieldInfo) -> FieldInfo {
@@ -46,7 +46,7 @@ fn make_field_flags_public(flags: FieldAccessFlags) -> FieldAccessFlags {
 }
 
 fn make_methods_public(methods: &[MethodInfo]) -> Vec<MethodInfo> {
-    methods.iter().map(|m| make_method_public(m)).collect()
+    methods.iter().map(make_method_public).collect()
 }
 
 fn make_method_public(m: &MethodInfo) -> MethodInfo {
@@ -63,10 +63,7 @@ fn make_method_flags_public(flags: MethodAccessFlags) -> MethodAccessFlags {
 }
 
 fn make_attributes_public(attributes: &[AttributeInfo]) -> Vec<AttributeInfo> {
-    attributes
-        .iter()
-        .map(|a| make_attribute_public(a))
-        .collect()
+    attributes.iter().map(make_attribute_public).collect()
 }
 
 fn make_attribute_public(attribute: &AttributeInfo) -> AttributeInfo {
@@ -106,20 +103,21 @@ fn make_attribute_public(attribute: &AttributeInfo) -> AttributeInfo {
             name_index: *name_index,
             classes: classes
                 .iter()
-                .map(|ic| match ic {
-                    InnerClassInfo {
+                .map(|ic| {
+                    let InnerClassInfo {
                         inner_class_info_index,
                         outer_class_info_index,
                         inner_name_index,
                         inner_class_access_flags,
-                    } => InnerClassInfo {
+                    } = ic;
+                    InnerClassInfo {
                         inner_class_info_index: *inner_class_info_index,
                         outer_class_info_index: *outer_class_info_index,
                         inner_name_index: *inner_name_index,
                         inner_class_access_flags: make_inner_class_flags_public(
                             *inner_class_access_flags,
                         ),
-                    },
+                    }
                 })
                 .collect(),
         },
