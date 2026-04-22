@@ -1,5 +1,3 @@
-#![forbid(unsafe_code)]
-
 use std::{iter::Peekable, str::Chars};
 
 const START_GENERIC: char = '<';
