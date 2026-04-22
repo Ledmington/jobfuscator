@@ -42,7 +42,11 @@ fn make_field_public(f: &FieldInfo) -> FieldInfo {
 }
 
 fn make_field_flags_public(flags: FieldAccessFlags) -> FieldAccessFlags {
-    FieldAccessFlags::from(flags.to_u16() | (FieldAccessFlag::Public as u16))
+    let mut f: u16 = flags.to_u16();
+    f |= FieldAccessFlag::Public as u16;
+    f &= !(FieldAccessFlag::Private as u16);
+    f &= !(FieldAccessFlag::Protected as u16);
+    FieldAccessFlags::from(f)
 }
 
 fn make_methods_public(methods: &[MethodInfo]) -> Vec<MethodInfo> {
@@ -59,7 +63,11 @@ fn make_method_public(m: &MethodInfo) -> MethodInfo {
 }
 
 fn make_method_flags_public(flags: MethodAccessFlags) -> MethodAccessFlags {
-    MethodAccessFlags::from(flags.to_u16() | (MethodAccessFlag::Public as u16))
+    let mut f: u16 = flags.to_u16();
+    f |= MethodAccessFlag::Public as u16;
+    f &= !(MethodAccessFlag::Private as u16);
+    f &= !(MethodAccessFlag::Protected as u16);
+    MethodAccessFlags::from(f)
 }
 
 fn make_attributes_public(attributes: &[AttributeInfo]) -> Vec<AttributeInfo> {
