@@ -12,6 +12,7 @@ pub enum ClassAccessFlag {
     Module = 0x8000,
 }
 
+#[derive(Copy, Clone)]
 pub struct ClassAccessFlags(u16);
 
 impl ClassAccessFlags {
@@ -68,6 +69,25 @@ impl From<u16> for ClassAccessFlags {
             (flags & !0xf631) == 0,
             "0x{flags:04x} is not a valid combination of class access flags.",
         );
+
+        assert!(
+            (flags & (ClassAccessFlag::Final as u16)) == 0
+                || (flags & (ClassAccessFlag::Abstract as u16)) == 0,
+            "A top-level abstract class cannot be final."
+        );
+
+        assert!(
+            (flags & (ClassAccessFlag::Final as u16)) == 0
+                || (flags & (ClassAccessFlag::Interface as u16)) == 0,
+            "A top-level interface cannot be final."
+        );
+
+        assert!(
+            (flags & (ClassAccessFlag::Abstract as u16)) == 0
+                || (flags & (ClassAccessFlag::Enum as u16)) == 0,
+            "A top-level enum cannot be abstract."
+        );
+
         ClassAccessFlags(flags)
     }
 }
@@ -87,6 +107,7 @@ pub enum InnerClassAccessFlag {
     Enum = 0x4000,
 }
 
+#[derive(Copy, Clone)]
 pub struct InnerClassAccessFlags(u16);
 
 impl InnerClassAccessFlags {
@@ -151,6 +172,7 @@ pub enum FieldAccessFlag {
     Enum = 0x4000,
 }
 
+#[derive(Copy, Clone)]
 pub struct FieldAccessFlags(u16);
 
 impl FieldAccessFlags {
@@ -207,6 +229,23 @@ impl From<u16> for FieldAccessFlags {
             (flags & !0x50df) == 0,
             "0x{flags:04x} is not a valid combination of field access flags.",
         );
+
+        assert!(
+            (flags & (FieldAccessFlag::Public as u16)) == 0
+                || (flags & (FieldAccessFlag::Private as u16)) == 0,
+            "A field cannot be both public and private."
+        );
+        assert!(
+            (flags & (FieldAccessFlag::Public as u16)) == 0
+                || (flags & (FieldAccessFlag::Protected as u16)) == 0,
+            "A field cannot be both public and protected."
+        );
+        assert!(
+            (flags & (FieldAccessFlag::Private as u16)) == 0
+                || (flags & (FieldAccessFlag::Protected as u16)) == 0,
+            "A field cannot be both private and protected."
+        );
+
         FieldAccessFlags(flags)
     }
 }
@@ -228,6 +267,7 @@ pub enum MethodAccessFlag {
     Synthetic = 0x1000,
 }
 
+#[derive(Copy, Clone)]
 pub struct MethodAccessFlags(u16);
 
 impl MethodAccessFlags {
@@ -290,6 +330,23 @@ impl From<u16> for MethodAccessFlags {
             (flags & !0x1dff) == 0,
             "0x{flags:04x} is not a valid combination of method access flags.",
         );
+
+        assert!(
+            (flags & (MethodAccessFlag::Public as u16)) == 0
+                || (flags & (MethodAccessFlag::Private as u16)) == 0,
+            "A method cannot be both public and private."
+        );
+        assert!(
+            (flags & (MethodAccessFlag::Public as u16)) == 0
+                || (flags & (MethodAccessFlag::Protected as u16)) == 0,
+            "A method cannot be both public and protected."
+        );
+        assert!(
+            (flags & (MethodAccessFlag::Private as u16)) == 0
+                || (flags & (MethodAccessFlag::Protected as u16)) == 0,
+            "A method cannot be both private and protected."
+        );
+
         MethodAccessFlags(flags)
     }
 }
@@ -302,6 +359,7 @@ pub enum MethodParameterAccessFlag {
     Mandated = 0x8000,
 }
 
+#[derive(Copy, Clone)]
 pub struct MethodParameterAccessFlags(u16);
 
 impl MethodParameterAccessFlags {

@@ -6,6 +6,7 @@ use crate::bytecode::{BytecodeInstruction, parse_bytecode};
 use crate::constant_pool::{ConstantPool, ConstantPoolTag};
 use crate::writer::{get_annotation_length, get_stack_map_entry_length};
 
+#[derive(Clone)]
 pub enum AttributeInfo {
     Code {
         name_index: u16,
@@ -122,16 +123,19 @@ impl AttributeInfo {
     }
 }
 
+#[derive(Clone)]
 pub struct Annotation {
     pub type_index: u16,
     pub element_value_pairs: Vec<ElementValuePair>,
 }
 
+#[derive(Clone)]
 pub struct ElementValuePair {
     pub element_name_index: u16,
     pub value: ElementValue,
 }
 
+#[derive(Clone)]
 pub enum ElementValue {
     Byte {
         const_value_index: u16,
@@ -195,17 +199,20 @@ impl ElementValue {
     }
 }
 
+#[derive(Clone)]
 pub struct RecordComponentInfo {
     pub name_index: u16,
     pub descriptor_index: u16,
     pub attributes: Vec<AttributeInfo>,
 }
 
+#[derive(Clone)]
 pub struct MethodParameter {
     pub name_index: u16,
     pub access_flags: MethodParameterAccessFlags,
 }
 
+#[derive(Clone)]
 pub struct ExceptionTableEntry {
     pub start_pc: u16,
     pub end_pc: u16,
@@ -213,11 +220,13 @@ pub struct ExceptionTableEntry {
     pub catch_type: u16,
 }
 
+#[derive(Clone)]
 pub struct LineNumberTableEntry {
     pub start_pc: u16,
     pub line_number: u16,
 }
 
+#[derive(Clone)]
 pub struct LocalVariableTableEntry {
     pub start_pc: u16,
     pub length: u16,
@@ -226,6 +235,7 @@ pub struct LocalVariableTableEntry {
     pub index: u16,
 }
 
+#[derive(Clone)]
 pub struct LocalVariableTypeTableEntry {
     pub start_pc: u16,
     pub length: u16,
@@ -234,6 +244,7 @@ pub struct LocalVariableTypeTableEntry {
     pub index: u16,
 }
 
+#[derive(Clone)]
 pub enum StackMapFrame {
     SameFrame {
         frame_type: u8,
@@ -265,7 +276,7 @@ pub enum StackMapFrame {
     },
 }
 
-#[derive(Debug)]
+#[derive(Clone)]
 pub enum VerificationTypeInfo {
     TopVariable,
     IntegerVariable,
@@ -278,11 +289,13 @@ pub enum VerificationTypeInfo {
     UninitializedVariable { offset: u16 },
 }
 
+#[derive(Clone)]
 pub struct BootstrapMethod {
     pub bootstrap_method_ref: u16,
     pub bootstrap_arguments: Vec<u16>,
 }
 
+#[derive(Clone)]
 pub struct InnerClassInfo {
     pub inner_class_info_index: u16,
     pub outer_class_info_index: u16,
