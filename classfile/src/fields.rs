@@ -7,6 +7,7 @@ use crate::{
     constant_pool::{ConstantPool, ConstantPoolTag},
 };
 
+#[derive(Clone)]
 pub struct FieldInfo {
     pub access_flags: FieldAccessFlags,
     pub name_index: u16,

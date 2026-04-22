@@ -7,6 +7,7 @@ use crate::{
     constant_pool::{ConstantPool, ConstantPoolTag},
 };
 
+#[derive(Clone)]
 pub struct MethodInfo {
     pub access_flags: MethodAccessFlags,
     pub name_index: u16,

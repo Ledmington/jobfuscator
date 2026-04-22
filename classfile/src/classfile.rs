@@ -12,6 +12,7 @@ use crate::methods::{MethodInfo, parse_methods};
 /**
  * Specification available at <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html>
  */
+#[derive(Clone)]
 pub struct ClassFile {
     pub minor_version: u16,
     pub major_version: u16,
