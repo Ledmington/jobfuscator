@@ -7,7 +7,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use binary_reader::bit_reader::BitReader;
+use binary_reader::byte_reader::ByteReader;
 
 use crate::{
     CentralDirectoryRecord, CompressionMethod, EndOfCentralDirectoryRecord, ExtraField,
@@ -22,10 +22,13 @@ pub fn parse_zip(filename: &str) -> ZipFile {
     let mut file_bytes = Vec::new();
     file.read_to_end(&mut file_bytes)
         .unwrap_or_else(|err| panic!("Could not read file '{}' due to: {}.", filename, err));
-    parse_zip_buf(&mut BitReader::new(&file_bytes))
+    parse_zip_buf(&mut ByteReader::new(
+        &file_bytes,
+        binary_reader::Endianness::Little,
+    ))
 }
 
-fn parse_local_file_header(reader: &mut BitReader) -> LocalFileHeader {
+fn parse_local_file_header(reader: &mut ByteReader) -> LocalFileHeader {
     {
         const EXPECTED_SIGNATURE: u32 = 0x04034b50;
         let signature = reader.read_u32().unwrap();
@@ -150,10 +153,10 @@ fn check_local_file_header(cdr: &CentralDirectoryRecord, lfh: &LocalFileHeader) 
     }
 }
 
-fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
+fn parse_zip_buf(reader: &mut ByteReader) -> ZipFile {
     let eocdr = parse_end_of_central_directory_record(reader);
 
-    reader.set_byte_position(eocdr.central_directory_offset as usize);
+    reader.set_position(eocdr.central_directory_offset as usize);
     let mut central_directory: Vec<CentralDirectoryRecord> =
         Vec::with_capacity(eocdr.total_central_directory_records as usize);
     for _ in 0..eocdr.total_central_directory_records {
@@ -162,7 +165,7 @@ fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
 
     {
         // check that the central directory size is correct
-        let pos: u32 = reader.get_byte_position() as u32;
+        let pos: u32 = reader.get_position() as u32;
         let actual_central_directory_size: u32 = pos - eocdr.central_directory_offset;
         if eocdr.central_directory_size != actual_central_directory_size {
             panic!(
@@ -174,7 +177,7 @@ fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
 
     let mut entries: Vec<ZipEntry> = Vec::with_capacity(central_directory.len());
     for cdr in central_directory {
-        reader.set_byte_position(cdr.local_file_header_offset as usize);
+        reader.set_position(cdr.local_file_header_offset as usize);
         let lfh = parse_local_file_header(reader);
 
         check_local_file_header(&cdr, &lfh);
@@ -183,14 +186,14 @@ fn parse_zip_buf(reader: &mut BitReader) -> ZipFile {
 
         entries.push(ZipEntry {
             filename: cdr.filename,
-        compressed_content,
-		});
+            compressed_content,
+        });
     }
 
     ZipFile { entries }
 }
 
-fn parse_version(reader: &mut BitReader) -> Version {
+fn parse_version(reader: &mut ByteReader) -> Version {
     let id = reader.read_u16().unwrap();
     let os = OS::try_from((id >> 8) as u8)
         .unwrap_or_else(|err| panic!("Error during parsing of OS: {}.", err));
@@ -199,7 +202,7 @@ fn parse_version(reader: &mut BitReader) -> Version {
     Version { os, major, minor }
 }
 
-fn parse_time(reader: &mut BitReader) -> MsDosTime {
+fn parse_time(reader: &mut ByteReader) -> MsDosTime {
     let time = reader.read_u16().unwrap();
 
     // Source: https://www.delorie.com/djgpp/doc/rbinter/it/65/16.html
@@ -213,7 +216,7 @@ fn parse_time(reader: &mut BitReader) -> MsDosTime {
     }
 }
 
-fn parse_date(reader: &mut BitReader) -> MsDosDate {
+fn parse_date(reader: &mut ByteReader) -> MsDosDate {
     let date = reader.read_u16().unwrap();
 
     // Source: https://www.delorie.com/djgpp/doc/rbinter/it/66/16.html
@@ -256,11 +259,11 @@ fn assert_not_in_the_future(date: &MsDosDate, time: &MsDosTime) {
     }
 }
 
-fn parse_extra_fields(reader: &mut BitReader, num_extra_fields: u16) -> Vec<ExtraField> {
+fn parse_extra_fields(reader: &mut ByteReader, num_extra_fields: u16) -> Vec<ExtraField> {
     let mut ef: Vec<ExtraField> = Vec::with_capacity(num_extra_fields as usize);
-    let initial_position = reader.get_byte_position();
+    let initial_position = reader.get_position();
     // why?
-    while reader.get_byte_position() < initial_position + (num_extra_fields as usize) {
+    while reader.get_position() < initial_position + (num_extra_fields as usize) {
         let header_id = reader.read_u16().unwrap();
         let field_type = ExtraFieldType::try_from(header_id)
             .unwrap_or_else(|err| panic!("Error during parsing of extra field type: {}.", err));
@@ -273,7 +276,7 @@ fn parse_extra_fields(reader: &mut BitReader, num_extra_fields: u16) -> Vec<Extr
     return ef;
 }
 
-fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRecord {
+fn parse_central_directory_record(reader: &mut ByteReader) -> CentralDirectoryRecord {
     {
         const EXPECTED_SIGNATURE: u32 = 0x02014b50;
         let signature = reader.read_u32().unwrap();
@@ -330,7 +333,7 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
     let external_file_attributes = reader.read_u32().unwrap();
 
     let local_file_header_offset = reader.read_u32().unwrap();
-    if (local_file_header_offset as usize) >= reader.size() {
+    if (local_file_header_offset as usize) >= reader.len() {
         panic!(
             "Invalid local file header offset: {} bytes (0x{:08x}).",
             local_file_header_offset, local_file_header_offset
@@ -367,7 +370,7 @@ fn parse_central_directory_record(reader: &mut BitReader) -> CentralDirectoryRec
     }
 }
 
-fn parse_end_of_central_directory_record(reader: &mut BitReader) -> EndOfCentralDirectoryRecord {
+fn parse_end_of_central_directory_record(reader: &mut ByteReader) -> EndOfCentralDirectoryRecord {
     {
         /*
          * We know that the End of Central Directory Record (EOCDR) is always at the end
@@ -377,16 +380,16 @@ fn parse_end_of_central_directory_record(reader: &mut BitReader) -> EndOfCentral
          * So, to find the start of EOCD (the signature 0x06054b50) we start at the byte
          * 65536 bytes from the end and scan forward.
          */
-        reader.set_byte_position(max(0, reader.size() - 65_536));
+        reader.set_position(max(0, reader.len() - 65_536));
         const EXPECTED_SIGNATURE: u32 = 0x06054b50;
         let mut found = false;
-        while reader.get_byte_position() < reader.size() {
+        while reader.get_position() < reader.len() {
             let signature = reader.read_u32().unwrap();
             if signature == EXPECTED_SIGNATURE {
                 found = true;
                 break;
             }
-            reader.set_byte_position(reader.get_byte_position() - 3);
+            reader.set_position(reader.get_position() - 3);
         }
 
         if !found {

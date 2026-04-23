@@ -2,6 +2,8 @@
 
 use std::io::Result;
 
+/// A binary reader which allows to read single bits.
+/// Big endian.
 pub struct BitReader<'a> {
     buf: &'a [u8],
     bit_position: usize,
@@ -76,6 +78,21 @@ impl<'a> BitReader<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reading_be_bits() {
+        let buffer: [u8; 1] = [0b01101001];
+        let mut reader: BitReader = BitReader::new(&buffer);
+
+        assert!(!reader.read_bit().unwrap());
+        assert!(reader.read_bit().unwrap());
+        assert!(reader.read_bit().unwrap());
+        assert!(!reader.read_bit().unwrap());
+        assert!(reader.read_bit().unwrap());
+        assert!(!reader.read_bit().unwrap());
+        assert!(!reader.read_bit().unwrap());
+        assert!(reader.read_bit().unwrap());
+    }
 
     #[test]
     fn reading_bytes() {

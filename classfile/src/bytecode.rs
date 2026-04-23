@@ -329,8 +329,8 @@ pub fn parse_bytecode(
     cp: &ConstantPool,
 ) -> Vec<(u32, BytecodeInstruction)> {
     let mut instructions: Vec<(u32, BytecodeInstruction)> = Vec::new();
-    while reader.position() < reader.len() {
-        let position: u32 = reader.position().try_into().unwrap();
+    while reader.get_position() < reader.len() {
+        let position: u32 = reader.get_position().try_into().unwrap();
         let tmp: Result<u8> = reader.read_u8();
         if tmp.is_err() {
             break;
@@ -620,7 +620,7 @@ pub fn parse_bytecode(
             },
             0xaa => {
                 // skip padding
-                let current_position = reader.position();
+                let current_position = reader.get_position();
                 let next_multiple_of_4 = current_position.div_ceil(4) * 4;
                 let num_padding_bytes: u8 = (next_multiple_of_4 - current_position) as u8;
                 for _ in 0..num_padding_bytes {
@@ -643,7 +643,7 @@ pub fn parse_bytecode(
             }
             0xab => {
                 // skip padding
-                let current_position = reader.position();
+                let current_position = reader.get_position();
                 let next_multiple_of_4 = current_position.div_ceil(4) * 4;
                 let num_padding_bytes: u8 = (next_multiple_of_4 - current_position) as u8;
                 for _ in 0..num_padding_bytes {
