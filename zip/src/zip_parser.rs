@@ -10,7 +10,7 @@ use std::{
 use binary_reader::byte_reader::ByteReader;
 
 use crate::{
-    CentralDirectoryRecord, CompressionMethod, EndOfCentralDirectoryRecord, ExtraField,
+    BitFlags, CentralDirectoryRecord, CompressionMethod, EndOfCentralDirectoryRecord, ExtraField,
     ExtraFieldType, LocalFileHeader, MsDosDate, MsDosTime, OS, Version, ZipEntry, ZipFile,
 };
 
@@ -42,7 +42,8 @@ fn parse_local_file_header(reader: &mut ByteReader) -> LocalFileHeader {
 
     let minimum_version = parse_version(reader);
 
-    let bit_flags = reader.read_u16().unwrap();
+    let bit_flags = BitFlags::try_from(reader.read_u16().unwrap())
+        .unwrap_or_else(|err| panic!("Could not parse bit_flags due to: {}.", err));
 
     let compression_method = CompressionMethod::try_from(reader.read_u16().unwrap())
         .unwrap_or_else(|err| panic!("Error during parsing of compression method: {}.", err));
@@ -106,10 +107,11 @@ fn check_local_file_header(cdr: &CentralDirectoryRecord, lfh: &LocalFileHeader) 
             cdr.minimum_version, lfh.minimum_version
         );
     }
-    if cdr.bit_flags != lfh.bit_flags {
+    if cdr.bit_flags.to_u16() != lfh.bit_flags.to_u16() {
         panic!(
             "Different bit flags in CDR (0x{:04x}) and LFH (0x{:04x}).",
-            cdr.bit_flags, lfh.bit_flags
+            cdr.bit_flags.to_u16(),
+            lfh.bit_flags.to_u16()
         );
     }
     if cdr.compression_method != lfh.compression_method {
@@ -252,18 +254,18 @@ fn assert_not_in_the_future(date: &MsDosDate, time: &MsDosTime) {
     let now = SystemTime::now();
 
     if then > now {
-        panic!(
-            "Last modification date+time is in the future: {} {}.",
+        eprintln!(
+            "WARNING: Last modification date+time is in the future: {} {}.",
             date, time
         );
     }
 }
 
-fn parse_extra_fields(reader: &mut ByteReader, num_extra_fields: u16) -> Vec<ExtraField> {
-    let mut ef: Vec<ExtraField> = Vec::with_capacity(num_extra_fields as usize);
+fn parse_extra_fields(reader: &mut ByteReader, extra_fields_bytes: u16) -> Vec<ExtraField> {
+    let mut ef: Vec<ExtraField> = Vec::with_capacity(extra_fields_bytes as usize);
     let initial_position = reader.get_position();
     // why?
-    while reader.get_position() < initial_position + (num_extra_fields as usize) {
+    while reader.get_position() < initial_position + (extra_fields_bytes as usize) {
         let header_id = reader.read_u16().unwrap();
         let field_type = ExtraFieldType::try_from(header_id)
             .unwrap_or_else(|err| panic!("Error during parsing of extra field type: {}.", err));
@@ -288,10 +290,12 @@ fn parse_central_directory_record(reader: &mut ByteReader) -> CentralDirectoryRe
         }
     }
 
+    // TODO: check version
     let version_made_by = parse_version(reader);
     let minimum_version = parse_version(reader);
 
-    let bit_flags = reader.read_u16().unwrap();
+    let bit_flags = BitFlags::try_from(reader.read_u16().unwrap())
+        .unwrap_or_else(|err| panic!("Could not parse bit_flags due to: {}.", err));
 
     let compression_method = CompressionMethod::try_from(reader.read_u16().unwrap())
         .unwrap_or_else(|err| panic!("Error during parsing of compression method id: {}.", err));
@@ -300,21 +304,35 @@ fn parse_central_directory_record(reader: &mut ByteReader) -> CentralDirectoryRe
     let last_modification_date = parse_date(reader);
     assert_not_in_the_future(&last_modification_date, &last_modification_time);
 
-    // TODO: check CRC32
     let crc32 = reader.read_u32().unwrap();
-    if crc32 != 0 {
-        panic!("Invalid CRC32: 0x{:08x}.", crc32);
-    }
-
     let compressed_size = reader.read_u32().unwrap();
     let uncompressed_size = reader.read_u32().unwrap();
 
-    if matches!(compression_method, CompressionMethod::None) && compressed_size != uncompressed_size
-    {
-        panic!(
-            "Compression method was NONE but compressed size ({} bytes) and uncompressed size ({} bytes) were different.",
-            compressed_size, uncompressed_size
+    if bit_flags.has_bit(3) {
+        assert!(
+            crc32 == 0,
+            "Expected CRC32 to be 0 but was 0x{:08x}.",
+            crc32
         );
+        assert!(
+            compressed_size == 0,
+            "Expected compressed_size to be 0 but was {}.",
+            compressed_size
+        );
+        assert!(
+            uncompressed_size == 0,
+            "Expected uncompressed_size to be 0 but was {}.",
+            uncompressed_size
+        );
+    } else {
+        if matches!(compression_method, CompressionMethod::None)
+            && compressed_size != uncompressed_size
+        {
+            panic!(
+                "Compression method was NONE but compressed size ({} bytes) and uncompressed size ({} bytes) were different.",
+                compressed_size, uncompressed_size
+            );
+        }
     }
 
     let file_name_length = reader.read_u16().unwrap();
@@ -383,7 +401,7 @@ fn parse_end_of_central_directory_record(reader: &mut ByteReader) -> EndOfCentra
         reader.set_position(max(0, reader.len() - 65_536));
         const EXPECTED_SIGNATURE: u32 = 0x06054b50;
         let mut found = false;
-        while reader.get_position() < reader.len() {
+        while reader.get_position() + 3 < reader.len() {
             let signature = reader.read_u32().unwrap();
             if signature == EXPECTED_SIGNATURE {
                 found = true;
