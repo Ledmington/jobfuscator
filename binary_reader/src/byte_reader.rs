@@ -4,6 +4,7 @@ use std::io::{Error, ErrorKind, Result};
 
 use crate::Endianness;
 
+/// A binary reader to read contiguous bytes.
 pub struct ByteReader<'a> {
     buf: &'a [u8],
     pos: usize,
@@ -84,8 +85,12 @@ impl<'a> ByteReader<'a> {
         (0..count).map(|_| self.read_i32()).collect()
     }
 
-    pub fn position(&self) -> usize {
+    pub fn get_position(&self) -> usize {
         self.pos
+    }
+
+    pub fn set_position(&mut self, new_pos: usize) {
+        self.pos = new_pos
     }
 
     pub fn len(&self) -> usize {
