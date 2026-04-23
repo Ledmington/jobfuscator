@@ -5,26 +5,26 @@ pub mod zip_parser;
 #[derive(PartialEq)]
 #[repr(u8)]
 enum OS {
-    MsDos = 0x00,
-    AMIGA = 0x01,
-    OpenVms = 0x02,
-    Unix = 0x03,
-    VmCms = 0x04,
-    AtariSt = 0x05,
-    Os2Hpfs = 0x06,
-    Macintosh = 0x07,
-    ZSystem = 0x08,
-    CPM = 0x09,
-    WindowsNtfs = 0x0a,
-    MVS = 0x0b,
-    VSE = 0x0c,
-    AcornRisc = 0x0d,
-    Vfat = 0x0e,
-    AlternateMvs = 0x0f,
-    Beos = 0x10,
-    Tandem = 0x11,
-    OS400 = 0x12,
-    OsxDarwin = 0x13,
+    MsDos = 0,
+    AMIGA = 1,
+    OpenVms = 2,
+    Unix = 3,
+    VmCms = 4,
+    AtariSt = 5,
+    Os2Hpfs = 6,
+    Macintosh = 7,
+    ZSystem = 8,
+    CPM = 9,
+    WindowsNtfs = 10,
+    MVS = 11,
+    VSE = 12,
+    AcornRisc = 13,
+    Vfat = 14,
+    AlternateMvs = 15,
+    Beos = 16,
+    Tandem = 17,
+    OS400 = 18,
+    OsxDarwin = 19,
 }
 
 impl OS {
@@ -59,27 +59,27 @@ impl TryFrom<u8> for OS {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0x00 => Ok(OS::MsDos),
-            0x01 => Ok(OS::AMIGA),
-            0x02 => Ok(OS::OpenVms),
-            0x03 => Ok(OS::Unix),
-            0x04 => Ok(OS::VmCms),
-            0x05 => Ok(OS::AtariSt),
-            0x06 => Ok(OS::Os2Hpfs),
-            0x07 => Ok(OS::Macintosh),
-            0x08 => Ok(OS::ZSystem),
-            0x09 => Ok(OS::CPM),
-            0x0a => Ok(OS::WindowsNtfs),
-            0x0b => Ok(OS::MVS),
-            0x0c => Ok(OS::VSE),
-            0x0d => Ok(OS::AcornRisc),
-            0x0e => Ok(OS::Vfat),
-            0x0f => Ok(OS::AlternateMvs),
-            0x10 => Ok(OS::Beos),
-            0x11 => Ok(OS::Tandem),
-            0x12 => Ok(OS::OS400),
-            0x13 => Ok(OS::OsxDarwin),
-            _ => Err(format!("Unknown OS id: 0x{value:02x}.")),
+            0 => Ok(OS::MsDos),
+            1 => Ok(OS::AMIGA),
+            2 => Ok(OS::OpenVms),
+            3 => Ok(OS::Unix),
+            4 => Ok(OS::VmCms),
+            5 => Ok(OS::AtariSt),
+            6 => Ok(OS::Os2Hpfs),
+            7 => Ok(OS::Macintosh),
+            8 => Ok(OS::ZSystem),
+            9 => Ok(OS::CPM),
+            10 => Ok(OS::WindowsNtfs),
+            11 => Ok(OS::MVS),
+            12 => Ok(OS::VSE),
+            13 => Ok(OS::AcornRisc),
+            14 => Ok(OS::Vfat),
+            15 => Ok(OS::AlternateMvs),
+            16 => Ok(OS::Beos),
+            17 => Ok(OS::Tandem),
+            18 => Ok(OS::OS400),
+            19 => Ok(OS::OsxDarwin),
+            _ => Err(format!("Unknown/unused OS id: {value} (0x{value:02x}).")),
         }
     }
 }
@@ -212,9 +212,29 @@ impl TryFrom<u16> for ExtraFieldType {
     }
 }
 
+struct BitFlags(u16);
+
+impl BitFlags {
+    pub fn to_u16(&self) -> u16 {
+        self.0
+    }
+
+    pub fn has_bit(&self, bit_index: i32) -> bool {
+        (self.0 & (1u16 << (15 - bit_index))) != 0
+    }
+}
+
+impl TryFrom<u16> for BitFlags {
+    type Error = String;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        Ok(BitFlags(value))
+    }
+}
+
 struct LocalFileHeader {
     minimum_version: Version,
-    bit_flags: u16,
+    bit_flags: BitFlags,
     compression_method: CompressionMethod,
     last_modification_time: MsDosTime,
     last_modification_date: MsDosDate,
@@ -227,7 +247,7 @@ struct LocalFileHeader {
 struct CentralDirectoryRecord {
     version_made_by: Version,
     minimum_version: Version,
-    bit_flags: u16,
+    bit_flags: BitFlags,
     compression_method: CompressionMethod,
     last_modification_time: MsDosTime,
     last_modification_date: MsDosDate,
