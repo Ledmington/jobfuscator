@@ -212,6 +212,13 @@ impl TryFrom<u16> for ExtraFieldType {
     }
 }
 
+#[repr(u16)]
+#[derive(Copy, Clone)]
+enum BitFlag {
+    Encrypted = 0x0001,
+    HasDataDescriptor = 0x0008,
+}
+
 struct BitFlags(u16);
 
 impl BitFlags {
@@ -219,8 +226,8 @@ impl BitFlags {
         self.0
     }
 
-    pub fn has_bit(&self, bit_index: i32) -> bool {
-        (self.0 & (1u16 << (15 - bit_index))) != 0
+    pub fn contains(&self, flag: &BitFlag) -> bool {
+        (self.0 & (*flag as u16)) != 0
     }
 }
 
@@ -242,6 +249,12 @@ struct LocalFileHeader {
     uncompressed_size: u32,
     filename: String,
     extra_fields: Vec<ExtraField>,
+}
+
+struct DataDescriptor {
+    crc32: u32,
+    compressed_size: u32,
+    uncompressed_size: u32,
 }
 
 struct CentralDirectoryRecord {

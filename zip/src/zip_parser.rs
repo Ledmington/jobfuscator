@@ -10,8 +10,9 @@ use std::{
 use binary_reader::byte_reader::ByteReader;
 
 use crate::{
-    BitFlags, CentralDirectoryRecord, CompressionMethod, EndOfCentralDirectoryRecord, ExtraField,
-    ExtraFieldType, LocalFileHeader, MsDosDate, MsDosTime, OS, Version, ZipEntry, ZipFile,
+    BitFlag, BitFlags, CentralDirectoryRecord, CompressionMethod, DataDescriptor,
+    EndOfCentralDirectoryRecord, ExtraField, ExtraFieldType, LocalFileHeader, MsDosDate, MsDosTime,
+    OS, Version, ZipEntry, ZipFile,
 };
 
 // Useful reference: https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
@@ -44,6 +45,11 @@ fn parse_local_file_header(reader: &mut ByteReader) -> LocalFileHeader {
 
     let bit_flags = BitFlags::try_from(reader.read_u16().unwrap())
         .unwrap_or_else(|err| panic!("Could not parse bit_flags due to: {}.", err));
+
+    assert!(
+        !bit_flags.contains(&BitFlag::Encrypted),
+        "Don't know what to do when the LFH is encrypted."
+    );
 
     let compression_method = CompressionMethod::try_from(reader.read_u16().unwrap())
         .unwrap_or_else(|err| panic!("Error during parsing of compression method: {}.", err));
@@ -186,6 +192,10 @@ fn parse_zip_buf(reader: &mut ByteReader) -> ZipFile {
 
         let compressed_content = reader.read_u8_vec(cdr.compressed_size as usize).unwrap();
 
+        if lfh.bit_flags.contains(&BitFlag::HasDataDescriptor) {
+            parse_data_descriptor(reader);
+        }
+
         entries.push(ZipEntry {
             filename: cdr.filename,
             compressed_content,
@@ -193,6 +203,17 @@ fn parse_zip_buf(reader: &mut ByteReader) -> ZipFile {
     }
 
     ZipFile { entries }
+}
+
+fn parse_data_descriptor(reader: &mut ByteReader) -> DataDescriptor {
+    let crc32 = reader.read_u32().unwrap();
+    let compressed_size = reader.read_u32().unwrap();
+    let uncompressed_size = reader.read_u32().unwrap();
+    DataDescriptor {
+        crc32,
+        compressed_size,
+        uncompressed_size,
+    }
 }
 
 fn parse_version(reader: &mut ByteReader) -> Version {
@@ -308,7 +329,9 @@ fn parse_central_directory_record(reader: &mut ByteReader) -> CentralDirectoryRe
     let compressed_size = reader.read_u32().unwrap();
     let uncompressed_size = reader.read_u32().unwrap();
 
-    if bit_flags.has_bit(3) {
+    let has_data_descriptor = bit_flags.contains(&BitFlag::HasDataDescriptor);
+
+    if has_data_descriptor {
         assert!(
             crc32 == 0,
             "Expected CRC32 to be 0 but was 0x{:08x}.",
