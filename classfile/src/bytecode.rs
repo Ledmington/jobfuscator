@@ -71,8 +71,17 @@ pub enum BytecodeInstruction {
         local_variable_index: u8,
     },
     IaLoad {},
+    LaLoad {},
+    FaLoad {},
+    DaLoad {},
     AaLoad {},
     BaLoad {},
+    CaLoad {},
+    SaLoad {},
+    IaStore {},
+    LaStore {},
+    FaStore {},
+    DaStore {},
     AaStore {},
     BaStore {},
     CaStore {},
@@ -434,8 +443,13 @@ pub fn parse_bytecode(
                 local_variable_index: 3,
             },
             0x2e => BytecodeInstruction::IaLoad {},
+            0x2f => BytecodeInstruction::LaLoad {},
+            0x30 => BytecodeInstruction::FaLoad {},
+            0x31 => BytecodeInstruction::DaLoad {},
             0x32 => BytecodeInstruction::AaLoad {},
             0x33 => BytecodeInstruction::BaLoad {},
+            0x34 => BytecodeInstruction::CaLoad {},
+            0x35 => BytecodeInstruction::SaLoad {},
             0x36 => BytecodeInstruction::IStore {
                 local_variable_index: reader.read_u8().unwrap(),
             },
@@ -487,6 +501,10 @@ pub fn parse_bytecode(
             0x4e => BytecodeInstruction::AStore {
                 local_variable_index: 3,
             },
+            0x4f => BytecodeInstruction::IaStore {},
+            0x50 => BytecodeInstruction::LaStore {},
+            0x51 => BytecodeInstruction::FaStore {},
+            0x52 => BytecodeInstruction::DaStore {},
             0x53 => BytecodeInstruction::AaStore {},
             0x54 => BytecodeInstruction::BaStore {},
             0x55 => BytecodeInstruction::CaStore {},
@@ -733,7 +751,7 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
     match instruction {
         BytecodeInstruction::Dup {} => w.write_u8(0x59),
         BytecodeInstruction::Dup2 {} => w.write_u8(0x5c),
-        BytecodeInstruction::AConstNull {} => todo!(),
+        BytecodeInstruction::AConstNull {} => w.write_u8(0x01),
         BytecodeInstruction::IConst { constant } => match constant {
             -1 => w.write_u8(0x02),
             0 => w.write_u8(0x03),
@@ -862,7 +880,18 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
                 w.write_u8(*local_variable_index);
             }
         },
-        BytecodeInstruction::FStore { .. } => todo!(),
+        BytecodeInstruction::FStore {
+            local_variable_index,
+        } => match local_variable_index {
+            0 => w.write_u8(0x43),
+            1 => w.write_u8(0x44),
+            2 => w.write_u8(0x45),
+            3 => w.write_u8(0x46),
+            _ => {
+                w.write_u8(0x38);
+                w.write_u8(*local_variable_index);
+            }
+        },
         BytecodeInstruction::DLoad {
             local_variable_index,
         } => match local_variable_index {
@@ -882,8 +911,17 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(*local_variable_index);
         }
         BytecodeInstruction::IaLoad {} => w.write_u8(0x2e),
+        BytecodeInstruction::LaLoad {} => w.write_u8(0x2f),
+        BytecodeInstruction::FaLoad {} => w.write_u8(0x30),
+        BytecodeInstruction::DaLoad {} => w.write_u8(0x31),
         BytecodeInstruction::AaLoad {} => w.write_u8(0x32),
         BytecodeInstruction::BaLoad {} => w.write_u8(0x33),
+        BytecodeInstruction::CaLoad {} => w.write_u8(0x34),
+        BytecodeInstruction::SaLoad {} => w.write_u8(0x35),
+        BytecodeInstruction::IaStore {} => w.write_u8(0x4f),
+        BytecodeInstruction::LaStore {} => w.write_u8(0x50),
+        BytecodeInstruction::FaStore {} => w.write_u8(0x51),
+        BytecodeInstruction::DaStore {} => w.write_u8(0x52),
         BytecodeInstruction::AaStore {} => w.write_u8(0x53),
         BytecodeInstruction::BaStore {} => w.write_u8(0x54),
         BytecodeInstruction::CaStore {} => w.write_u8(0x55),
@@ -1029,7 +1067,10 @@ pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction
             w.write_u8(0x9e);
             w.write_i16(*offset);
         }
-        BytecodeInstruction::IfNull { .. } => todo!(),
+        BytecodeInstruction::IfNull { offset } => {
+            w.write_u8(0xc6);
+            w.write_i16(*offset);
+        }
         BytecodeInstruction::IfNonNull { offset } => {
             w.write_u8(0xc7);
             w.write_i16(*offset);
@@ -1196,7 +1237,12 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
             0..=3 => 1,
             _ => 2,
         },
-        BytecodeInstruction::FStore { .. } => todo!(),
+        BytecodeInstruction::FStore {
+            local_variable_index,
+        } => match local_variable_index {
+            0..=3 => 1,
+            _ => 2,
+        },
         BytecodeInstruction::DLoad {
             local_variable_index,
         } => match local_variable_index {
@@ -1205,8 +1251,17 @@ pub fn get_instruction_length(instruction: &BytecodeInstruction) -> u32 {
         },
         BytecodeInstruction::DStore { .. } => 2,
         BytecodeInstruction::IaLoad {} => 1,
+        BytecodeInstruction::LaLoad {} => 1,
+        BytecodeInstruction::FaLoad {} => 1,
+        BytecodeInstruction::DaLoad {} => 1,
         BytecodeInstruction::AaLoad {} => 1,
         BytecodeInstruction::BaLoad {} => 1,
+        BytecodeInstruction::CaLoad {} => 1,
+        BytecodeInstruction::SaLoad {} => 1,
+        BytecodeInstruction::IaStore {} => 1,
+        BytecodeInstruction::LaStore {} => 1,
+        BytecodeInstruction::FaStore {} => 1,
+        BytecodeInstruction::DaStore {} => 1,
         BytecodeInstruction::AaStore {} => 1,
         BytecodeInstruction::BaStore {} => 1,
         BytecodeInstruction::CaStore {} => 1,
