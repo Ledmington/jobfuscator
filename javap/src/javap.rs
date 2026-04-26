@@ -1755,7 +1755,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                 ..
             } => {
                 lw.print("EnclosingMethod: ")
-                    .print(&format!("#{}.#{}", class_index, method_index))
+                    .print(&format!("#{class_index}.#{method_index}"))
                     .tab()
                     .print("// ")
                     .println(&cp.get_class_name(*class_index).replace('/', "."));
