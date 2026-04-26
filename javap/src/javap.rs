@@ -637,8 +637,17 @@ fn get_opcode_and_arguments_string(position: &u32, instruction: &BytecodeInstruc
             }
         }
         BytecodeInstruction::IaLoad {} => "iaload".to_owned(),
+        BytecodeInstruction::LaLoad {} => "laload".to_owned(),
+        BytecodeInstruction::FaLoad {} => "faload".to_owned(),
+        BytecodeInstruction::DaLoad {} => "daload".to_owned(),
         BytecodeInstruction::AaLoad {} => "aaload".to_owned(),
         BytecodeInstruction::BaLoad {} => "baload".to_owned(),
+        BytecodeInstruction::CaLoad {} => "caload".to_owned(),
+        BytecodeInstruction::SaLoad {} => "saload".to_owned(),
+        BytecodeInstruction::IaStore {} => "iastore".to_owned(),
+        BytecodeInstruction::LaStore {} => "lastore".to_owned(),
+        BytecodeInstruction::FaStore {} => "fastore".to_owned(),
+        BytecodeInstruction::DaStore {} => "dastore".to_owned(),
         BytecodeInstruction::AaStore {} => "aastore".to_owned(),
         BytecodeInstruction::BaStore {} => "bastore".to_owned(),
         BytecodeInstruction::CaStore {} => "castore".to_owned(),
@@ -916,7 +925,7 @@ fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
             )
         }
         ConstantPoolInfo::Class { name_index } => {
-            "class ".to_owned() + &cp.get_utf8_content(*name_index)
+            "class ".to_owned() + &cp.get_wrapped_utf8_content(*name_index)
         }
         _ => unreachable!(
             "Unknown CP entry to get constant string from: {}.",
@@ -958,8 +967,17 @@ fn get_comment(
         | BytecodeInstruction::DLoad { .. }
         | BytecodeInstruction::DStore { .. }
         | BytecodeInstruction::IaLoad {}
+        | BytecodeInstruction::LaLoad {}
+        | BytecodeInstruction::FaLoad {}
+        | BytecodeInstruction::DaLoad {}
         | BytecodeInstruction::AaLoad {}
         | BytecodeInstruction::BaLoad {}
+        | BytecodeInstruction::CaLoad {}
+        | BytecodeInstruction::SaLoad {}
+        | BytecodeInstruction::IaStore {}
+        | BytecodeInstruction::LaStore {}
+        | BytecodeInstruction::FaStore {}
+        | BytecodeInstruction::DaStore {}
         | BytecodeInstruction::AaStore {}
         | BytecodeInstruction::BaStore {}
         | BytecodeInstruction::CaStore {}
@@ -1267,8 +1285,10 @@ fn get_verification_type_info_string(cp: &ConstantPool, vti: &VerificationTypeIn
         VerificationTypeInfo::UninitializedThisVariable => todo!(),
         VerificationTypeInfo::ObjectVariable {
             constant_pool_index,
-        } => "class ".to_owned() + &cp.get_class_name(*constant_pool_index),
-        VerificationTypeInfo::UninitializedVariable { .. } => todo!(),
+        } => format!("class {}", cp.get_class_name(*constant_pool_index)),
+        VerificationTypeInfo::UninitializedVariable { offset } => {
+            format!("uninitialized {offset}")
+        }
     }
 }
 
