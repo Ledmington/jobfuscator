@@ -89,7 +89,8 @@ fn make_attribute_public(attribute: &AttributeInfo) -> AttributeInfo {
         | AttributeInfo::RuntimeVisibleAnnotations { .. }
         | AttributeInfo::ConstantValue { .. }
         | AttributeInfo::Exceptions { .. }
-        | AttributeInfo::EnclosingMethod { .. } => attribute.clone(),
+        | AttributeInfo::EnclosingMethod { .. }
+        | AttributeInfo::NestHost { .. } => attribute.clone(),
         AttributeInfo::Code {
             name_index,
             max_stack,

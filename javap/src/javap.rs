@@ -1370,6 +1370,7 @@ fn print_method_attributes(
                 if !exception_table.is_empty() {
                     lw.println("Exception table:");
                     lw.println("   from    to  target type");
+                    lw.indent(1);
                     for exception in exception_table.iter() {
                         lw.println(&format!(
                             "    {}  {}  {}   Class {}",
@@ -1379,6 +1380,7 @@ fn print_method_attributes(
                             cp.get_class_name(exception.catch_type)
                         ));
                     }
+                    lw.indent(-1);
                 }
                 print_code_attributes(lw, cp, attributes);
 
