@@ -50,7 +50,7 @@ impl ClassAccessFlags {
             (ClassAccessFlag::Super, "class"),
             (ClassAccessFlag::Interface, "interface"),
             (ClassAccessFlag::Abstract, ""),
-            (ClassAccessFlag::Synthetic, "synthetic"),
+            (ClassAccessFlag::Synthetic, ""),
             (ClassAccessFlag::Annotation, "annotation"),
             (ClassAccessFlag::Enum, ""),
             (ClassAccessFlag::Module, "module"),

@@ -72,6 +72,15 @@ pub enum AttributeInfo {
         name_index: u16,
         exception_indices: Vec<u16>,
     },
+    EnclosingMethod {
+        name_index: u16,
+        class_index: u16,
+        method_index: u16,
+    },
+    NestHost {
+        name_index: u16,
+        host_class_index: u16,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -91,6 +100,8 @@ pub enum AttributeKind {
     RuntimeVisibleAnnotations,
     ConstantValue,
     Exceptions,
+    EnclosingMethod,
+    NestHost,
 }
 
 impl std::fmt::Display for AttributeKind {
@@ -119,6 +130,8 @@ impl AttributeInfo {
             }
             AttributeInfo::ConstantValue { .. } => AttributeKind::ConstantValue,
             AttributeInfo::Exceptions { .. } => AttributeKind::Exceptions,
+            AttributeInfo::EnclosingMethod { .. } => AttributeKind::EnclosingMethod,
+            AttributeInfo::NestHost { .. } => AttributeKind::NestHost,
         }
     }
 }
@@ -484,6 +497,27 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
             AttributeInfo::NestMembers {
                 name_index: attribute_name_index,
                 classes,
+            }
+        }
+        "EnclosingMethod" => {
+            let class_index: u16 = reader.read_u16().unwrap();
+            assert_valid_and_type!(cp, class_index, ConstantPoolTag::Class);
+            let method_index: u16 = reader.read_u16().unwrap();
+            if method_index != 0 {
+                assert_valid_and_type!(cp, method_index, ConstantPoolTag::NameAndType);
+            }
+            AttributeInfo::EnclosingMethod {
+                name_index: attribute_name_index,
+                class_index,
+                method_index,
+            }
+        }
+        "NestHost" => {
+            let host_class_index: u16 = reader.read_u16().unwrap();
+            assert_valid_and_type!(cp, host_class_index, ConstantPoolTag::Class);
+            AttributeInfo::NestHost {
+                name_index: attribute_name_index,
+                host_class_index,
             }
         }
         _ => panic!(

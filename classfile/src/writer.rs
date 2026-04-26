@@ -212,6 +212,8 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
         AttributeInfo::Exceptions {
             exception_indices, ..
         } => 2 + 2 * (exception_indices.len() as u32),
+        AttributeInfo::EnclosingMethod { .. } => 2 + 2,
+        AttributeInfo::NestHost { .. } => 2,
     }
 }
 
@@ -467,6 +469,24 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u32(get_attribute_length(attribute));
                 w.write_u16(exception_indices.len().try_into().unwrap());
                 w.write_u16_vec(exception_indices);
+            }
+            AttributeInfo::EnclosingMethod {
+                name_index,
+                class_index,
+                method_index,
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(*class_index);
+                w.write_u16(*method_index);
+            }
+            AttributeInfo::NestHost {
+                name_index,
+                host_class_index,
+            } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
+                w.write_u16(*host_class_index);
             }
         }
     }

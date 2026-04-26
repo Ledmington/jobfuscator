@@ -1369,16 +1369,18 @@ fn print_method_attributes(
                 }
                 if !exception_table.is_empty() {
                     lw.println("Exception table:");
-                    lw.println("   from    to  target type");
+                    lw.indent(1);
+                    lw.println(" from    to  target type");
                     for exception in exception_table.iter() {
                         lw.println(&format!(
-                            "    {}  {}  {}   Class {}",
+                            " {:5} {:5} {:5}   Class {}",
                             exception.start_pc,
                             exception.end_pc,
                             exception.handler_pc,
                             cp.get_class_name(exception.catch_type)
                         ));
                     }
+                    lw.indent(-1);
                 }
                 print_code_attributes(lw, cp, attributes);
 
@@ -1746,6 +1748,25 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                 for class_index in classes {
                     lw.println(&format!("  {}", cp.get_class_name(*class_index)));
                 }
+            }
+            AttributeInfo::EnclosingMethod {
+                class_index,
+                method_index,
+                ..
+            } => {
+                lw.print("EnclosingMethod: ")
+                    .print(&format!("#{class_index}.#{method_index}"))
+                    .tab()
+                    .print("// ")
+                    .println(&cp.get_class_name(*class_index).replace('/', "."));
+            }
+            AttributeInfo::NestHost {
+                host_class_index, ..
+            } => {
+                lw.println(&format!(
+                    "NestHost: class {}",
+                    cp.get_class_name(*host_class_index)
+                ));
             }
             _ => unreachable!(),
         }
