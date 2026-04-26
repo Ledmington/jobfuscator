@@ -1287,7 +1287,7 @@ fn get_verification_type_info_string(cp: &ConstantPool, vti: &VerificationTypeIn
             constant_pool_index,
         } => format!("class {}", cp.get_class_name(*constant_pool_index)),
         VerificationTypeInfo::UninitializedVariable { offset } => {
-            format!("uninitialized {}", offset)
+            format!("uninitialized {offset}")
         }
     }
 }
