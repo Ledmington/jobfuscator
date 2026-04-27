@@ -294,14 +294,25 @@ pub struct ZipFile {
 }
 
 impl ZipFile {
+    pub fn num_entries(&self) -> usize {
+        self.entries.len()
+    }
+
     pub fn entries(&self) -> &Vec<ZipEntry> {
         &self.entries
     }
 }
 
 pub struct ZipEntry {
-    filename: String,
+    version_made_by: Version,
+    minimum_version: Version,
+    bit_flags: BitFlags,
+    compression_method: CompressionMethod,
+    last_modification_time: MsDosTime,
+    last_modification_date: MsDosDate,
     compressed_content: Vec<u8>,
+    filename: String,
+    comment: String,
 }
 
 impl ZipEntry {
@@ -311,5 +322,33 @@ impl ZipEntry {
 
     pub fn compressed_size(&self) -> usize {
         self.compressed_content.len()
+    }
+
+    pub fn version_made_by(&self) -> String {
+        self.version_made_by.to_string()
+    }
+
+    pub fn minimum_version(&self) -> String {
+        self.minimum_version.to_string()
+    }
+
+    pub fn bit_flags(&self) -> u16 {
+        self.bit_flags.to_u16()
+    }
+
+    pub fn compression_method(&self) -> String {
+        self.compression_method.to_string()
+    }
+
+    pub fn last_modification_date(&self) -> String {
+        self.last_modification_date.to_string()
+    }
+
+    pub fn last_modification_time(&self) -> String {
+        self.last_modification_time.to_string()
+    }
+
+    pub fn comment(&self) -> String {
+        self.comment.clone()
     }
 }
