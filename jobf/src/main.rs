@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
-mod transformations;
+mod make_everything_public;
+mod pipeline;
+mod transformation;
 
 use std::{
     fs::File,
@@ -15,7 +17,7 @@ use classfile::{
 use cli_parser::{CommandLineOption, CommandLineParser, CommandLineType};
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::FileOptions};
 
-use crate::transformations::make_everything_public;
+use crate::{make_everything_public::MakeEverythingPublic, pipeline::TransformationPipeline};
 
 fn is_class_file(bytes: &[u8]) -> bool {
     bytes.starts_with(&[0xCA, 0xFE, 0xBA, 0xBE])
@@ -25,17 +27,9 @@ fn is_zip_file(bytes: &[u8]) -> bool {
     bytes.starts_with(&[0x50, 0x4B, 0x03, 0x04])
 }
 
-fn transform_class_file(cf: &ClassFile, all_public: bool) -> ClassFile {
-    if all_public {
-        make_everything_public(cf)
-    } else {
-        cf.clone()
-    }
-}
-
-fn parse_and_rewrite(reader: &mut BinaryReader, all_public: bool) -> Vec<u8> {
+fn parse_and_rewrite(reader: &mut BinaryReader, pipeline: &TransformationPipeline) -> Vec<u8> {
     let in_cf: ClassFile = parse_class_file(reader);
-    let out_cf = transform_class_file(&in_cf, all_public);
+    let out_cf = pipeline.execute(&in_cf);
     write_class_file(&out_cf)
 }
 
@@ -101,6 +95,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let quiet = args.get("quiet").unwrap().as_bool();
     let make_everything_public = args.get("make-everything-public").unwrap().as_bool();
 
+    let mut pipeline: TransformationPipeline = TransformationPipeline::new();
+
+    if make_everything_public {
+        pipeline.add(Box::new(MakeEverythingPublic {}));
+    }
+
     let mut file = File::open(&input_filename)
         .unwrap_or_else(|err| die!("Could not open file '{}' due to: {}.", input_filename, err));
 
@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         file.read_to_end(&mut file_bytes)?;
 
         let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endianness::Big);
-        let out_bytes = parse_and_rewrite(&mut reader, make_everything_public);
+        let out_bytes = parse_and_rewrite(&mut reader, &pipeline);
         log!(
             quiet,
             "{} -> valid class file ({} bytes)",
@@ -155,7 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             entry.read_to_end(&mut file_bytes)?;
 
             let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endianness::Big);
-            let out_bytes = parse_and_rewrite(&mut reader, make_everything_public);
+            let out_bytes = parse_and_rewrite(&mut reader, &pipeline);
             log!(quiet, "{} ({} bytes) OK", name, file_bytes.len());
 
             zip_writer.start_file(name, options)?;

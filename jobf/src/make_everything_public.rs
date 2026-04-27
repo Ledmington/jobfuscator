@@ -9,18 +9,24 @@ use classfile::{
     methods::MethodInfo,
 };
 
-pub(crate) fn make_everything_public(cf: &ClassFile) -> ClassFile {
-    ClassFile {
-        minor_version: cf.minor_version,
-        major_version: cf.major_version,
-        constant_pool: cf.constant_pool.clone(),
-        access_flags: make_class_flags_public(cf.access_flags),
-        this_class: cf.this_class,
-        super_class: cf.super_class,
-        interfaces: cf.interfaces.clone(),
-        fields: make_fields_public(&cf.fields),
-        methods: make_methods_public(&cf.methods),
-        attributes: make_attributes_public(&cf.attributes),
+use crate::transformation::ClassFileTransformation;
+
+pub(crate) struct MakeEverythingPublic {}
+
+impl ClassFileTransformation for MakeEverythingPublic {
+    fn transform(&self, cf: &ClassFile) -> ClassFile {
+        ClassFile {
+            minor_version: cf.minor_version,
+            major_version: cf.major_version,
+            constant_pool: cf.constant_pool.clone(),
+            access_flags: make_class_flags_public(cf.access_flags),
+            this_class: cf.this_class,
+            super_class: cf.super_class,
+            interfaces: cf.interfaces.clone(),
+            fields: make_fields_public(&cf.fields),
+            methods: make_methods_public(&cf.methods),
+            attributes: make_attributes_public(&cf.attributes),
+        }
     }
 }
 
