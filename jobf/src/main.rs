@@ -2,6 +2,7 @@
 
 mod make_everything_public;
 mod pipeline;
+mod shuffle_fields;
 mod transformation;
 
 use std::{
@@ -17,7 +18,10 @@ use classfile::{
 use cli_parser::{CommandLineOption, CommandLineParser, CommandLineType};
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::FileOptions};
 
-use crate::{make_everything_public::MakeEverythingPublic, pipeline::TransformationPipeline};
+use crate::{
+    make_everything_public::MakeEverythingPublic, pipeline::TransformationPipeline,
+    shuffle_fields::ShuffleFields,
+};
 
 fn is_class_file(bytes: &[u8]) -> bool {
     bytes.starts_with(&[0xCA, 0xFE, 0xBA, 0xBE])
@@ -78,9 +82,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             ),
             CommandLineOption::new(
+                Some("s".to_owned()),
+                Some("seed".to_owned()),
+                "64-bit seed for RNG-based transformations.".to_owned(),
+                CommandLineType::U64 {
+                    default_value: Some(42u64),
+                },
+            ),
+            CommandLineOption::new(
                 None,
                 Some("make-everything-public".to_owned()),
                 "Converts all classes, fields and methods to public.".to_owned(),
+                CommandLineType::Boolean {
+                    default_value: Some(false),
+                },
+            ),
+            CommandLineOption::new(
+                None,
+                Some("shuffle-fields".to_owned()),
+                "Shuffles the fields inside a class.".to_owned(),
                 CommandLineType::Boolean {
                     default_value: Some(false),
                 },
@@ -94,11 +114,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_filename = args.get("output").unwrap().as_str();
     let quiet = args.get("quiet").unwrap().as_bool();
     let make_everything_public = args.get("make-everything-public").unwrap().as_bool();
+    let shuffle_fields = args.get("shuffle-fields").unwrap().as_bool();
 
     let mut pipeline: TransformationPipeline = TransformationPipeline::new();
 
     if make_everything_public {
         pipeline.add(Box::new(MakeEverythingPublic {}));
+    }
+    if shuffle_fields {
+        pipeline.add(Box::new(ShuffleFields {}));
     }
 
     let mut file = File::open(&input_filename)
