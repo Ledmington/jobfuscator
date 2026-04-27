@@ -206,8 +206,15 @@ fn parse_zip_buf(reader: &mut ByteReader) -> ZipFile {
         }
 
         entries.push(ZipEntry {
-            filename: cdr.filename,
+            version_made_by: cdr.version_made_by,
+            minimum_version: cdr.minimum_version,
+            bit_flags: cdr.bit_flags,
+            compression_method: cdr.compression_method,
+            last_modification_time: cdr.last_modification_time,
+            last_modification_date: cdr.last_modification_date,
             compressed_content,
+            filename: cdr.filename,
+            comment: cdr.file_comment,
         });
     }
 
