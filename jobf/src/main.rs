@@ -8,6 +8,7 @@ mod transformation;
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
+    path::Path,
 };
 
 use binary_reader::BinaryReader;
@@ -74,6 +75,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             ),
             CommandLineOption::new(
+                Some("f".to_owned()),
+                Some("force".to_owned()),
+                "When enabled, overwrites the output file if it already exists.".to_owned(),
+                CommandLineType::Boolean {
+                    default_value: None,
+                },
+            ),
+            CommandLineOption::new(
                 Some("q".to_owned()),
                 Some("quiet".to_owned()),
                 "Avoids printing on stdout.".to_owned(),
@@ -84,7 +93,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             CommandLineOption::new(
                 Some("s".to_owned()),
                 Some("seed".to_owned()),
-                "64-bit seed for RNG-based transformations.".to_owned(),
+                "64-bit seed for RNG-based transformations (accepts hexadecimal and decimal)."
+                    .to_owned(),
                 CommandLineType::U64 {
                     default_value: Some(42u64),
                 },
@@ -112,9 +122,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let input_filename = args.get("input").unwrap().as_str();
     let output_filename = args.get("output").unwrap().as_str();
+    let force = args.get("force").unwrap().as_bool();
     let quiet = args.get("quiet").unwrap().as_bool();
     let make_everything_public = args.get("make-everything-public").unwrap().as_bool();
     let shuffle_fields = args.get("shuffle-fields").unwrap().as_bool();
+    let seed: u64 = args.get("seed").unwrap().as_u64();
 
     let mut pipeline: TransformationPipeline = TransformationPipeline::new();
 
@@ -122,20 +134,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         pipeline.add(Box::new(MakeEverythingPublic {}));
     }
     if shuffle_fields {
-        pipeline.add(Box::new(ShuffleFields {}));
+        pipeline.add(Box::new(ShuffleFields::new(seed)));
     }
 
     let mut file = File::open(&input_filename)
         .unwrap_or_else(|err| die!("Could not open file '{}' due to: {}.", input_filename, err));
 
-    // Read first few bytes to detect file type
+    // Read first few bytes to detect file type and rewind
     let mut header = [0u8; 4];
     file.read_exact(&mut header)?;
-
-    // rewind file
     file.seek(SeekFrom::Start(0))?;
 
-    if is_class_file(&header) {
+    let is_class_file = is_class_file(&header);
+    let is_zip_file = is_zip_file(&header);
+
+    if !is_class_file && !is_zip_file {
+        die!("Unknown input file type (not .class or .jar)");
+    }
+
+    if Path::new(&output_filename).exists() && !force {
+        die!(
+            "Output file '{}' already exists. To overwrite it, re-run with '--force'.",
+            output_filename
+        );
+    }
+
+    if is_class_file {
         let mut file_bytes = Vec::new();
         file.read_to_end(&mut file_bytes)?;
 
@@ -158,7 +182,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         out_file.write_all(&out_bytes)?;
 
         log!(quiet, "Wrote output to {}", &output_filename);
-    } else if is_zip_file(&header) {
+    } else if is_zip_file {
         let mut archive = ZipArchive::new(file)?;
 
         let out_file = File::create(&output_filename)?;
@@ -188,8 +212,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         zip_writer.finish()?;
         log!(quiet, "Wrote output jar to {}", &output_filename);
-    } else {
-        return Err("Unknown file type (not .class or .jar)".into());
     }
 
     Ok(())
