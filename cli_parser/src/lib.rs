@@ -140,18 +140,16 @@ impl CommandLineOption {
             },
             CommandLineType::U64 { default_value } => match argument_value {
                 Some(v) => {
-                    if v.starts_with("0x") {
+                    if let Some(stripped) = v.strip_prefix("0x") {
                         Ok(CommandLineValue::U64(
-                            u64::from_str_radix(&v[2..], 16).unwrap_or_else(|err| {
+                            u64::from_str_radix(stripped, 16).unwrap_or_else(|err| {
                                 panic!("Tried to parse '{}' as hex u64 but got error: {}.", v, err)
                             }),
                         ))
                     } else {
-                        Ok(CommandLineValue::U64(
-                            u64::from_str_radix(v, 10).unwrap_or_else(|err| {
-                                panic!("Tried to parse '{}' as u64 but got error: {}.", v, err)
-                            }),
-                        ))
+                        Ok(CommandLineValue::U64(v.parse::<u64>().unwrap_or_else(
+                            |err| panic!("Tried to parse '{}' as u64 but got error: {}.", v, err),
+                        )))
                     }
                 }
                 None => match default_value {
