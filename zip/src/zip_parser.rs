@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
 use std::{
-    cmp::max,
     fs::File,
     io::Read,
     time::{Duration, SystemTime, UNIX_EPOCH},
