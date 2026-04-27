@@ -431,16 +431,22 @@ fn parse_end_of_central_directory_record(reader: &mut ByteReader) -> EndOfCentra
          * So, to find the start of EOCD (the signature 0x06054b50) we start at the byte
          * 65536 bytes from the end and scan forward.
          */
-        reader.set_position(max(0, reader.len() - 65_536));
         const EXPECTED_SIGNATURE: u32 = 0x06054b50;
+        const MINIMUM_EOCDR_LENGTH: usize = 22;
+        let start = reader.len().saturating_sub(MINIMUM_EOCDR_LENGTH);
         let mut found = false;
-        while reader.get_position() + 3 < reader.len() {
+        let mut pos = start;
+        loop {
+            reader.set_position(pos);
             let signature = reader.read_u32().unwrap();
             if signature == EXPECTED_SIGNATURE {
                 found = true;
                 break;
             }
-            reader.set_position(reader.get_position() - 3);
+            if pos == 0 {
+                break;
+            }
+            pos = pos.saturating_sub(1);
         }
 
         if !found {
