@@ -153,7 +153,7 @@ struct MsDosDate {
 
 impl std::fmt::Display for MsDosDate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:02}:{:02}:{}", self.day, self.month, self.year + 1980)
+        write!(f, "{:02}:{:02}:{}", self.day, self.month, self.year)
     }
 }
 
@@ -235,7 +235,15 @@ impl TryFrom<u16> for BitFlags {
     type Error = String;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
-        Ok(BitFlags(value))
+        const EXPECTED_MASK: u16 = 0b1101_0111_1000_0000u16;
+        if (value & EXPECTED_MASK) != 0 {
+            Err(format!(
+                "Expected bit_flags to respect the mask 0x{:04x} but did not, was 0x{:04x}.",
+                EXPECTED_MASK, value
+            ))
+        } else {
+            Ok(BitFlags(value))
+        }
     }
 }
 
