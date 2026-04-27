@@ -20,6 +20,7 @@ pub struct CommandLineOption {
 #[derive(Clone, Debug)]
 pub enum CommandLineType {
     Boolean { default_value: Option<bool> },
+    U64 { default_value: Option<u64> },
     String { default_value: Option<String> },
 }
 
@@ -29,6 +30,10 @@ impl fmt::Display for CommandLineType {
             CommandLineType::Boolean { default_value } => match default_value {
                 Some(v) => write!(f, "bool (default: {v})"),
                 None => write!(f, "bool"),
+            },
+            CommandLineType::U64 { default_value } => match default_value {
+                Some(v) => write!(f, "u64 (default: {v})"),
+                None => write!(f, "u64"),
             },
             CommandLineType::String { default_value } => match default_value {
                 Some(v) => write!(f, "string (default: \"{v}\")"),
@@ -41,6 +46,7 @@ impl fmt::Display for CommandLineType {
 #[derive(Debug, Clone)]
 pub enum CommandLineValue {
     Boolean(bool),
+    U64(u64),
     String(String),
 }
 
@@ -49,6 +55,13 @@ impl CommandLineValue {
         match self {
             CommandLineValue::Boolean(value) => *value,
             _ => panic!("This value is not a boolean."),
+        }
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        match self {
+            CommandLineValue::U64(value) => *value,
+            _ => panic!("This value is not a u64."),
         }
     }
 
@@ -96,6 +109,7 @@ impl CommandLineOption {
     fn is_mandatory(&self) -> bool {
         match &self.option_type {
             CommandLineType::Boolean { default_value } => default_value.is_none(),
+            CommandLineType::U64 { default_value } => default_value.is_none(),
             CommandLineType::String { default_value } => default_value.is_none(),
         }
     }
@@ -123,6 +137,27 @@ impl CommandLineOption {
                 Some(other) => Err(format!(
                     "'{other}' is not a valid value for '{argument_name}'."
                 )),
+            },
+            CommandLineType::U64 { default_value } => match argument_value {
+                Some(v) => {
+                    if v.starts_with("0x") {
+                        Ok(CommandLineValue::U64(
+                            u64::from_str_radix(&v[2..], 16).unwrap_or_else(|err| {
+                                panic!("Tried to parse '{}' as hex u64 but got error: {}.", v, err)
+                            }),
+                        ))
+                    } else {
+                        Ok(CommandLineValue::U64(
+                            u64::from_str_radix(v, 10).unwrap_or_else(|err| {
+                                panic!("Tried to parse '{}' as u64 but got error: {}.", v, err)
+                            }),
+                        ))
+                    }
+                }
+                None => match default_value {
+                    Some(v) => Ok(CommandLineValue::U64(*v)),
+                    None => Err(format!("Option '{argument_name}' requires a value.")),
+                },
             },
             CommandLineType::String { .. } => match argument_value {
                 Some(s) => Ok(CommandLineValue::String(s.to_owned())),
@@ -458,6 +493,35 @@ mod tests {
     }
 
     #[rstest]
+    #[case(vec!["-s", "72623859790382856"])]
+    #[case(vec!["-s=72623859790382856"])]
+    #[case(vec!["--seed", "72623859790382856"])]
+    #[case(vec!["--seed=72623859790382856"])]
+    #[case(vec!["-s", "0x0102030405060708"])]
+    #[case(vec!["-s=0x0102030405060708"])]
+    #[case(vec!["--seed", "0x0102030405060708"])]
+    #[case(vec!["--seed=0x0102030405060708"])]
+    fn parse_u64_option(#[case] input: Vec<&str>) {
+        let parser = CommandLineParser::new(
+            "test-parser",
+            Some("A parser for testing".to_string()),
+            vec![CommandLineOption {
+                short_name: Some("s".to_string()),
+                long_name: Some("seed".to_string()),
+                description: "The seed for RNG.".to_owned(),
+                option_type: CommandLineType::U64 {
+                    default_value: None,
+                },
+            }],
+        );
+
+        let string_args: Vec<String> = input.iter().map(|s| s.to_string()).collect();
+        let args = parser.parse_str(&string_args).unwrap();
+        assert_eq!(0x0102030405060708u64, args.get("s").unwrap().as_u64());
+        assert_eq!(0x0102030405060708u64, args.get("seed").unwrap().as_u64());
+    }
+
+    #[rstest]
     #[case(vec!["-i", "input.txt"])]
     #[case(vec!["-i=input.txt"])]
     #[case(vec!["--input", "input.txt"])]
@@ -512,6 +576,14 @@ mod tests {
                         default_value: None,
                     },
                 },
+                CommandLineOption {
+                    short_name: Some("s".to_string()),
+                    long_name: Some("seed".to_string()),
+                    description: "The seed for RNG.".to_owned(),
+                    option_type: CommandLineType::U64 {
+                        default_value: Some(0x0102030405060708u64),
+                    },
+                },
             ],
         );
 
@@ -524,6 +596,7 @@ mod tests {
             " -i, --input   The input file to read from.",
             "     --output  The output file to write to.",
             " -v            Prints verbose messages.",
+            " -s, --seed    The seed for RNG.",
             "",
         ]
         .join("\n");
