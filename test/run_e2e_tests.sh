@@ -79,7 +79,7 @@ run_roundtrip_test() {
     ACTUAL_HEX=$(mktemp)
     DIFF_OUTPUT=$(mktemp)
 
-    "${JOBF}" --input "${TEST_FILE}" --output "${OUTPUT}" --quiet
+    "${JOBF}" --input "${TEST_FILE}" --output "${OUTPUT}" --quiet=true --force
 
     xxd "${TEST_FILE}" > "${EXPECTED_HEX}"
     xxd "${OUTPUT}" > "${ACTUAL_HEX}"
@@ -137,7 +137,7 @@ run_field_shuffle_test() {
     ACTUAL_OUTPUT=$(mktemp)
     DIFF_OUTPUT=$(mktemp)
 
-    ${JOBF} --input "${TEST_FILE}" --output "${TEMP_FILE}" --quiet --seed=0x01020304 --shuffle-fields
+    ${JOBF} --input "${TEST_FILE}" --output "${TEMP_FILE}" --quiet=true --seed=0x01020304 --shuffle-fields=true --force
 
     ${SYSTEM_JAVAP} -l -v -p "${TEMP_FILE}" > "${EXPECTED_OUTPUT}"
     ${OUR_JAVAP} "${TEMP_FILE}" > "${ACTUAL_OUTPUT}"
