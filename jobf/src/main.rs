@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some("force".to_owned()),
                 "When enabled, overwrites the output file if it already exists.".to_owned(),
                 CommandLineType::Boolean {
-                    default_value: None,
+                    default_value: Some(false),
                 },
             ),
             CommandLineOption::new(
