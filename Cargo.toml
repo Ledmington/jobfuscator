@@ -7,6 +7,8 @@ members = [
     "sha",
     "javap",
     "cli_parser",
+    "zip",
+    "unzipper",
     "jobf",
 ]
 resolver = "3"

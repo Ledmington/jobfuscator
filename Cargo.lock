@@ -438,7 +438,7 @@ dependencies = [
  "binary_reader",
  "classfile",
  "cli_parser",
- "zip",
+ "zip 8.5.1",
 ]
 
 [[package]]
@@ -900,6 +900,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
+name = "unzipper"
+version = "0.1.0"
+dependencies = [
+ "zip 0.1.0",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1104,6 +1111,13 @@ name = "zeroize"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
+
+[[package]]
+name = "zip"
+version = "0.1.0"
+dependencies = [
+ "binary_reader",
+]
 
 [[package]]
 name = "zip"

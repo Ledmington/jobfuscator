@@ -7,7 +7,7 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
 };
 
-use binary_reader::BinaryReader;
+use binary_reader::byte_reader::ByteReader;
 use classfile::{
     classfile::{ClassFile, parse_class_file},
     writer::write_class_file,
@@ -33,7 +33,7 @@ fn transform_class_file(cf: &ClassFile, all_public: bool) -> ClassFile {
     }
 }
 
-fn parse_and_rewrite(reader: &mut BinaryReader, all_public: bool) -> Vec<u8> {
+fn parse_and_rewrite(reader: &mut ByteReader, all_public: bool) -> Vec<u8> {
     let in_cf: ClassFile = parse_class_file(reader);
     let out_cf = transform_class_file(&in_cf, all_public);
     write_class_file(&out_cf)
@@ -115,7 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut file_bytes = Vec::new();
         file.read_to_end(&mut file_bytes)?;
 
-        let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endianness::Big);
+        let mut reader = ByteReader::new(&file_bytes, binary_reader::Endianness::Big);
         let out_bytes = parse_and_rewrite(&mut reader, make_everything_public);
         log!(
             quiet,
@@ -154,7 +154,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut file_bytes = Vec::new();
             entry.read_to_end(&mut file_bytes)?;
 
-            let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endianness::Big);
+            let mut reader = ByteReader::new(&file_bytes, binary_reader::Endianness::Big);
             let out_bytes = parse_and_rewrite(&mut reader, make_everything_public);
             log!(quiet, "{} ({} bytes) OK", name, file_bytes.len());
 
