@@ -259,13 +259,15 @@ impl CommandLineParser {
 
         for option in &self.options {
             let value: Option<CommandLineValue> = match &option.option_type {
-                CommandLineType::Boolean {
-                    default_value: Some(v),
-                } => Some(CommandLineValue::Boolean(*v)),
-                CommandLineType::String {
-                    default_value: Some(v),
-                } => Some(CommandLineValue::String(v.clone())),
-                _ => None,
+                CommandLineType::Boolean { default_value } => default_value
+                    .as_ref()
+                    .map(|v| CommandLineValue::Boolean(*v)),
+                CommandLineType::U64 { default_value } => {
+                    default_value.as_ref().map(|v| CommandLineValue::U64(*v))
+                }
+                CommandLineType::String { default_value } => default_value
+                    .as_ref()
+                    .map(|v| CommandLineValue::String(v.clone())),
             };
 
             if value.is_some() {
@@ -517,6 +519,26 @@ mod tests {
         let args = parser.parse_str(&string_args).unwrap();
         assert_eq!(0x0102030405060708u64, args.get("s").unwrap().as_u64());
         assert_eq!(0x0102030405060708u64, args.get("seed").unwrap().as_u64());
+    }
+
+    #[test]
+    fn parse_default_u64_option() {
+        let parser = CommandLineParser::new(
+            "test-parser",
+            Some("A parser for testing".to_string()),
+            vec![CommandLineOption {
+                short_name: Some("s".to_string()),
+                long_name: Some("seed".to_string()),
+                description: "The seed for RNG.".to_owned(),
+                option_type: CommandLineType::U64 {
+                    default_value: Some(42u64),
+                },
+            }],
+        );
+
+        let args = parser.parse_str(&[]).unwrap();
+        assert_eq!(42u64, args.get("s").unwrap().as_u64());
+        assert_eq!(42u64, args.get("seed").unwrap().as_u64());
     }
 
     #[rstest]
