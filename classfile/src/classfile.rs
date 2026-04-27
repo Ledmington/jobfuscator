@@ -1,4 +1,3 @@
-
 use binary_reader::byte_reader::ByteReader;
 
 use crate::access_flags::ClassAccessFlags;
