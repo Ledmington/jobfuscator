@@ -60,26 +60,36 @@ fn parse_local_file_header(reader: &mut ByteReader) -> LocalFileHeader {
 
     // TODO: check CRC32
     let crc32 = reader.read_u32().unwrap();
-    if crc32 != 0 {
-        panic!("Invalid CRC32: 0x{:08x}.", crc32);
-    }
-
     let compressed_size = reader.read_u32().unwrap();
-    if compressed_size != 0 {
-        panic!("Invalid compressed size: {} bytes.", compressed_size);
-    }
-
     let uncompressed_size = reader.read_u32().unwrap();
-    if uncompressed_size != 0 {
-        panic!("Invalid uncompressed size: {} bytes.", uncompressed_size);
-    }
 
-    if matches!(compression_method, CompressionMethod::None) && compressed_size != uncompressed_size
-    {
-        panic!(
-            "Compression method was NONE but compressed size ({} bytes) and uncompressed size ({} bytes) were different.",
-            compressed_size, uncompressed_size
+    let has_data_descriptor = bit_flags.contains(&BitFlag::HasDataDescriptor);
+
+    if has_data_descriptor {
+        assert!(
+            crc32 == 0,
+            "Expected CRC32 to be 0 but was 0x{:08x}.",
+            crc32
         );
+        assert!(
+            compressed_size == 0,
+            "Expected compressed_size to be 0 but was {}.",
+            compressed_size
+        );
+        assert!(
+            uncompressed_size == 0,
+            "Expected uncompressed_size to be 0 but was {}.",
+            uncompressed_size
+        );
+    } else {
+        if matches!(compression_method, CompressionMethod::None)
+            && compressed_size != uncompressed_size
+        {
+            panic!(
+                "Compression method was NONE but compressed size ({} bytes) and uncompressed size ({} bytes) were different.",
+                compressed_size, uncompressed_size
+            );
+        }
     }
 
     let file_name_length = reader.read_u16().unwrap();
