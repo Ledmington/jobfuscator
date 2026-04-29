@@ -21,10 +21,14 @@ jobf -i my-app.jar -o my-shadowed-app.jar
 
 Command-line options:
 ```
- -h, --help    Prints this message and exits.
- -i, --input   The file to read from.
- -o, --output  The file to write to.
- -q, --quiet   Avoids printing on stdout.
+ -h, --help                    Prints this message and exits.
+ -i, --input                   The file to read from.
+ -o, --output                  The file to write to.
+ -f, --force                   When enabled, overwrites the output file if it already exists.
+ -q, --quiet                   Avoids printing on stdout.
+ -s, --seed                    64-bit seed for RNG-based transformations (accepts hexadecimal and decimal).
+     --make-everything-public  Converts all classes, fields and methods to public.
+     --shuffle-fields          Shuffles the fields inside a class.
 ```
 
 It's a strong requirement that the produced jar file must have the same behavior of the input jar file, so if happen to find a case in which behavior is modified, please open an issue.
