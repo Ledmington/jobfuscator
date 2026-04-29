@@ -132,7 +132,7 @@ run_field_shuffle_test() {
     local ACTUAL_OUTPUT
     local DIFF_OUTPUT
 
-    TEMP_FILE=$(mktemp)
+    TEMP_FILE=$(mktemp --suffix=.class)
     EXPECTED_OUTPUT=$(mktemp)
     ACTUAL_OUTPUT=$(mktemp)
     DIFF_OUTPUT=$(mktemp)
