@@ -567,14 +567,24 @@ fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attrib
         "Signature" => {
             check_attribute_length(attribute_length, 2, attribute_name);
             let signature_index: u16 = reader.read_u16().unwrap();
+            assert_valid_and_type!(cp, signature_index, ConstantPoolTag::Utf8);
             AttributeInfo::Signature {
                 name_index: attribute_name_index,
                 signature_index,
             }
         }
         "ConstantValue" => {
-            let constant_value_index: u16 = reader.read_u16().unwrap();
             check_attribute_length(attribute_length, 2, attribute_name);
+            let constant_value_index: u16 = reader.read_u16().unwrap();
+            assert_valid_and_type!(
+                cp,
+                constant_value_index,
+                ConstantPoolTag::Integer,
+                ConstantPoolTag::Float,
+                ConstantPoolTag::Long,
+                ConstantPoolTag::Double,
+                ConstantPoolTag::String
+            );
             AttributeInfo::ConstantValue {
                 name_index: attribute_name_index,
                 constant_value_index,
