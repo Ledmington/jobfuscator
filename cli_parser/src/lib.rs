@@ -143,12 +143,12 @@ impl CommandLineOption {
                     if let Some(stripped) = v.strip_prefix("0x") {
                         Ok(CommandLineValue::U64(
                             u64::from_str_radix(stripped, 16).unwrap_or_else(|err| {
-                                panic!("Tried to parse '{}' as hex u64 but got error: {}.", v, err)
+                                panic!("Tried to parse '{v}' as hex u64 but got error: {err}.")
                             }),
                         ))
                     } else {
                         Ok(CommandLineValue::U64(v.parse::<u64>().unwrap_or_else(
-                            |err| panic!("Tried to parse '{}' as u64 but got error: {}.", v, err),
+                            |err| panic!("Tried to parse '{v}' as u64 but got error: {err}."),
                         )))
                     }
                 }
