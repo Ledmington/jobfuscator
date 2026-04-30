@@ -112,7 +112,7 @@ mod tests {
             ),
             (
                 UNIX_EPOCH + Duration::new(1022918213, 817793381),
-                "Jun 1, 2002"
+                "Jun 1, 2002",
             ),
         ];
         for (input, expected) in cases {
