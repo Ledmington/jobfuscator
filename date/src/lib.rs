@@ -12,7 +12,7 @@ fn get_max_days_in_month(month: u8, year: u16) -> u8 {
     match month {
         0 => 31,
         1 => {
-            if year.is_multiple_of(4) && !year.is_multiple_of(100) {
+            if year.is_multiple_of(4) && !year.is_multiple_of(100) || year.is_multiple_of(400) {
                 29
             } else {
                 28
@@ -34,22 +34,21 @@ fn get_max_days_in_month(month: u8, year: u16) -> u8 {
 
 impl From<SystemTime> for Date {
     fn from(st: SystemTime) -> Self {
-        let seconds: u64 = st.duration_since(UNIX_EPOCH).unwrap().as_secs();
-        let days: u64 = seconds / 60 / 60 / 24;
+        let st_seconds: u64 = st.duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let st_days: u64 = st_seconds / 60 / 60 / 24;
 
-        let mut day: u8 = 0;
+        let mut day: u8 = 1;
         let mut month: u8 = 0;
         let mut year: u16 = 1970;
-        let mut total_days: u64 = 0;
 
-        while total_days < days {
+        for _ in 0..st_days {
             day += 1;
-            total_days += 1;
 
             let days_in_current_month = get_max_days_in_month(month, year);
-            assert!(day <= days_in_current_month);
-            if day == days_in_current_month {
-                day = 0;
+            assert!(day >= 1 && day <= days_in_current_month + 1);
+
+            if day > days_in_current_month {
+                day = 1;
                 month += 1;
                 if month == 12 {
                     month = 0;
@@ -106,6 +105,14 @@ mod tests {
             (
                 UNIX_EPOCH + Duration::new(1327622400, 867753386),
                 "Jan 27, 2012",
+            ),
+            (
+                UNIX_EPOCH + Duration::new(704620613, 666233912),
+                "Apr 30, 1992",
+            ),
+            (
+                UNIX_EPOCH + Duration::new(1022918213, 817793381),
+                "Jun 1, 2002",
             ),
         ];
         for (input, expected) in cases {
