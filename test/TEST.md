@@ -45,7 +45,6 @@ find . -type f -name "*.class" | wc -l
 | Project Lombok         | https://github.com/projectlombok/lombok.git         | 1072       |  20/04/2026  |
 | Fernflower             | https://github.com/JetBrains/fernflower.git         | 696        |  20/04/2026  |
 | JITWatch               | https://github.com/AdoptOpenJDK/jitwatch.git        | 566        |  20/04/2026  |
-| Android SDK            | https://android.googlesource.com/platform/sdk       | ????       |  20/04/2026  |
 
 ## Neo4j
 ```
@@ -54,20 +53,6 @@ sdk install maven
 git clone https://github.com/neo4j/neo4j.git
 cd neo4j
 mvn install -DskipTests -T1C
-```
-
-## Android SDK
-```
-mkdir -p ~/bin
-curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-chmod +x ~/bin/repo
-export PATH=~/bin:$PATH
-mkdir aosp
-cd aosp
-repo init -u https://android.googlesource.com/platform/manifest -b android-14.0.0_r1
-repo sync -j$(nproc)
-source build/envsetup.sh
-make -j$(nproc)
 ```
 
 ## JMH
