@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+use zip::deflate::decompress;
 use zip::{ZipFile, zip_parser::parse_zip};
 
 pub fn main() {
@@ -23,6 +24,8 @@ pub fn main() {
             entry.last_modification_time()
         );
         println!("  C. Size: {} bytes", entry.compressed_size());
+        let uncompressed_content = decompress(&entry.compressed_content);
+        println!("  U. Size: {} bytes", uncompressed_content.len());
         println!(
             "  Comment: '{}'{}",
             entry.comment(),

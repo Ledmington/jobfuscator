@@ -1,4 +1,4 @@
-use binary_writer::{BinaryWriter, Endianness};
+use binary_writer::{Endianness, byte_writer::ByteWriter};
 
 use crate::{
     attributes::{Annotation, AttributeInfo, ElementValue, StackMapFrame, VerificationTypeInfo},
@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub fn write_class_file(cf: &ClassFile) -> Vec<u8> {
-    let mut w: BinaryWriter = BinaryWriter::new(Endianness::Big);
+    let mut w: ByteWriter = ByteWriter::new(Endianness::Big);
 
     w.write_u32(0xcafebabe);
     w.write_u16(cf.minor_version);
@@ -39,7 +39,7 @@ pub fn write_class_file(cf: &ClassFile) -> Vec<u8> {
     w.array()
 }
 
-fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
+fn write_constant_pool(w: &mut ByteWriter, cp: &ConstantPool) {
     for entry in cp.entries.iter() {
         if matches!(entry, ConstantPoolInfo::Null {}) {
             continue;
@@ -127,7 +127,7 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
     }
 }
 
-fn write_fields(w: &mut BinaryWriter, fields: &[FieldInfo]) {
+fn write_fields(w: &mut ByteWriter, fields: &[FieldInfo]) {
     for field in fields.iter() {
         w.write_u16(field.access_flags.to_u16());
         w.write_u16(field.name_index);
@@ -137,7 +137,7 @@ fn write_fields(w: &mut BinaryWriter, fields: &[FieldInfo]) {
     }
 }
 
-fn write_methods(w: &mut BinaryWriter, methods: &[MethodInfo]) {
+fn write_methods(w: &mut ByteWriter, methods: &[MethodInfo]) {
     for method in methods.iter() {
         w.write_u16(method.access_flags.to_u16());
         w.write_u16(method.name_index);
@@ -294,7 +294,7 @@ fn get_element_value_length(value: &ElementValue) -> u32 {
     }
 }
 
-fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
+fn write_attributes(w: &mut ByteWriter, attributes: &[AttributeInfo]) {
     for attribute in attributes.iter() {
         match attribute {
             AttributeInfo::Code {
@@ -492,7 +492,7 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
     }
 }
 
-fn write_stack_map_entry(w: &mut BinaryWriter, entry: &StackMapFrame) {
+fn write_stack_map_entry(w: &mut ByteWriter, entry: &StackMapFrame) {
     match entry {
         StackMapFrame::SameFrame { frame_type } => w.write_u8(*frame_type),
         StackMapFrame::SameLocals1StackItemFrame { frame_type, stack } => {
@@ -548,7 +548,7 @@ fn write_stack_map_entry(w: &mut BinaryWriter, entry: &StackMapFrame) {
     }
 }
 
-fn write_verification_type_info(w: &mut BinaryWriter, type_info: &VerificationTypeInfo) {
+fn write_verification_type_info(w: &mut ByteWriter, type_info: &VerificationTypeInfo) {
     match type_info {
         VerificationTypeInfo::TopVariable => w.write_u8(0),
         VerificationTypeInfo::IntegerVariable => w.write_u8(1),
@@ -570,14 +570,14 @@ fn write_verification_type_info(w: &mut BinaryWriter, type_info: &VerificationTy
     }
 }
 
-fn write_annotations(w: &mut BinaryWriter, annotations: &[Annotation]) {
+fn write_annotations(w: &mut ByteWriter, annotations: &[Annotation]) {
     w.write_u16(annotations.len().try_into().unwrap());
     for annotation in annotations.iter() {
         write_annotation(w, annotation);
     }
 }
 
-fn write_annotation(w: &mut BinaryWriter, annotation: &Annotation) {
+fn write_annotation(w: &mut ByteWriter, annotation: &Annotation) {
     w.write_u16(annotation.type_index);
     w.write_u16(annotation.element_value_pairs.len().try_into().unwrap());
     for evp in annotation.element_value_pairs.iter() {
@@ -586,7 +586,7 @@ fn write_annotation(w: &mut BinaryWriter, annotation: &Annotation) {
     }
 }
 
-fn write_element_value(w: &mut BinaryWriter, value: &ElementValue) {
+fn write_element_value(w: &mut ByteWriter, value: &ElementValue) {
     w.write_u8(value.tag() as u8);
     match &value {
         crate::attributes::ElementValue::Byte { const_value_index } => {

@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod deflate;
 pub mod zip_parser;
 
 #[derive(PartialEq)]
@@ -310,7 +311,7 @@ pub struct ZipEntry {
     compression_method: CompressionMethod,
     last_modification_time: MsDosTime,
     last_modification_date: MsDosDate,
-    compressed_content: Vec<u8>,
+    pub compressed_content: Vec<u8>,
     filename: String,
     comment: String,
 }

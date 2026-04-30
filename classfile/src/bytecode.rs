@@ -4,7 +4,7 @@ use std::{
 };
 
 use binary_reader::byte_reader::ByteReader;
-use binary_writer::BinaryWriter;
+use binary_writer::byte_writer::ByteWriter;
 
 use crate::{
     assert_valid_and_type,
@@ -747,7 +747,7 @@ pub fn parse_bytecode(
     instructions
 }
 
-pub fn write_instruction(w: &mut BinaryWriter, instruction: &BytecodeInstruction) {
+pub fn write_instruction(w: &mut ByteWriter, instruction: &BytecodeInstruction) {
     match instruction {
         BytecodeInstruction::Dup {} => w.write_u8(0x59),
         BytecodeInstruction::Dup2 {} => w.write_u8(0x5c),

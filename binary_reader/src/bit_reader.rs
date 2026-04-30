@@ -29,7 +29,7 @@ impl<'a> BitReader<'a> {
         self.bit_position = new_pos * 8
     }
 
-    fn read_bit(&mut self) -> Result<bool> {
+    pub fn read_bit(&mut self) -> Result<bool> {
         let byte_pos = self.bit_position / 8;
         let bit_pos = self.bit_position % 8;
         self.bit_position += 1;
