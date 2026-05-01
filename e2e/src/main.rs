@@ -74,11 +74,11 @@ impl TestEnv {
     }
 
     fn class_file(&self, name: &str) -> PathBuf {
-        self.data_dir().join(format!("{}.class", name))
+        self.data_dir().join(format!("{name}.class"))
     }
 
-    fn tmp_class_file<'a>(&self, tmp: &'a TempDir, name: &str) -> PathBuf {
-        tmp.path().join(format!("{}.class", name))
+    fn tmp_class_file(&self, tmp: &TempDir, name: &str) -> PathBuf {
+        tmp.path().join(format!("{name}.class"))
     }
 }
 
@@ -86,8 +86,8 @@ fn which(binary: &str) -> PathBuf {
     let output = Command::new("which")
         .arg(binary)
         .output()
-        .unwrap_or_else(|_| panic!("failed to run 'which {}'", binary));
-    assert!(output.status.success(), "'which {}' failed", binary);
+        .unwrap_or_else(|_| panic!("failed to run 'which {binary}'"));
+    assert!(output.status.success(), "'which {binary}' failed");
     PathBuf::from(String::from_utf8(output.stdout).unwrap().trim())
 }
 
@@ -116,24 +116,24 @@ fn diff_text(expected: &[u8], actual: &[u8]) -> String {
     let mut out = String::new();
     for line in expected.lines() {
         if !actual.contains(line) {
-            out.push_str(&format!("{}  - {}{}\n", RED, line, RESET));
+            out.push_str(&format!("{RED}  - {line}{RESET}\n"));
         }
     }
     for line in actual.lines() {
         if !expected.contains(line) {
-            out.push_str(&format!("{}  + {}{}\n", GREEN, line, RESET));
+            out.push_str(&format!("{GREEN}  + {line}{RESET}\n"));
         }
     }
     out
 }
 
 fn ok(name: &str) {
-    println!("  {} ... {}OK{}", name, GREEN, RESET);
+    println!("  {name} ... {GREEN}OK{RESET}");
 }
 
 fn fail(failures: &mut Vec<String>, name: &str, reason: &str) {
-    failures.push(format!("{}: {}", name, reason));
-    println!("  {} ... {}FAILED{}", name, RED, RESET);
+    failures.push(format!("{name}: {reason}"));
+    println!("  {name} ... {RED}FAILED{RESET}");
 }
 
 fn run_javap_tests(env: &TestEnv) -> Vec<String> {
@@ -191,7 +191,7 @@ fn run_roundtrip_tests(env: &TestEnv) -> Vec<String> {
             fail(
                 &mut failures,
                 case.name,
-                &format!("jobf exited with {}", status),
+                &format!("jobf exited with {status}"),
             );
             continue;
         }
@@ -329,7 +329,7 @@ fn main() {
 
     let env = TestEnv::new(&build_mode);
 
-    println!("Build mode:   {}", build_mode);
+    println!("Build mode:   {build_mode}");
     println!("system java:  {}", env.system_java.display());
     println!("system javap: {}", env.system_javap.display());
     println!("our javap:    {}", env.our_javap.display());
@@ -342,11 +342,11 @@ fn main() {
     failures.extend(run_execution_tests(&env));
 
     if failures.is_empty() {
-        println!("\n{}All tests passed.{}", GREEN, RESET);
+        println!("\n{GREEN}All tests passed.{RESET}");
     } else {
         println!("\n{}{} failure(s):{}", RED, failures.len(), RESET);
         for f in &failures {
-            println!("  - {}", f);
+            println!("  - {f}");
         }
         std::process::exit(1);
     }
