@@ -185,8 +185,76 @@ run_field_shuffle_tests() {
     fi
 }
 
+run_execution_test() {
+    local TEST_NAME="$1"
+    local TEST_FILE="${TEST_DIR}/data/${TEST_NAME}.class"
+    local TEMP_DIR
+    local TEMP_FILE
+    local EXPECTED_OUTPUT
+    local ACTUAL_OUTPUT
+    local DIFF_OUTPUT
+
+    TEMP_DIR=$(mktemp -d)
+    TEMP_FILE="${TEMP_DIR}/${TEST_NAME}.class"
+    EXPECTED_OUTPUT=$(mktemp)
+    ACTUAL_OUTPUT=$(mktemp)
+    DIFF_OUTPUT=$(mktemp)
+
+    # Run original class and capture output; fail if not executable
+    ${SYSTEM_JAVA} -cp "${TEST_DIR}/data" "${TEST_NAME}" > "${EXPECTED_OUTPUT}" 2>&1
+    local java_exit_code=$?
+    if [ $java_exit_code -ne 0 ]; then
+        echo -e "${TEST_FILE} ... \033[0;31mFAILED\033[0m (original class is not executable, exit code: ${java_exit_code})"
+        cat "${EXPECTED_OUTPUT}"
+        rm -f "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}" "${DIFF_OUTPUT}"
+        rm -rf "${TEMP_DIR}"
+        return 1
+    fi
+
+    "${JOBF}" --input "${TEST_FILE}" --output "${TEMP_FILE}" --quiet=true --seed=0x01020304 --shuffle-fields=true --force
+    ${SYSTEM_JAVA} -cp "${TEMP_DIR}" "${TEST_NAME}" > "${ACTUAL_OUTPUT}" 2>&1
+
+    diff "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}" > "${DIFF_OUTPUT}"
+    local exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo -e "${TEST_FILE} ... \033[0;31mFAILED\033[0m"
+        echo "Expected output: ${EXPECTED_OUTPUT}"
+        echo "Actual output: ${ACTUAL_OUTPUT}"
+        cat "${DIFF_OUTPUT}"
+        rm -rf "${TEMP_DIR}"
+        return 1
+    fi
+
+    echo -e "${TEST_FILE} ... \033[0;32mOK\033[0m"
+    rm -f "${EXPECTED_OUTPUT}" "${ACTUAL_OUTPUT}" "${DIFF_OUTPUT}"
+    rm -rf "${TEMP_DIR}"
+}
+
+run_execution_tests() {
+    SYSTEM_JAVA=$(realpath "$(which java)")
+    JOBF=$(realpath "${ROOT}/target/${BUILD_MODE}/jobf")
+
+    echo ""
+    echo "End-to-End execution tests (field-shuffle must preserve behaviour)"
+    echo " build mode:     ${BUILD_MODE}"
+    echo " system's java:  ${SYSTEM_JAVA}"
+    echo " tested jobf:    ${JOBF}"
+    echo ""
+
+    set +e
+    exit_code=0
+    run_execution_test "HelloWorld"          || exit_code=1
+    set -e
+
+    if [ "$exit_code" -ne 0 ]; then
+        exit $exit_code
+    fi
+}
+
 run_javap_tests
 run_roundtrip_tests
 run_field_shuffle_tests
+run_execution_tests
 
 exit 0
