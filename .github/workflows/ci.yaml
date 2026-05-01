@@ -53,6 +53,12 @@ jobs:
       - name: Unit Tests
         run: cargo test ${{ matrix.release_flag }}
 
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
       - name: Integration tests
         run: cargo run --bin e2e ${{ matrix.release_flag }}
 
