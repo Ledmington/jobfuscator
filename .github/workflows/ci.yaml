@@ -54,7 +54,7 @@ jobs:
         run: cargo test ${{ matrix.release_flag }}
 
       - name: Integration tests
-        run: ${GITHUB_WORKSPACE}/test/run_e2e_tests.sh ${{ matrix.profile }}
+        run: cargo run --bin e2e ${{ matrix.release_flag }}
 
       - name: Docs
         run: cargo doc --no-deps ${{ matrix.release_flag }}
