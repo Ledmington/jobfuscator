@@ -8,6 +8,7 @@ members = [
     "javap",
     "cli_parser",
     "jobf",
+    "e2e",
 ]
 resolver = "3"
 
