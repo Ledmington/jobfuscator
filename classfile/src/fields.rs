@@ -31,33 +31,6 @@ pub fn parse_fields(
         let attributes: Vec<AttributeInfo> =
             parse_field_attributes(reader, cp, attributes_count.into());
 
-        /*let constant_value = find_attribute(&attributes, AttributeKind::ConstantValue);
-        if let Some(AttributeInfo::ConstantValue {
-            constant_value_index,
-            ..
-        }) = constant_value
-        {
-            let field_descriptor = parse_field_descriptor(&cp.get_utf8_content(descriptor_index));
-            match field_descriptor.field_type {
-                Type::Boolean | Type::Char | Type::Byte | Type::Short | Type::Int => {
-                    assert_valid_and_type!(cp, *constant_value_index, ConstantPoolTag::Integer)
-                }
-                Type::Long => {
-                    assert_valid_and_type!(cp, *constant_value_index, ConstantPoolTag::Long)
-                }
-                Type::Float => {
-                    assert_valid_and_type!(cp, *constant_value_index, ConstantPoolTag::Float)
-                }
-                Type::Double => {
-                    assert_valid_and_type!(cp, *constant_value_index, ConstantPoolTag::Double)
-                }
-                Type::Object { class_name } if class_name == "java/lang/String" => {
-                    assert_valid_and_type!(cp, *constant_value_index, ConstantPoolTag::String);
-                }
-                _ => {}
-            }
-        }*/
-
         fields.push(FieldInfo {
             access_flags,
             name_index,
