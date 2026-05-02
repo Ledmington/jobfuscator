@@ -3,6 +3,7 @@
 mod make_everything_public;
 mod pipeline;
 mod shuffle_fields;
+mod shuffle_methods;
 mod transformation;
 
 use std::{
@@ -21,7 +22,7 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter, write::FileOptions};
 
 use crate::{
     make_everything_public::MakeEverythingPublic, pipeline::TransformationPipeline,
-    shuffle_fields::ShuffleFields,
+    shuffle_fields::ShuffleFields, shuffle_methods::ShuffleMethods,
 };
 
 fn is_class_file(bytes: &[u8]) -> bool {
@@ -115,6 +116,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     default_value: Some(false),
                 },
             ),
+            CommandLineOption::new(
+                None,
+                Some("shuffle-methods".to_owned()),
+                "Shuffles the methods inside a class.".to_owned(),
+                CommandLineType::Boolean {
+                    default_value: Some(false),
+                },
+            ),
         ],
     );
 
@@ -126,6 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let quiet = args.get("quiet").unwrap().as_bool();
     let make_everything_public = args.get("make-everything-public").unwrap().as_bool();
     let shuffle_fields = args.get("shuffle-fields").unwrap().as_bool();
+    let shuffle_methods = args.get("shuffle-methods").unwrap().as_bool();
     let seed: u64 = args.get("seed").unwrap().as_u64();
 
     let mut pipeline: TransformationPipeline = TransformationPipeline::new();
@@ -135,6 +145,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if shuffle_fields {
         pipeline.add(Box::new(ShuffleFields::new(seed)));
+    }
+    if shuffle_methods {
+        pipeline.add(Box::new(ShuffleMethods::new(seed)));
     }
 
     let mut file = File::open(&input_filename)
