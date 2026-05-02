@@ -470,6 +470,16 @@ fn main() {
         "method-shuffle",
         "--shuffle-methods=true",
     ));
+    failures.extend(run_shuffle_javap_tests(
+        &env,
+        "constant-pool-shuffle",
+        "--shuffle-constant-pool=true",
+    ));
+    failures.extend(run_shuffle_execution_tests(
+        &env,
+        "constant_pool-shuffle",
+        "--shuffle-constant-pool=true",
+    ));
 
     if failures.is_empty() {
         println!("\n{GREEN}All tests passed.{RESET}");
