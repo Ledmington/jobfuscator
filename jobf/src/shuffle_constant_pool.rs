@@ -36,12 +36,12 @@ impl ShuffleConstantPool {
         // Map old index -> new index
         let mut cp_index_map: HashMap<u16, u16> = HashMap::new();
         for (new_pos, &old_idx) in shuffled.iter().enumerate() {
-            cp_index_map.insert(old_idx, new_pos as u16);
+            cp_index_map.insert(old_idx, new_pos.try_into().unwrap());
         }
 
         // Fix up the implicit Null slots after Long/Double
         // Wherever old_idx is a Long/Double, old_idx+1 must follow new_idx+1
-        for &old_idx in &shuffled {
+        for old_idx in 0..cp.entries.len().try_into().unwrap() {
             if matches!(
                 cp[old_idx],
                 ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. }
@@ -67,9 +67,17 @@ impl ShuffleConstantPool {
                 ConstantPoolInfo::String { string_index } => ConstantPoolInfo::String {
                     string_index: cp_index_map.get(*string_index),
                 },
-                ConstantPoolInfo::Class { name_index } => ConstantPoolInfo::Class {
-                    name_index: cp_index_map.get(*name_index),
-                },
+                ConstantPoolInfo::Class { name_index } => {
+                    println!(
+                        "Class entry ('{}'): from {} to {}",
+                        cp.get_class_name(*name_index - 1),
+                        name_index,
+                        cp_index_map.get(*name_index)
+                    );
+                    ConstantPoolInfo::Class {
+                        name_index: cp_index_map.get(*name_index),
+                    }
+                }
                 ConstantPoolInfo::FieldRef {
                     class_index,
                     name_and_type_index,
@@ -112,7 +120,7 @@ impl ShuffleConstantPool {
                     bootstrap_method_attr_index,
                     name_and_type_index,
                 } => ConstantPoolInfo::InvokeDynamic {
-                    bootstrap_method_attr_index: cp_index_map.get(*bootstrap_method_attr_index),
+                    bootstrap_method_attr_index: *bootstrap_method_attr_index,
                     name_and_type_index: cp_index_map.get(*name_and_type_index),
                 },
             });
@@ -325,13 +333,25 @@ impl ClassFileTransformation for ShuffleConstantPool {
     fn transform(&self, cf: &ClassFile) -> ClassFile {
         let cp_index_map: CPIndexMap = self.shuffle_indices(&cf.constant_pool);
 
+        {
+            let mut keys: Vec<&u16> = cp_index_map.map.keys().collect();
+            keys.sort();
+            for k in keys.iter() {
+                println!(" {}: {}", *k + 1, cp_index_map.get(**k + 1));
+            }
+        }
+
         ClassFile {
             minor_version: cf.minor_version,
             major_version: cf.major_version,
             constant_pool: self.modify_constant_pool(&cp_index_map, &cf.constant_pool),
             access_flags: cf.access_flags,
             this_class: cp_index_map.get(cf.this_class),
-            super_class: cp_index_map.get(cf.super_class),
+            super_class: if cf.super_class == 0 {
+                0
+            } else {
+                cp_index_map.get(cf.super_class)
+            },
             interfaces: cf
                 .interfaces
                 .iter()
