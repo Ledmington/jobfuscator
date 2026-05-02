@@ -213,8 +213,9 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
             ConstantPoolInfo::Utf8 { bytes } => {
                 let content: String = constant_pool::convert_utf8(bytes).trim_end().to_owned();
                 if !content.trim().is_empty() {
-                    lw.println(&content);
+                    lw.print(&content);
                 }
+                lw.println("");
             }
             ConstantPoolInfo::Integer { bytes } => {
                 lw.println(&(*bytes as i32).to_string());
