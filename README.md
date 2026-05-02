@@ -29,6 +29,7 @@ Command-line options:
  -s, --seed                    64-bit seed for RNG-based transformations (accepts hexadecimal and decimal).
      --make-everything-public  Converts all classes, fields and methods to public.
      --shuffle-fields          Shuffles the fields inside a class.
+     --shuffle-methods         Shuffles the methods inside a class.
 ```
 
 It's a strong requirement that the produced jar file must have the same behavior of the input jar file, so if happen to find a case in which behavior is modified, please open an issue.
