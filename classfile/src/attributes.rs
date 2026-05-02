@@ -1,4 +1,4 @@
-use binary_reader::BinaryReader;
+use binary_reader::byte_reader::ByteReader;
 
 use crate::access_flags::{InnerClassAccessFlags, MethodParameterAccessFlags};
 use crate::assert_valid_and_type;
@@ -334,7 +334,7 @@ impl InnerClassInfo {
 }
 
 pub fn parse_class_attributes(
-    reader: &mut BinaryReader,
+    reader: &mut ByteReader,
     cp: &ConstantPool,
     num_attributes: usize,
 ) -> Vec<AttributeInfo> {
@@ -354,7 +354,7 @@ pub fn parse_class_attributes(
     attributes
 }
 
-fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
+fn parse_classfile_attribute(reader: &mut ByteReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
@@ -527,7 +527,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
 }
 
 pub fn parse_field_attributes(
-    reader: &mut BinaryReader,
+    reader: &mut ByteReader,
     cp: &ConstantPool,
     num_attributes: usize,
 ) -> Vec<AttributeInfo> {
@@ -558,7 +558,7 @@ fn check_attribute_length(
     );
 }
 
-fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
+fn parse_field_attribute(reader: &mut ByteReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
@@ -597,7 +597,7 @@ fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attrib
 }
 
 pub fn parse_method_attributes(
-    reader: &mut BinaryReader,
+    reader: &mut ByteReader,
     cp: &ConstantPool,
     num_attributes: usize,
 ) -> Vec<AttributeInfo> {
@@ -617,7 +617,7 @@ pub fn parse_method_attributes(
     attributes
 }
 
-fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
+fn parse_method_attribute(reader: &mut ByteReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
     assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
@@ -633,7 +633,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             );
             let code_bytes: Vec<u8> = reader.read_u8_vec(code_length.try_into().unwrap()).unwrap();
             let code: Vec<(u32, BytecodeInstruction)> = parse_bytecode(
-                &mut BinaryReader::new(&code_bytes, binary_reader::Endianness::Big),
+                &mut ByteReader::new(&code_bytes, binary_reader::Endianness::Big),
                 cp,
             );
             let exception_table_length: u16 = reader.read_u16().unwrap();
@@ -750,7 +750,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
     }
 }
 
-fn parse_annotation(cp: &ConstantPool, reader: &mut BinaryReader) -> Annotation {
+fn parse_annotation(cp: &ConstantPool, reader: &mut ByteReader) -> Annotation {
     let type_index: u16 = reader.read_u16().unwrap();
     assert_valid_and_type!(cp, type_index, ConstantPoolTag::Utf8);
     let num_element_value_pairs: u16 = reader.read_u16().unwrap();
@@ -771,7 +771,7 @@ fn parse_annotation(cp: &ConstantPool, reader: &mut BinaryReader) -> Annotation 
     }
 }
 
-fn parse_element_value(cp: &ConstantPool, reader: &mut BinaryReader) -> ElementValue {
+fn parse_element_value(cp: &ConstantPool, reader: &mut ByteReader) -> ElementValue {
     let element_value_tag: char = reader.read_u8().unwrap() as char;
     match element_value_tag {
         'B' => ElementValue::Byte {
@@ -824,7 +824,7 @@ fn parse_element_value(cp: &ConstantPool, reader: &mut BinaryReader) -> ElementV
 }
 
 fn parse_code_attributes(
-    reader: &mut BinaryReader,
+    reader: &mut ByteReader,
     cp: &ConstantPool,
     num_attributes: usize,
     code: &[(u32, BytecodeInstruction)],
@@ -848,7 +848,7 @@ fn parse_code_attributes(
 
 fn parse_code_attribute(
     cp: &ConstantPool,
-    reader: &mut BinaryReader,
+    reader: &mut ByteReader,
     code: &[(u32, BytecodeInstruction)],
     code_length: u32,
 ) -> AttributeInfo {
@@ -981,7 +981,7 @@ fn parse_code_attribute(
     }
 }
 
-fn parse_stack_map_entry(reader: &mut BinaryReader) -> StackMapFrame {
+fn parse_stack_map_entry(reader: &mut ByteReader) -> StackMapFrame {
     let frame_type: u8 = reader.read_u8().unwrap();
     match frame_type {
         0..=63 => StackMapFrame::SameFrame { frame_type },
@@ -1024,7 +1024,7 @@ fn parse_stack_map_entry(reader: &mut BinaryReader) -> StackMapFrame {
 }
 
 fn parse_verification_type_info_vec(
-    reader: &mut BinaryReader,
+    reader: &mut ByteReader,
     num: usize,
 ) -> Vec<VerificationTypeInfo> {
     let mut result: Vec<VerificationTypeInfo> = Vec::with_capacity(num);
@@ -1034,7 +1034,7 @@ fn parse_verification_type_info_vec(
     result
 }
 
-fn parse_verification_type_info(reader: &mut BinaryReader) -> VerificationTypeInfo {
+fn parse_verification_type_info(reader: &mut ByteReader) -> VerificationTypeInfo {
     let tag: u8 = reader.read_u8().unwrap();
     match tag {
         0 => VerificationTypeInfo::TopVariable,

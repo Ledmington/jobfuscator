@@ -1,4 +1,4 @@
-use binary_reader::BinaryReader;
+use binary_reader::byte_reader::ByteReader;
 
 use crate::{
     access_flags::MethodAccessFlags,
@@ -16,7 +16,7 @@ pub struct MethodInfo {
 }
 
 pub fn parse_methods(
-    reader: &mut BinaryReader,
+    reader: &mut ByteReader,
     cp: &ConstantPool,
     num_methods: usize,
 ) -> Vec<MethodInfo> {
