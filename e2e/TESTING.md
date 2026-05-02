@@ -32,8 +32,8 @@ find . -type f -name "*.class" | wc -l
 | Scala                  | https://github.com/scala/scala3.git                 | 14905      |  22/02/2026  |
 | Netty                  | https://github.com/netty/netty.git                  | 12518      |  23/04/2026  |
 | Groovy                 | https://github.com/apache/groovy.git                | 8794       |  22/02/2026  |
-| Google Guava           | https://github.com/google/guava.git                 | 7184       |  22/02/2026  |
-| jUnit                  | https://github.com/junit-team/junit-framework.git   | 6604       |  23/04/2026  |
+| Google Guava           | https://github.com/google/guava.git                 | 6753       |  02/05/2026  |
+| jUnit                  | https://github.com/junit-team/junit-framework.git   | 6385       |  02/05/2026  |
 | LibGDX                 | https://github.com/libgdx/libgdx.git                | 4171       |  02/05/2026  |
 | Clojure                | https://github.com/clojure/clojure.git              | 3864       |  22/02/2026  |
 | jMonkeyEngine          | https://github.com/jMonkeyEngine/jmonkeyengine.git  | 3397       |  02/05/2026  |
@@ -98,17 +98,32 @@ find . -type f -name "*.class" | wc -l
 
 ## Groovy
 ```bash
-
+sdk install java 25.0.3-tem
+sdk install gradle
+wget https://github.com/apache/groovy/archive/refs/tags/GROOVY_5_0_5.tar.gz
+tar xzf GROOVY_5_0_5.tar.gz
+cd groovy-GROOVY_5_0_5.tar.gz
+gradle -p bootstrap
+./gradlew build
 ```
 
 ## Google Guava
 ```bash
-
+sdk install java 25.0.3-tem
+sdk install maven
+wget https://github.com/google/guava/archive/refs/tags/v33.6.0.tar.gz
+tar xzf v33.6.0.tar.gz
+cd guava-v33.6.0
+./mvnw install -DskipTests -T1C
 ```
 
 ## jUnit
 ```bash
-
+sdk install java 25.0.3-tem
+sdk install gradle
+git clone --depth 1 --branch r6.0.3 https://github.com/junit-team/junit-framework.git
+cd junit-framework
+./gradlew build
 ```
 
 ## SBT
