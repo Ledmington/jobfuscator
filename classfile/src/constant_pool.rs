@@ -13,17 +13,68 @@ pub struct ConstantPool {
 }
 
 impl ConstantPool {
+    // TODO: find a better name
+    pub fn assert_valid_and_type(&self, cp_index: u16, expected_tags: &[ConstantPoolTag]) {
+        let cp_len = self.len();
+        assert!(expected_tags.len() > 0, "Empty expected tags.");
+        assert!(
+            cp_index >= 1 && cp_index <= cp_len.try_into().unwrap(),
+            "Constant pool index must be >= 1 and <= {cp_len} but was {cp_index} (0x{cp_index:04x})."
+        );
+        let actual_tag = self[cp_index].tag();
+        let mut found: bool = false;
+        for i in 0..expected_tags.len() {
+            let expected_tag = &expected_tags[i];
+            if *expected_tag == actual_tag {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            if expected_tags.len() == 1 {
+                panic!(
+                    "Expected an entry with tag {:?} at index {cp_index} but was {actual_tag}.",
+                    expected_tags[0]
+                );
+            } else {
+                panic!(
+                    "Expected an entry with any of the tags {} at index {cp_index} but was {actual_tag}.",
+                    expected_tags
+                        .iter()
+                        .map(|t| format!("{t:?}"))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                );
+            }
+        }
+    }
+
+    fn get_entry(&self, cp_index: u16, expected: &[ConstantPoolTag]) -> &ConstantPoolInfo {
+        self.assert_valid_and_type(cp_index, expected);
+        let entry = &self[cp_index];
+        entry
+    }
+
     pub fn get_class_name(&self, cp_index: u16) -> String {
-        let class_entry: &ConstantPoolInfo = &self[cp_index];
-        match class_entry {
-            ConstantPoolInfo::Class { name_index } => self.get_wrapped_utf8_content(*name_index),
-            _ => panic!("Expected entry #{cp_index} to be of Class type but it wasn't."),
+        if let ConstantPoolInfo::Class { name_index } =
+            self.get_entry(cp_index, &[ConstantPoolTag::Class])
+        {
+            self.get_wrapped_utf8_content(*name_index)
+        } else {
+            unreachable!()
         }
     }
 
     pub fn get_method_ref(&self, cp_index: u16) -> String {
-        let method_ref_entry: &ConstantPoolInfo = &self[cp_index];
-        match method_ref_entry {
+        let entry = self.get_entry(
+            cp_index,
+            &[
+                ConstantPoolTag::Fieldref,
+                ConstantPoolTag::Methodref,
+                ConstantPoolTag::InterfaceMethodref,
+            ],
+        );
+        match entry {
             ConstantPoolInfo::FieldRef {
                 class_index,
                 name_and_type_index,
@@ -391,38 +442,6 @@ fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) ->
     }
 }
 
-// TODO: find a better name
-#[macro_export]
-macro_rules! assert_valid_and_type {
-    ($cp:expr, $cp_index:expr, $($expected_tag:expr),+) => {{
-        let cp = $cp;
-        let cp_index = $cp_index;
-        let cp_len = cp.len();
-        let expected_tags = &[$($expected_tag),+];
-        assert!(expected_tags.len() > 0, "Empty expected tags.");
-        assert!(
-            cp_index >= 1 && cp_index <= (cp_len as u16),
-            "Constant pool index must be >= 1 and <= {cp_len} but was {cp_index} (0x{cp_index:04x})."
-        );
-        let actual_tag = cp[cp_index].tag();
-        let mut found: bool = false;
-        for i in 0..expected_tags.len() {
-            let expected_tag = &expected_tags[i];
-            if *expected_tag == actual_tag {
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            if expected_tags.len() == 1 {
-                panic!("Expected an entry with tag {:?} at index {cp_index} but was {actual_tag}.", expected_tags[0]);
-            } else {
-                panic!("Expected an entry with any of the tags {} at index {cp_index} but was {actual_tag}.", expected_tags.iter().map(|t| format!("{t:?}")).collect::<Vec<String>>().join(", "));
-            }
-        }
-    }};
-}
-
 pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo]) {
     let mut i = 0;
     while i < cp.len() {
@@ -441,41 +460,41 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
                 i += 1;
             }
             ConstantPoolInfo::String { string_index } => {
-                assert_valid_and_type!(cp, *string_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(*string_index, &[ConstantPoolTag::Utf8]);
             }
             ConstantPoolInfo::Class { name_index } => {
-                assert_valid_and_type!(cp, *name_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(*name_index, &[ConstantPoolTag::Utf8]);
             }
             ConstantPoolInfo::FieldRef {
                 class_index,
                 name_and_type_index,
             } => {
-                assert_valid_and_type!(cp, *class_index, ConstantPoolTag::Class);
-                assert_valid_and_type!(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+                cp.assert_valid_and_type(*class_index, &[ConstantPoolTag::Class]);
+                cp.assert_valid_and_type(*name_and_type_index, &[ConstantPoolTag::NameAndType]);
             }
             ConstantPoolInfo::MethodRef {
                 class_index,
                 name_and_type_index,
             } => {
-                assert_valid_and_type!(cp, *class_index, ConstantPoolTag::Class);
-                assert_valid_and_type!(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+                cp.assert_valid_and_type(*class_index, &[ConstantPoolTag::Class]);
+                cp.assert_valid_and_type(*name_and_type_index, &[ConstantPoolTag::NameAndType]);
             }
             ConstantPoolInfo::InterfaceMethodRef {
                 class_index,
                 name_and_type_index,
             } => {
-                assert_valid_and_type!(cp, *class_index, ConstantPoolTag::Class);
-                assert_valid_and_type!(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+                cp.assert_valid_and_type(*class_index, &[ConstantPoolTag::Class]);
+                cp.assert_valid_and_type(*name_and_type_index, &[ConstantPoolTag::NameAndType]);
             }
             ConstantPoolInfo::NameAndType {
                 name_index,
                 descriptor_index,
             } => {
-                assert_valid_and_type!(cp, *name_index, ConstantPoolTag::Utf8);
-                assert_valid_and_type!(cp, *descriptor_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(*name_index, &[ConstantPoolTag::Utf8]);
+                cp.assert_valid_and_type(*descriptor_index, &[ConstantPoolTag::Utf8]);
             }
             ConstantPoolInfo::MethodType { descriptor_index } => {
-                assert_valid_and_type!(cp, *descriptor_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(*descriptor_index, &[ConstantPoolTag::Utf8]);
             }
             ConstantPoolInfo::MethodHandle {
                 reference_kind,
@@ -485,24 +504,24 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
                 | ReferenceKind::GetStatic
                 | ReferenceKind::PutField
                 | ReferenceKind::PutStatic => {
-                    assert_valid_and_type!(cp, *reference_index, ConstantPoolTag::Fieldref);
+                    cp.assert_valid_and_type(*reference_index, &[ConstantPoolTag::Fieldref]);
                 }
                 ReferenceKind::InvokeVirtual | ReferenceKind::NewInvokeSpecial => {
-                    assert_valid_and_type!(cp, *reference_index, ConstantPoolTag::Methodref);
+                    cp.assert_valid_and_type(*reference_index, &[ConstantPoolTag::Methodref]);
                 }
                 ReferenceKind::InvokeStatic | ReferenceKind::InvokeSpecial => {
-                    assert_valid_and_type!(
-                        cp,
+                    cp.assert_valid_and_type(
                         *reference_index,
-                        ConstantPoolTag::Methodref,
-                        ConstantPoolTag::InterfaceMethodref
+                        &[
+                            ConstantPoolTag::Methodref,
+                            ConstantPoolTag::InterfaceMethodref,
+                        ],
                     );
                 }
                 ReferenceKind::InvokeInterface => {
-                    assert_valid_and_type!(
-                        cp,
+                    cp.assert_valid_and_type(
                         *reference_index,
-                        ConstantPoolTag::InterfaceMethodref
+                        &[ConstantPoolTag::InterfaceMethodref],
                     );
                 }
             },
@@ -522,7 +541,7 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
                     }
                     _ => unreachable!(),
                 }
-                assert_valid_and_type!(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+                cp.assert_valid_and_type(*name_and_type_index, &[ConstantPoolTag::NameAndType]);
             }
         }
 

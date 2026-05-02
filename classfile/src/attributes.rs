@@ -1,7 +1,6 @@
 use binary_reader::BinaryReader;
 
 use crate::access_flags::{InnerClassAccessFlags, MethodParameterAccessFlags};
-use crate::assert_valid_and_type;
 use crate::bytecode::{BytecodeInstruction, parse_bytecode};
 use crate::constant_pool::{ConstantPool, ConstantPoolTag};
 use crate::writer::{get_annotation_length, get_stack_map_entry_length};
@@ -356,7 +355,7 @@ pub fn parse_class_attributes(
 
 fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    cp.assert_valid_and_type(attribute_name_index, &[ConstantPoolTag::Utf8]);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -366,7 +365,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                 "The attribute_length field of SourceFile must be 2 but was {attribute_length}.",
             );
             let source_file_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type!(cp, source_file_index, ConstantPoolTag::Utf8);
+            cp.assert_valid_and_type(source_file_index, &[ConstantPoolTag::Utf8]);
             AttributeInfo::SourceFile {
                 name_index: attribute_name_index,
                 source_file_index,
@@ -380,23 +379,24 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                 Vec::with_capacity(num_bootstrap_methods.into());
             for _ in 0..num_bootstrap_methods {
                 let bootstrap_method_ref: u16 = reader.read_u16().unwrap();
-                assert_valid_and_type!(cp, bootstrap_method_ref, ConstantPoolTag::MethodHandle);
+                cp.assert_valid_and_type(bootstrap_method_ref, &[ConstantPoolTag::MethodHandle]);
                 let num_bootstrap_arguments: u16 = reader.read_u16().unwrap();
                 let bootstrap_arguments: Vec<u16> =
                     reader.read_u16_vec(num_bootstrap_arguments.into()).unwrap();
                 for index in bootstrap_arguments.iter() {
-                    assert_valid_and_type!(
-                        cp,
+                    cp.assert_valid_and_type(
                         *index,
-                        ConstantPoolTag::Integer,
-                        ConstantPoolTag::Float,
-                        ConstantPoolTag::Long,
-                        ConstantPoolTag::Double,
-                        ConstantPoolTag::Class,
-                        ConstantPoolTag::String,
-                        ConstantPoolTag::MethodHandle,
-                        ConstantPoolTag::MethodType,
-                        ConstantPoolTag::Dynamic
+                        &[
+                            ConstantPoolTag::Integer,
+                            ConstantPoolTag::Float,
+                            ConstantPoolTag::Long,
+                            ConstantPoolTag::Double,
+                            ConstantPoolTag::Class,
+                            ConstantPoolTag::String,
+                            ConstantPoolTag::MethodHandle,
+                            ConstantPoolTag::MethodType,
+                            ConstantPoolTag::Dynamic,
+                        ],
                     );
                 }
                 running_length += 2 + 2 + 2 * (bootstrap_arguments.len() as u32);
@@ -434,19 +434,19 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
                         "Expected field outer_class_info_index of entry n.{i} to be 0 since inner_class_info_index was zero, but it was {outer_class_info_index}.",
                     );
                 } else {
-                    assert_valid_and_type!(cp, inner_class_info_index, ConstantPoolTag::Class);
+                    cp.assert_valid_and_type(inner_class_info_index, &[ConstantPoolTag::Class]);
                     assert!(
                         inner_class_info_index != outer_class_info_index,
                         "Expected field outer_class_info_index of entry n.{i} to be different from inner_class_info_index ({inner_class_info_index}) but it was.",
                     );
                     if outer_class_info_index != 0 {
-                        assert_valid_and_type!(cp, outer_class_info_index, ConstantPoolTag::Class);
+                        cp.assert_valid_and_type(outer_class_info_index, &[ConstantPoolTag::Class]);
                     }
                 }
                 let inner_name_index = reader.read_u16().unwrap();
                 if inner_name_index != 0 {
                     // The inner class is not anonymous
-                    assert_valid_and_type!(cp, inner_name_index, ConstantPoolTag::Utf8);
+                    cp.assert_valid_and_type(inner_name_index, &[ConstantPoolTag::Utf8]);
                 }
                 let inner_class_access_flags: InnerClassAccessFlags =
                     InnerClassAccessFlags::from(reader.read_u16().unwrap());
@@ -501,10 +501,10 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
         }
         "EnclosingMethod" => {
             let class_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type!(cp, class_index, ConstantPoolTag::Class);
+            cp.assert_valid_and_type(class_index, &[ConstantPoolTag::Class]);
             let method_index: u16 = reader.read_u16().unwrap();
             if method_index != 0 {
-                assert_valid_and_type!(cp, method_index, ConstantPoolTag::NameAndType);
+                cp.assert_valid_and_type(method_index, &[ConstantPoolTag::NameAndType]);
             }
             AttributeInfo::EnclosingMethod {
                 name_index: attribute_name_index,
@@ -514,7 +514,7 @@ fn parse_classfile_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> At
         }
         "NestHost" => {
             let host_class_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type!(cp, host_class_index, ConstantPoolTag::Class);
+            cp.assert_valid_and_type(host_class_index, &[ConstantPoolTag::Class]);
             AttributeInfo::NestHost {
                 name_index: attribute_name_index,
                 host_class_index,
@@ -560,14 +560,14 @@ fn check_attribute_length(
 
 fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    cp.assert_valid_and_type(attribute_name_index, &[ConstantPoolTag::Utf8]);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
         "Signature" => {
             check_attribute_length(attribute_length, 2, attribute_name);
             let signature_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type!(cp, signature_index, ConstantPoolTag::Utf8);
+            cp.assert_valid_and_type(signature_index, &[ConstantPoolTag::Utf8]);
             AttributeInfo::Signature {
                 name_index: attribute_name_index,
                 signature_index,
@@ -576,14 +576,15 @@ fn parse_field_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attrib
         "ConstantValue" => {
             check_attribute_length(attribute_length, 2, attribute_name);
             let constant_value_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type!(
-                cp,
+            cp.assert_valid_and_type(
                 constant_value_index,
-                ConstantPoolTag::Integer,
-                ConstantPoolTag::Float,
-                ConstantPoolTag::Long,
-                ConstantPoolTag::Double,
-                ConstantPoolTag::String
+                &[
+                    ConstantPoolTag::Integer,
+                    ConstantPoolTag::Float,
+                    ConstantPoolTag::Long,
+                    ConstantPoolTag::Double,
+                    ConstantPoolTag::String,
+                ],
             );
             AttributeInfo::ConstantValue {
                 name_index: attribute_name_index,
@@ -619,7 +620,7 @@ pub fn parse_method_attributes(
 
 fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    cp.assert_valid_and_type(attribute_name_index, &[ConstantPoolTag::Utf8]);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -665,7 +666,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
                 );
                 let catch_type: u16 = reader.read_u16().unwrap();
                 if catch_type != 0 {
-                    assert_valid_and_type!(cp, catch_type, ConstantPoolTag::Class);
+                    cp.assert_valid_and_type(catch_type, &[ConstantPoolTag::Class]);
                 }
                 exception_table.push(ExceptionTableEntry {
                     start_pc,
@@ -694,7 +695,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             for _ in 0..parameters_count {
                 let name_index: u16 = reader.read_u16().unwrap();
                 if name_index != 0 {
-                    assert_valid_and_type!(cp, name_index, ConstantPoolTag::Utf8);
+                    cp.assert_valid_and_type(name_index, &[ConstantPoolTag::Utf8]);
                 }
                 let access_flags: MethodParameterAccessFlags =
                     MethodParameterAccessFlags::from(reader.read_u16().unwrap());
@@ -711,7 +712,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
         "Signature" => {
             check_attribute_length(attribute_length, 2, attribute_name);
             let signature_index: u16 = reader.read_u16().unwrap();
-            assert_valid_and_type!(cp, signature_index, ConstantPoolTag::Utf8);
+            cp.assert_valid_and_type(signature_index, &[ConstantPoolTag::Utf8]);
             AttributeInfo::Signature {
                 name_index: attribute_name_index,
                 signature_index,
@@ -737,7 +738,7 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             check_attribute_length(expected_attribute_length, attribute_length, attribute_name);
             let exception_indices = reader.read_u16_vec(num_exceptions.into()).unwrap();
             for exception_index in exception_indices.iter() {
-                assert_valid_and_type!(cp, *exception_index, ConstantPoolTag::Class);
+                cp.assert_valid_and_type(*exception_index, &[ConstantPoolTag::Class]);
             }
             AttributeInfo::Exceptions {
                 name_index: attribute_name_index,
@@ -752,13 +753,13 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
 
 fn parse_annotation(cp: &ConstantPool, reader: &mut BinaryReader) -> Annotation {
     let type_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type!(cp, type_index, ConstantPoolTag::Utf8);
+    cp.assert_valid_and_type(type_index, &[ConstantPoolTag::Utf8]);
     let num_element_value_pairs: u16 = reader.read_u16().unwrap();
     let mut element_value_pairs: Vec<ElementValuePair> =
         Vec::with_capacity(num_element_value_pairs.into());
     for _ in 0..num_element_value_pairs {
         let element_name_index: u16 = reader.read_u16().unwrap();
-        assert_valid_and_type!(cp, element_name_index, ConstantPoolTag::Utf8);
+        cp.assert_valid_and_type(element_name_index, &[ConstantPoolTag::Utf8]);
         let value: ElementValue = parse_element_value(cp, reader);
         element_value_pairs.push(ElementValuePair {
             element_name_index,
@@ -853,7 +854,7 @@ fn parse_code_attribute(
     code_length: u32,
 ) -> AttributeInfo {
     let attribute_name_index: u16 = reader.read_u16().unwrap();
-    assert_valid_and_type!(cp, attribute_name_index, ConstantPoolTag::Utf8);
+    cp.assert_valid_and_type(attribute_name_index, &[ConstantPoolTag::Utf8]);
     let attribute_name: String = cp.get_utf8_content(attribute_name_index);
     let attribute_length: u32 = reader.read_u32().unwrap();
     match attribute_name.as_str() {
@@ -902,9 +903,9 @@ fn parse_code_attribute(
                     "LocalVariableTable entry {i} has start_pc + length ({start_pc} + {length}) which does not correspond to a valid instruction.",
                 );
                 let name_index: u16 = reader.read_u16().unwrap();
-                assert_valid_and_type!(cp, name_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(name_index, &[ConstantPoolTag::Utf8]);
                 let descriptor_index: u16 = reader.read_u16().unwrap();
-                assert_valid_and_type!(cp, descriptor_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(descriptor_index, &[ConstantPoolTag::Utf8]);
                 let index: u16 = reader.read_u16().unwrap();
                 local_variable_table.push(LocalVariableTableEntry {
                     start_pc,
@@ -941,9 +942,9 @@ fn parse_code_attribute(
                     "LocalVariableTypeTable entry {i} has start_pc + length ({start_pc} + {length}) which does not correspond to a valid instruction.",
                 );
                 let name_index: u16 = reader.read_u16().unwrap();
-                assert_valid_and_type!(cp, name_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(name_index, &[ConstantPoolTag::Utf8]);
                 let descriptor_index: u16 = reader.read_u16().unwrap();
-                assert_valid_and_type!(cp, descriptor_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(descriptor_index, &[ConstantPoolTag::Utf8]);
                 let index: u16 = reader.read_u16().unwrap();
                 local_variable_type_table.push(LocalVariableTypeTableEntry {
                     start_pc,
