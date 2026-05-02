@@ -69,7 +69,7 @@ cargo test
 
 Run end-to-end integration tests:
 ```
-./test/run_e2e_tests.sh
+cargo run --bin e2e
 ```
 
 Linting
