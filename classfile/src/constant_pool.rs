@@ -14,7 +14,7 @@ pub struct ConstantPool {
 
 impl ConstantPool {
     pub fn get_class_name(&self, cp_index: u16) -> String {
-        let class_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        let class_entry: &ConstantPoolInfo = &self[cp_index];
         match class_entry {
             ConstantPoolInfo::Class { name_index } => self.get_wrapped_utf8_content(*name_index),
             _ => panic!("Expected entry #{cp_index} to be of Class type but it wasn't."),
@@ -22,7 +22,7 @@ impl ConstantPool {
     }
 
     pub fn get_method_ref(&self, cp_index: u16) -> String {
-        let method_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        let method_ref_entry: &ConstantPoolInfo = &self[cp_index];
         match method_ref_entry {
             ConstantPoolInfo::FieldRef {
                 class_index,
@@ -45,7 +45,7 @@ impl ConstantPool {
     }
 
     pub fn get_field_ref(&self, cp_index: u16) -> String {
-        let field_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        let field_ref_entry: &ConstantPoolInfo = &self[cp_index];
         match field_ref_entry {
             ConstantPoolInfo::FieldRef {
                 class_index,
@@ -60,7 +60,7 @@ impl ConstantPool {
     }
 
     pub fn get_field_ref_name_and_type(&self, cp_index: u16) -> String {
-        let field_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        let field_ref_entry: &ConstantPoolInfo = &self[cp_index];
         match field_ref_entry {
             ConstantPoolInfo::FieldRef {
                 name_and_type_index,
@@ -71,7 +71,7 @@ impl ConstantPool {
     }
 
     pub fn get_invoke_dynamic(&self, cp_index: u16) -> String {
-        let invoke_dynamic_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        let invoke_dynamic_entry: &ConstantPoolInfo = &self[cp_index];
         match invoke_dynamic_entry {
             ConstantPoolInfo::InvokeDynamic {
                 bootstrap_method_attr_index,
@@ -93,7 +93,7 @@ impl ConstantPool {
     }
 
     pub fn get_name_and_type(&self, cp_index: u16) -> String {
-        let name_and_type_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        let name_and_type_entry: &ConstantPoolInfo = &self[cp_index];
         match name_and_type_entry {
             ConstantPoolInfo::NameAndType {
                 name_index,
@@ -123,7 +123,7 @@ impl ConstantPool {
     }
 
     pub fn get_utf8_content(&self, cp_index: u16) -> String {
-        let name_entry: &ConstantPoolInfo = &self[cp_index - 1];
+        let name_entry: &ConstantPoolInfo = &self[cp_index];
         match name_entry {
             ConstantPoolInfo::Utf8 { bytes } => convert_utf8(bytes),
             _ => panic!("Expected entry #{cp_index} to be of Utf8 type but it wasn't."),
@@ -142,8 +142,10 @@ impl ConstantPool {
 impl Index<u16> for ConstantPool {
     type Output = ConstantPoolInfo;
 
+    /// The input index is assumed to be in the range [[ `1` ; `cp.len()` ]].
     fn index(&self, index: u16) -> &Self::Output {
-        &self.entries[index as usize]
+        assert!(index >= 1);
+        &self.entries[(index - 1) as usize]
     }
 }
 
@@ -157,9 +159,7 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
 
 #[derive(Clone)]
 pub enum ConstantPoolInfo {
-    /**
-     * The type of constant pool entry which can be found right after a Long or Double one.
-     */
+    /// The type of constant pool entry which can be found right after a Long or Double one.
     Null {},
     Utf8 {
         bytes: Vec<u8>,
@@ -404,7 +404,7 @@ macro_rules! assert_valid_and_type {
             cp_index >= 1 && cp_index <= (cp_len as u16),
             "Constant pool index must be >= 1 and <= {cp_len} but was {cp_index} (0x{cp_index:04x})."
         );
-        let actual_tag = cp[cp_index - 1].tag();
+        let actual_tag = cp[cp_index].tag();
         let mut found: bool = false;
         for i in 0..expected_tags.len() {
             let expected_tag = &expected_tags[i];
@@ -426,7 +426,7 @@ macro_rules! assert_valid_and_type {
 pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo]) {
     let mut i = 0;
     while i < cp.len() {
-        let entry = &cp[i.try_into().unwrap()];
+        let entry = &cp[(i + 1).try_into().unwrap()];
         match entry {
             ConstantPoolInfo::Null {} => {
                 unreachable!("Checking a null CP entry.");

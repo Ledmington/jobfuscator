@@ -189,13 +189,8 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
             Source: <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.4.5>
         */
         if i > 1
-            && (matches!(
-                cp[(i - 1).try_into().unwrap()],
-                ConstantPoolInfo::Long { .. }
-            ) || matches!(
-                cp[(i - 1).try_into().unwrap()],
-                ConstantPoolInfo::Double { .. }
-            ))
+            && (matches!(cp[i.try_into().unwrap()], ConstantPoolInfo::Long { .. })
+                || matches!(cp[i.try_into().unwrap()], ConstantPoolInfo::Double { .. }))
         {
             continue;
         }
@@ -205,7 +200,7 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
             ("#".to_owned() + &(i + 1).to_string())
         ));
 
-        let entry = &cp[i.try_into().unwrap()];
+        let entry = &cp[(i + 1).try_into().unwrap()];
 
         lw.print(&format!(" = {:<18} ", entry.tag().to_string()));
 
@@ -898,7 +893,7 @@ fn get_double_value(high_bytes: u32, low_bytes: u32) -> f64 {
 }
 
 fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
-    let entry = &cp[constant_pool_index - 1];
+    let entry = &cp[constant_pool_index];
     match entry {
         ConstantPoolInfo::String { string_index } => {
             let string_content: String = cp.get_utf8_content(*string_index).trim_end().to_owned();
@@ -1098,7 +1093,7 @@ fn get_comment(
 
         BytecodeInstruction::GetStatic { field_ref_index } => Some(
             "Field ".to_owned()
-                + &match cp[field_ref_index - 1] {
+                + &match cp[*field_ref_index] {
                     ConstantPoolInfo::FieldRef {
                         class_index,
                         name_and_type_index,
@@ -1114,7 +1109,7 @@ fn get_comment(
         ),
         BytecodeInstruction::PutStatic { field_ref_index } => Some(
             "Field ".to_owned()
-                + &match cp[field_ref_index - 1] {
+                + &match cp[*field_ref_index] {
                     ConstantPoolInfo::FieldRef {
                         class_index,
                         name_and_type_index,
@@ -1130,7 +1125,7 @@ fn get_comment(
         ),
         BytecodeInstruction::GetField { field_ref_index } => Some(
             "Field ".to_owned()
-                + &match cp[field_ref_index - 1] {
+                + &match cp[*field_ref_index] {
                     ConstantPoolInfo::FieldRef {
                         class_index,
                         name_and_type_index,
@@ -1146,7 +1141,7 @@ fn get_comment(
         ),
         BytecodeInstruction::PutField { field_ref_index } => Some(
             "Field ".to_owned()
-                + &match cp[field_ref_index - 1] {
+                + &match cp[*field_ref_index] {
                     ConstantPoolInfo::FieldRef {
                         class_index,
                         name_and_type_index,
@@ -1162,7 +1157,7 @@ fn get_comment(
         ),
         BytecodeInstruction::InvokeSpecial { method_ref_index } => Some(
             "Method ".to_owned()
-                + &match cp[method_ref_index - 1] {
+                + &match cp[*method_ref_index] {
                     ConstantPoolInfo::MethodRef {
                         class_index,
                         name_and_type_index,
@@ -1177,7 +1172,7 @@ fn get_comment(
                 },
         ),
         BytecodeInstruction::InvokeStatic { method_ref_index } => {
-            let method_entry = &cp[method_ref_index - 1];
+            let method_entry = &cp[*method_ref_index];
             Some(
                 get_method_type(method_entry)
                     + " "
@@ -1207,7 +1202,7 @@ fn get_comment(
             )
         }
         BytecodeInstruction::InvokeVirtual { method_ref_index } => {
-            let method_entry = &cp[method_ref_index - 1];
+            let method_entry = &cp[*method_ref_index];
             Some(
                 get_method_type(method_entry)
                     + " "
@@ -1243,7 +1238,7 @@ fn get_comment(
             constant_pool_index,
             ..
         } => {
-            let method_entry = &cp[constant_pool_index - 1];
+            let method_entry = &cp[*constant_pool_index];
             Some(
                 get_method_type(method_entry)
                     + " "
@@ -1678,7 +1673,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                     lw.print(&format!("{}: #{} ", i, method.bootstrap_method_ref));
 
                     // TODO: can we merge this match-case with the one below?
-                    match cp[method.bootstrap_method_ref - 1] {
+                    match cp[method.bootstrap_method_ref] {
                         ConstantPoolInfo::MethodHandle {
                             reference_kind,
                             reference_index,
@@ -1695,7 +1690,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                     lw.println("Method arguments:");
                     for arg in method.bootstrap_arguments.iter() {
                         lw.print(&format!("  #{arg} "));
-                        match cp[arg - 1] {
+                        match cp[*arg] {
                             ConstantPoolInfo::String { string_index } => {
                                 lw.println(&cp.get_utf8_content(string_index));
                             }
