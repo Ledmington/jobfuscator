@@ -99,13 +99,38 @@ fn which(binary: &str) -> PathBuf {
     PathBuf::from(String::from_utf8(output.stdout).unwrap().trim())
 }
 
-fn run(cmd: &mut Command) -> Output {
-    cmd.output()
-        .unwrap_or_else(|e| panic!("failed to spawn {:?}: {}", cmd.get_program(), e))
+/// Formats a Command's program and arguments as a shell-like string for display.
+fn format_cmd(cmd: &Command) -> String {
+    let prog = cmd.get_program().to_string_lossy().into_owned();
+    let args: Vec<String> = cmd
+        .get_args()
+        .map(|a| {
+            let s = a.to_string_lossy();
+            if s.contains(' ') {
+                format!("'{s}'")
+            } else {
+                s.into_owned()
+            }
+        })
+        .collect();
+    if args.is_empty() {
+        prog
+    } else {
+        format!("{prog} {}", args.join(" "))
+    }
 }
 
-fn jobf_shuffle(env: &TestEnv, input: &PathBuf, output: &PathBuf) -> bool {
-    run(Command::new(&env.jobf)
+/// Runs a command and returns its output, along with the formatted command line.
+fn run(cmd: &mut Command) -> (Output, String) {
+    let cmdline = format_cmd(cmd);
+    let output = cmd
+        .output()
+        .unwrap_or_else(|e| panic!("failed to spawn {:?}: {}", cmd.get_program(), e));
+    (output, cmdline)
+}
+
+fn jobf_shuffle(env: &TestEnv, input: &PathBuf, output: &PathBuf) -> Result<(), String> {
+    let (out, cmdline) = run(Command::new(&env.jobf)
         .arg("--input")
         .arg(input)
         .arg("--output")
@@ -113,9 +138,13 @@ fn jobf_shuffle(env: &TestEnv, input: &PathBuf, output: &PathBuf) -> bool {
         .arg("--quiet=true")
         .arg("--seed=0x01020304")
         .arg("--shuffle-fields=true")
-        .arg("--force"))
-    .status
-    .success()
+        .arg("--force"));
+
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(format_output_detail(&cmdline, &out))
+    }
 }
 
 /// Runs `diff` on two byte slices by writing them to temp files, prints the
@@ -143,8 +172,21 @@ fn diff_outputs(expected: &[u8], actual: &[u8], label_expected: &str, label_actu
         print!("{}", String::from_utf8_lossy(&output.stdout));
     }
 
-    // diff exits 1 when files differ, 0 when identical
     output.status.code() != Some(0)
+}
+
+/// Formats the command line and any stdout/stderr from an Output for display after a failure.
+fn format_output_detail(cmdline: &str, output: &Output) -> String {
+    let mut detail = format!("    cmd: {cmdline}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stdout.trim().is_empty() {
+        detail.push_str(&format!("\n    stdout: {}", stdout.trim_end()));
+    }
+    if !stderr.trim().is_empty() {
+        detail.push_str(&format!("\n    stderr: {}", stderr.trim_end()));
+    }
+    detail
 }
 
 fn ok(name: &str) {
@@ -152,8 +194,11 @@ fn ok(name: &str) {
 }
 
 fn fail(failures: &mut Vec<String>, name: &str, reason: &str) {
-    failures.push(format!("{name}: {reason}"));
+    // Store only the first line in the recap, print full detail inline.
+    let short = reason.lines().next().unwrap_or(reason);
+    failures.push(format!("{name}: {short}"));
     println!("  {name} ... {RED}FAILED{RESET}");
+    println!("{reason}");
 }
 
 fn run_javap_tests(env: &TestEnv) -> Vec<String> {
@@ -164,15 +209,41 @@ fn run_javap_tests(env: &TestEnv) -> Vec<String> {
     for case in TEST_CASES {
         let class_file = env.class_file(case.name);
 
-        let expected = run(Command::new(&env.system_javap)
+        let (expected_out, expected_cmd) = run(Command::new(&env.system_javap)
             .args(["-l", "-v", "-p"])
-            .arg(&class_file))
-        .stdout;
+            .arg(&class_file));
 
-        let actual = run(Command::new(&env.our_javap).arg(&class_file)).stdout;
+        let (actual_out, actual_cmd) = run(Command::new(&env.our_javap).arg(&class_file));
 
-        if diff_outputs(&expected, &actual, "system javap", "our javap") {
-            fail(&mut failures, case.name, "output differs from system javap");
+        if !expected_out.status.success() {
+            fail(
+                &mut failures,
+                case.name,
+                &format!(
+                    "system javap failed\n{}",
+                    format_output_detail(&expected_cmd, &expected_out)
+                ),
+            );
+        } else if !actual_out.status.success() {
+            fail(
+                &mut failures,
+                case.name,
+                &format!(
+                    "our javap failed\n{}",
+                    format_output_detail(&actual_cmd, &actual_out)
+                ),
+            );
+        } else if diff_outputs(
+            &expected_out.stdout,
+            &actual_out.stdout,
+            "system javap",
+            "our javap",
+        ) {
+            fail(
+                &mut failures,
+                case.name,
+                &format!("output differs from system javap\n    cmd: {actual_cmd}"),
+            );
         } else {
             ok(case.name);
         }
@@ -191,20 +262,23 @@ fn run_roundtrip_tests(env: &TestEnv) -> Vec<String> {
         let tmp = TempDir::new().unwrap();
         let output_file = env.tmp_class_file(&tmp, case.name);
 
-        let status = run(Command::new(&env.jobf)
+        let (out, cmdline) = run(Command::new(&env.jobf)
             .arg("--input")
             .arg(&class_file)
             .arg("--output")
             .arg(&output_file)
             .arg("--quiet=true")
-            .arg("--force"))
-        .status;
+            .arg("--force"));
 
-        if !status.success() {
+        if !out.status.success() {
             fail(
                 &mut failures,
                 case.name,
-                &format!("jobf exited with {status}"),
+                &format!(
+                    "jobf exited with {}\n{}",
+                    out.status,
+                    format_output_detail(&cmdline, &out)
+                ),
             );
             continue;
         }
@@ -213,7 +287,7 @@ fn run_roundtrip_tests(env: &TestEnv) -> Vec<String> {
             fail(
                 &mut failures,
                 case.name,
-                "roundtrip produced different bytes",
+                &format!("roundtrip produced different bytes\n    cmd: {cmdline}"),
             );
         } else {
             ok(case.name);
@@ -233,23 +307,49 @@ fn run_field_shuffle_tests(env: &TestEnv) -> Vec<String> {
         let tmp = TempDir::new().unwrap();
         let shuffled = env.tmp_class_file(&tmp, case.name);
 
-        if !jobf_shuffle(env, &class_file, &shuffled) {
-            fail(&mut failures, case.name, "jobf failed during field shuffle");
-            continue;
-        }
-
-        let expected = run(Command::new(&env.system_javap)
-            .args(["-l", "-v", "-p"])
-            .arg(&shuffled))
-        .stdout;
-
-        let actual = run(Command::new(&env.our_javap).arg(&shuffled)).stdout;
-
-        if diff_outputs(&expected, &actual, "system javap", "our javap") {
+        if let Err(detail) = jobf_shuffle(env, &class_file, &shuffled) {
             fail(
                 &mut failures,
                 case.name,
-                "javap output differs after field shuffle",
+                &format!("jobf failed during field shuffle\n{detail}"),
+            );
+            continue;
+        }
+
+        let (expected_out, expected_cmd) = run(Command::new(&env.system_javap)
+            .args(["-l", "-v", "-p"])
+            .arg(&shuffled));
+
+        let (actual_out, actual_cmd) = run(Command::new(&env.our_javap).arg(&shuffled));
+
+        if !expected_out.status.success() {
+            fail(
+                &mut failures,
+                case.name,
+                &format!(
+                    "system javap failed after field shuffle\n{}",
+                    format_output_detail(&expected_cmd, &expected_out)
+                ),
+            );
+        } else if !actual_out.status.success() {
+            fail(
+                &mut failures,
+                case.name,
+                &format!(
+                    "our javap failed after field shuffle\n{}",
+                    format_output_detail(&actual_cmd, &actual_out)
+                ),
+            );
+        } else if diff_outputs(
+            &expected_out.stdout,
+            &actual_out.stdout,
+            "system javap",
+            "our javap",
+        ) {
+            fail(
+                &mut failures,
+                case.name,
+                &format!("javap output differs after field shuffle\n    cmd: {actual_cmd}"),
             );
         } else {
             ok(case.name);
@@ -269,7 +369,7 @@ fn run_execution_tests(env: &TestEnv) -> Vec<String> {
         let tmp = TempDir::new().unwrap();
         let shuffled = env.tmp_class_file(&tmp, case.name);
 
-        let original = run(Command::new(&env.system_java)
+        let (original, original_cmd) = run(Command::new(&env.system_java)
             .arg("-cp")
             .arg(env.data_dir())
             .arg(case.name));
@@ -279,20 +379,23 @@ fn run_execution_tests(env: &TestEnv) -> Vec<String> {
                 &mut failures,
                 case.name,
                 &format!(
-                    "original class is not executable (exit {:?})\n{}",
-                    original.status.code(),
-                    String::from_utf8_lossy(&original.stderr),
+                    "original class is not executable\n{}",
+                    format_output_detail(&original_cmd, &original)
                 ),
             );
             continue;
         }
 
-        if !jobf_shuffle(env, &class_file, &shuffled) {
-            fail(&mut failures, case.name, "jobf failed during field shuffle");
+        if let Err(detail) = jobf_shuffle(env, &class_file, &shuffled) {
+            fail(
+                &mut failures,
+                case.name,
+                &format!("jobf failed during field shuffle\n{detail}"),
+            );
             continue;
         }
 
-        let modified = run(Command::new(&env.system_java)
+        let (modified, modified_cmd) = run(Command::new(&env.system_java)
             .arg("-cp")
             .arg(tmp.path())
             .arg(case.name));
@@ -302,9 +405,8 @@ fn run_execution_tests(env: &TestEnv) -> Vec<String> {
                 &mut failures,
                 case.name,
                 &format!(
-                    "modified class is not executable (exit {:?})\n{}",
-                    modified.status.code(),
-                    String::from_utf8_lossy(&modified.stderr),
+                    "modified class is not executable\n{}",
+                    format_output_detail(&modified_cmd, &modified)
                 ),
             );
             continue;
@@ -314,7 +416,7 @@ fn run_execution_tests(env: &TestEnv) -> Vec<String> {
             fail(
                 &mut failures,
                 case.name,
-                "output differs after field shuffle",
+                &format!("output differs after field shuffle\n    cmd: {modified_cmd}"),
             );
         } else {
             ok(case.name);
