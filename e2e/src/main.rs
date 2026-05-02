@@ -45,6 +45,10 @@ const TEST_CASES: &[TestCase] = &[
         name: "SecuritySettings$1",
         executable: false,
     },
+    TestCase {
+        name: "Employee",
+        executable: true,
+    },
 ];
 
 struct TestEnv {
