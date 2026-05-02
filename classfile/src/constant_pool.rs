@@ -9,7 +9,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct ConstantPool {
-    pub(crate) entries: Vec<ConstantPoolInfo>,
+    pub entries: Vec<ConstantPoolInfo>,
 }
 
 impl ConstantPool {
