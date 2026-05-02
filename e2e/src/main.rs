@@ -118,21 +118,33 @@ fn jobf_shuffle(env: &TestEnv, input: &PathBuf, output: &PathBuf) -> bool {
     .success()
 }
 
-fn diff_text(expected: &[u8], actual: &[u8]) -> String {
-    let expected = String::from_utf8_lossy(expected);
-    let actual = String::from_utf8_lossy(actual);
-    let mut out = String::new();
-    for line in expected.lines() {
-        if !actual.contains(line) {
-            out.push_str(&format!("{RED}  - {line}{RESET}\n"));
-        }
+/// Runs `diff` on two byte slices by writing them to temp files, prints the
+/// output, and returns true if they differ.
+fn diff_outputs(expected: &[u8], actual: &[u8], label_expected: &str, label_actual: &str) -> bool {
+    use std::io::Write;
+
+    let mut expected_file = tempfile::NamedTempFile::new().unwrap();
+    let mut actual_file = tempfile::NamedTempFile::new().unwrap();
+    expected_file.write_all(expected).unwrap();
+    actual_file.write_all(actual).unwrap();
+
+    let output = Command::new("diff")
+        .arg("--label")
+        .arg(label_expected)
+        .arg("--label")
+        .arg(label_actual)
+        .arg("-u")
+        .arg(expected_file.path())
+        .arg(actual_file.path())
+        .output()
+        .expect("failed to run 'diff'");
+
+    if !output.stdout.is_empty() {
+        print!("{}", String::from_utf8_lossy(&output.stdout));
     }
-    for line in actual.lines() {
-        if !expected.contains(line) {
-            out.push_str(&format!("{GREEN}  + {line}{RESET}\n"));
-        }
-    }
-    out
+
+    // diff exits 1 when files differ, 0 when identical
+    output.status.code() != Some(0)
 }
 
 fn ok(name: &str) {
@@ -159,15 +171,8 @@ fn run_javap_tests(env: &TestEnv) -> Vec<String> {
 
         let actual = run(Command::new(&env.our_javap).arg(&class_file)).stdout;
 
-        if expected != actual {
-            fail(
-                &mut failures,
-                case.name,
-                &format!(
-                    "output differs from system javap\n{}",
-                    diff_text(&expected, &actual),
-                ),
-            );
+        if diff_outputs(&expected, &actual, "system javap", "our javap") {
+            fail(&mut failures, case.name, "output differs from system javap");
         } else {
             ok(case.name);
         }
@@ -240,14 +245,11 @@ fn run_field_shuffle_tests(env: &TestEnv) -> Vec<String> {
 
         let actual = run(Command::new(&env.our_javap).arg(&shuffled)).stdout;
 
-        if expected != actual {
+        if diff_outputs(&expected, &actual, "system javap", "our javap") {
             fail(
                 &mut failures,
                 case.name,
-                &format!(
-                    "javap output differs after field shuffle\n{}",
-                    diff_text(&expected, &actual),
-                ),
+                "javap output differs after field shuffle",
             );
         } else {
             ok(case.name);
@@ -308,14 +310,11 @@ fn run_execution_tests(env: &TestEnv) -> Vec<String> {
             continue;
         }
 
-        if original.stdout != modified.stdout {
+        if diff_outputs(&original.stdout, &modified.stdout, "original", "modified") {
             fail(
                 &mut failures,
                 case.name,
-                &format!(
-                    "output differs after field shuffle\n{}",
-                    diff_text(&original.stdout, &modified.stdout),
-                ),
+                "output differs after field shuffle",
             );
         } else {
             ok(case.name);
