@@ -46,56 +46,6 @@ find . -type f -name "*.class" | wc -l
 | Fernflower             | https://github.com/JetBrains/fernflower.git         | 696        |  20/04/2026  |
 | JITWatch               | https://github.com/AdoptOpenJDK/jitwatch.git        | 566        |  20/04/2026  |
 
-## Intellij IDEA
-```bash
-
-```
-
-## Kotlin
-```bash
-
-```
-
-## GraalVM
-```bash
-
-```
-
-## Apache Spark
-```bash
-
-```
-
-## Gradle
-```bash
-
-```
-
-## OpenJDK
-```bash
-
-```
-
-## Neo4J
-```bash
-
-```
-
-## Apache Hadoop
-```bash
-
-```
-
-## Apache Cassandra
-```bash
-
-```
-
-## Scala
-```bash
-
-```
-
 ## Groovy
 ```bash
 sdk install java 25.0.3-tem
