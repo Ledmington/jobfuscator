@@ -34,20 +34,155 @@ find . -type f -name "*.class" | wc -l
 | Groovy                 | https://github.com/apache/groovy.git                | 8794       |  22/02/2026  |
 | Google Guava           | https://github.com/google/guava.git                 | 7184       |  22/02/2026  |
 | jUnit                  | https://github.com/junit-team/junit-framework.git   | 6604       |  23/04/2026  |
-| Sbt                    | https://github.com/sbt/sbt.git                      | 4513       |  22/02/2026  |
-| LibGDX                 | https://github.com/libgdx/libgdx.git                | 4006       |  22/02/2026  |
+| LibGDX                 | https://github.com/libgdx/libgdx.git                | 4171       |  02/05/2026  |
 | Clojure                | https://github.com/clojure/clojure.git              | 3864       |  22/02/2026  |
-| Maven                  | https://github.com/apache/maven.git                 | 3301       |  22/02/2026  |
-| Mindustry (no Android) | https://github.com/Anuken/Mindustry.git             | 3012       |  22/02/2026  |
+| jMonkeyEngine          | https://github.com/jMonkeyEngine/jmonkeyengine.git  | 3397       |  02/05/2026  |
+| Sbt                    | https://github.com/sbt/sbt.git                      | 3336       |  02/05/2026  |
+| Mindustry (no Android) | https://github.com/Anuken/Mindustry.git             | 3073       |  02/05/2026  |
 | JMH                    | https://github.com/openjdk/jmh.git                  | 2948       |  23/04/2026  |
-| jMonkeyEngine          | https://github.com/jMonkeyEngine/jmonkeyengine.git  | 2668       |  22/02/2026  |
-| Apache Commons Lang    | https://github.com/apache/commons-lang.git          | 1266       |  22/02/2026  |
+| Maven                  | https://github.com/apache/maven.git                 | 1365       |  02/05/2026  |
+| Apache Commons Lang    | https://github.com/apache/commons-lang.git          | 1226       |  02/05/2026  |
 | Project Lombok         | https://github.com/projectlombok/lombok.git         | 1072       |  20/04/2026  |
 | Fernflower             | https://github.com/JetBrains/fernflower.git         | 696        |  20/04/2026  |
 | JITWatch               | https://github.com/AdoptOpenJDK/jitwatch.git        | 566        |  20/04/2026  |
 
-## Neo4j
+## Intellij IDEA
+```bash
+
 ```
+
+## Kotlin
+```bash
+
+```
+
+## GraalVM
+```bash
+
+```
+
+## Apache Spark
+```bash
+
+```
+
+## Gradle
+```bash
+
+```
+
+## OpenJDK
+```bash
+
+```
+
+## Neo4J
+```bash
+
+```
+
+## Apache Hadoop
+```bash
+
+```
+
+## Apache Cassandra
+```bash
+
+```
+
+## Scala
+```bash
+
+```
+
+## Groovy
+```bash
+
+```
+
+## Google Guava
+```bash
+
+```
+
+## jUnit
+```bash
+
+```
+
+## SBT
+```bash
+sdk install java 25.0.3-tem
+sdk install sbt
+wget https://github.com/sbt/sbt/archive/refs/tags/v1.12.10.tar.gz
+tar xzf v1.12.10.tar.gz
+cd sbt-v1.12.10
+sbt compile
+```
+
+## LibGDX
+```bash
+sdk install java 21.0.10-tem
+sdk install gradle
+git clone --depth 1 --recurse-submodules --branch 1.14.0 https://github.com/libgdx/libgdx.git
+cd libgdx
+./gradlew fetchNatives
+./gradlew build -x :backends:gdx-backend-android:build
+```
+
+## Clojure
+```bash
+sdk install java 25.0.3-tem
+sdk install maven
+wget https://github.com/clojure/clojure/archive/refs/tags/clojure-1.12.4.tar.gz
+tar xzf clojure-1.12.4.tar.gz
+cd clojure-clojure-1.12.4
+mvn install -DskipTests -T1C
+```
+
+## Maven
+```bash
+sdk install java 25.0.3-tem
+sdk install maven
+wget https://github.com/apache/maven/archive/refs/tags/maven-3.9.15.tar.gz
+tar xzf maven-3.9.15.tar.gz
+cd maven-maven-3.9.15
+mvn package -DskipTests -T1C
+```
+
+## Mindustry
+```bash
+sdk install java 25.0.3-tem
+sdk install gradle
+wget https://github.com/Anuken/Mindustry/archive/refs/tags/v157.4.tar.gz
+tar xzf v157.4.tar.gz
+cd Mindustry-157.4
+
+```
+
+## jMonkeyEngine
+```bash
+sdk install java 21.0.10-tem
+sdk install gradle
+wget https://github.com/jMonkeyEngine/jmonkeyengine/archive/refs/tags/v3.9.0-stable.tar.gz
+tar xzf v3.9.0-stable.tar.gz
+cd jmonkeyengine-3.9.0-stable
+./gradlew build
+```
+
+## Apache Commons Lang
+```bash
+sdk install java 25.0.2-tem
+sdk install maven
+wget https://github.com/apache/commons-lang/archive/refs/tags/rel/commons-lang-3.20.0.tar.gz
+tar xzf commons-lang-3.20.0.tar.gz
+cd commons-lang-rel-commons-lang-3.20.0/
+
+```
+
+## Neo4j
+```bash
 sdk install java 21.0.10-tem
 sdk install maven
 git clone https://github.com/neo4j/neo4j.git
@@ -56,7 +191,7 @@ mvn install -DskipTests -T1C
 ```
 
 ## JMH
-```
+```bash
 sdk install java 25.0.2-tem
 sdk install maven
 git clone https://github.com/openjdk/jmh.git
@@ -65,7 +200,7 @@ mvn install -DskipTests -T1C
 ```
 
 ## jUnit
-```
+```bash
 sdk install java 25.0.2-tem
 sdk install gradle
 git clone https://github.com/junit-team/junit-framework.git
@@ -74,7 +209,7 @@ cd junit-framework
 ```
 
 ## Fernflower
-```
+```bash
 sdk install java 25.0.2-tem
 sdk install gradle
 git clone https://github.com/JetBrains/fernflower.git
@@ -83,7 +218,7 @@ cd fernflower
 ```
 
 ## JITWatch
-```
+```bash
 sdk install java 25.0.2-tem
 sdk install maven
 git clone https://github.com/AdoptOpenJDK/jitwatch.git
@@ -92,7 +227,7 @@ mvn package -DskipTests -T1C
 ```
 
 ## Netty
-```
+```bash
 sdk install java 25.0.2-tem
 sdk install maven
 wget https://github.com/netty/netty/archive/refs/tags/netty-4.2.12.Final.tar.gz
@@ -102,7 +237,7 @@ cd netty
 ```
 
 ## ElasticSearch
-```
+```bash
 sdk install java 25.0.2-tem
 sdk install gradle
 wget https://github.com/elastic/elasticsearch/archive/refs/tags/v9.3.3.tar.gz
@@ -112,7 +247,7 @@ cd elasticsearch-9.3.3
 ```
 
 ## Spring Boot
-```
+```bash
 sdk install java 25.0.2-tem
 sdk install gradle
 git clone https://github.com/spring-projects/spring-boot.git --single-branch --branch v4.0.5
@@ -121,7 +256,7 @@ cd spring-boot
 ```
 
 ## Project Lombok
-```
+```bash
 sdk install java 25.0.2-tem
 sdk install ant
 wget https://github.com/projectlombok/lombok/archive/refs/tags/v1.18.46.tar.gz
