@@ -129,7 +129,7 @@ fn run(cmd: &mut Command) -> (Output, String) {
     (output, cmdline)
 }
 
-fn jobf_shuffle(env: &TestEnv, input: &PathBuf, output: &PathBuf) -> Result<(), String> {
+fn jobf_shuffle_fields(env: &TestEnv, input: &PathBuf, output: &PathBuf) -> Result<(), String> {
     let (out, cmdline) = run(Command::new(&env.jobf)
         .arg("--input")
         .arg(input)
@@ -138,6 +138,24 @@ fn jobf_shuffle(env: &TestEnv, input: &PathBuf, output: &PathBuf) -> Result<(), 
         .arg("--quiet=true")
         .arg("--seed=0x01020304")
         .arg("--shuffle-fields=true")
+        .arg("--force"));
+
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(format_output_detail(&cmdline, &out))
+    }
+}
+
+fn jobf_shuffle_methods(env: &TestEnv, input: &PathBuf, output: &PathBuf) -> Result<(), String> {
+    let (out, cmdline) = run(Command::new(&env.jobf)
+        .arg("--input")
+        .arg(input)
+        .arg("--output")
+        .arg(output)
+        .arg("--quiet=true")
+        .arg("--seed=0x01020304")
+        .arg("--shuffle-methods=true")
         .arg("--force"));
 
     if out.status.success() {
@@ -307,7 +325,7 @@ fn run_field_shuffle_tests(env: &TestEnv) -> Vec<String> {
         let tmp = TempDir::new().unwrap();
         let shuffled = env.tmp_class_file(&tmp, case.name);
 
-        if let Err(detail) = jobf_shuffle(env, &class_file, &shuffled) {
+        if let Err(detail) = jobf_shuffle_fields(env, &class_file, &shuffled) {
             fail(
                 &mut failures,
                 case.name,
@@ -359,7 +377,69 @@ fn run_field_shuffle_tests(env: &TestEnv) -> Vec<String> {
     failures
 }
 
-fn run_execution_tests(env: &TestEnv) -> Vec<String> {
+fn run_method_shuffle_tests(env: &TestEnv) -> Vec<String> {
+    println!("\nEncoding after method-shuffle roundtrip tests");
+
+    let mut failures = vec![];
+
+    for case in TEST_CASES {
+        let class_file = env.class_file(case.name);
+        let tmp = TempDir::new().unwrap();
+        let shuffled = env.tmp_class_file(&tmp, case.name);
+
+        if let Err(detail) = jobf_shuffle_methods(env, &class_file, &shuffled) {
+            fail(
+                &mut failures,
+                case.name,
+                &format!("jobf failed during method shuffle\n{detail}"),
+            );
+            continue;
+        }
+
+        let (expected_out, expected_cmd) = run(Command::new(&env.system_javap)
+            .args(["-l", "-v", "-p"])
+            .arg(&shuffled));
+
+        let (actual_out, actual_cmd) = run(Command::new(&env.our_javap).arg(&shuffled));
+
+        if !expected_out.status.success() {
+            fail(
+                &mut failures,
+                case.name,
+                &format!(
+                    "system javap failed after method shuffle\n{}",
+                    format_output_detail(&expected_cmd, &expected_out)
+                ),
+            );
+        } else if !actual_out.status.success() {
+            fail(
+                &mut failures,
+                case.name,
+                &format!(
+                    "our javap failed after method shuffle\n{}",
+                    format_output_detail(&actual_cmd, &actual_out)
+                ),
+            );
+        } else if diff_outputs(
+            &expected_out.stdout,
+            &actual_out.stdout,
+            "system javap",
+            "our javap",
+        ) {
+            fail(
+                &mut failures,
+                case.name,
+                &format!("javap output differs after method shuffle\n    cmd: {actual_cmd}"),
+            );
+        } else {
+            ok(case.name);
+        }
+    }
+
+    failures
+}
+
+fn run_execution_after_field_shuffle_tests(env: &TestEnv) -> Vec<String> {
     println!("\nExecution after field-shuffle tests");
 
     let mut failures = vec![];
@@ -386,7 +466,7 @@ fn run_execution_tests(env: &TestEnv) -> Vec<String> {
             continue;
         }
 
-        if let Err(detail) = jobf_shuffle(env, &class_file, &shuffled) {
+        if let Err(detail) = jobf_shuffle_fields(env, &class_file, &shuffled) {
             fail(
                 &mut failures,
                 case.name,
@@ -426,6 +506,73 @@ fn run_execution_tests(env: &TestEnv) -> Vec<String> {
     failures
 }
 
+fn run_execution_after_method_shuffle_tests(env: &TestEnv) -> Vec<String> {
+    println!("\nExecution after method-shuffle tests");
+
+    let mut failures = vec![];
+
+    for case in TEST_CASES.iter().filter(|c| c.executable) {
+        let class_file = env.class_file(case.name);
+        let tmp = TempDir::new().unwrap();
+        let shuffled = env.tmp_class_file(&tmp, case.name);
+
+        let (original, original_cmd) = run(Command::new(&env.system_java)
+            .arg("-cp")
+            .arg(env.data_dir())
+            .arg(case.name));
+
+        if !original.status.success() {
+            fail(
+                &mut failures,
+                case.name,
+                &format!(
+                    "original class is not executable\n{}",
+                    format_output_detail(&original_cmd, &original)
+                ),
+            );
+            continue;
+        }
+
+        if let Err(detail) = jobf_shuffle_methods(env, &class_file, &shuffled) {
+            fail(
+                &mut failures,
+                case.name,
+                &format!("jobf failed during method shuffle\n{detail}"),
+            );
+            continue;
+        }
+
+        let (modified, modified_cmd) = run(Command::new(&env.system_java)
+            .arg("-cp")
+            .arg(tmp.path())
+            .arg(case.name));
+
+        if !modified.status.success() {
+            fail(
+                &mut failures,
+                case.name,
+                &format!(
+                    "modified class is not executable\n{}",
+                    format_output_detail(&modified_cmd, &modified)
+                ),
+            );
+            continue;
+        }
+
+        if diff_outputs(&original.stdout, &modified.stdout, "original", "modified") {
+            fail(
+                &mut failures,
+                case.name,
+                &format!("output differs after method shuffle\n    cmd: {modified_cmd}"),
+            );
+        } else {
+            ok(case.name);
+        }
+    }
+
+    failures
+}
+
 fn main() {
     let build_mode = std::env::args()
         .nth(1)
@@ -448,7 +595,9 @@ fn main() {
     failures.extend(run_javap_tests(&env));
     failures.extend(run_roundtrip_tests(&env));
     failures.extend(run_field_shuffle_tests(&env));
-    failures.extend(run_execution_tests(&env));
+    failures.extend(run_execution_after_field_shuffle_tests(&env));
+    failures.extend(run_method_shuffle_tests(&env));
+    failures.extend(run_execution_after_method_shuffle_tests(&env));
 
     if failures.is_empty() {
         println!("\n{GREEN}All tests passed.{RESET}");
