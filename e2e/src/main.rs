@@ -144,7 +144,7 @@ fn jobf_shuffle(env: &TestEnv, input: &Path, output: &Path, flag: &str) -> Resul
         .arg("--output")
         .arg(output)
         .arg("--quiet=true")
-        .arg("--seed=0x01020304")
+        .arg("--seed=0x12345678")
         .arg(flag)
         .arg("--force"));
 
