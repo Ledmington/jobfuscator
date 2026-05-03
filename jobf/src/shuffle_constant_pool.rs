@@ -78,15 +78,6 @@ impl ShuffleConstantPool {
             cp_index_map.insert(old_idx, (new_pos + 1).try_into().unwrap());
         }
 
-        {
-            // TODO: only for debug, remove
-            println!(" ### CP_INDEX_MAP ### ");
-            for (k, v) in cp_index_map.iter() {
-                println!("  {k} : {v}");
-            }
-            println!(" ### CP_INDEX_MAP ### ");
-        }
-
         // Make sure that the CP index map does not contain excess elements
         assert!(cp_index_map.len() == cp.len());
 
@@ -116,23 +107,9 @@ impl ShuffleConstantPool {
                 ConstantPoolInfo::String { string_index } => ConstantPoolInfo::String {
                     string_index: cp_index_map.get(*string_index),
                 },
-                ConstantPoolInfo::Class { name_index } => {
-                    println!(" ### ");
-                    println!(" OLD : '{}'", cp.get_class_name(*name_index));
-                    println!(" {} : {}", name_index - 1, cp[name_index - 1].tag());
-                    println!(" {} : {}", name_index, cp[*name_index].tag());
-                    println!(" {} : {}", name_index + 1, cp[name_index + 1].tag());
-                    println!(" ### ");
-                    // println!(
-                    //     "Class entry ('{}'): from {} to {}",
-                    //     cp.get_class_name(*name_index),
-                    //     name_index,
-                    //     cp_index_map.get(*name_index)
-                    // );
-                    ConstantPoolInfo::Class {
-                        name_index: cp_index_map.get(*name_index - 1),
-                    }
-                }
+                ConstantPoolInfo::Class { name_index } => ConstantPoolInfo::Class {
+                    name_index: cp_index_map.get(*name_index),
+                },
                 ConstantPoolInfo::FieldRef {
                     class_index,
                     name_and_type_index,
@@ -403,16 +380,6 @@ impl CPIndexMap {
 impl ClassFileTransformation for ShuffleConstantPool {
     fn transform(&self, cf: &ClassFile) -> ClassFile {
         let cp_index_map: CPIndexMap = self.shuffle_indices(&cf.constant_pool);
-
-        {
-            println!(" ### CP_INDEX_MAP ### ");
-            let mut pairs: Vec<(&u16, &u16)> = cp_index_map.map.iter().collect();
-            pairs.sort_by_key(|&(&k, _)| k);
-            for (k, v) in pairs {
-                println!("  {k} : {v}");
-            }
-            println!(" ### CP_INDEX_MAP ### ");
-        }
 
         let new_constant_pool: ConstantPool =
             self.modify_constant_pool(&cp_index_map, &cf.constant_pool);
