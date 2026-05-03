@@ -18,6 +18,10 @@ struct TestCase {
 
 const TEST_CASES: &[TestCase] = &[
     TestCase {
+        name: "Empty",
+        executable: false,
+    },
+    TestCase {
         name: "HelloWorld",
         executable: true,
     },
