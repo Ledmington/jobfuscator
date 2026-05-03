@@ -410,7 +410,10 @@ fn print_methods(
         if i > 0 {
             lw.println("");
         }
-        lw.print(&format!("{} ", method.access_flags.modifier_repr()));
+
+        if method.access_flags.to_u16() != 0x00u16 {
+            lw.print(&format!("{} ", method.access_flags.modifier_repr()));
+        }
 
         let is_class_initializer: bool = method_name == "<clinit>";
 
