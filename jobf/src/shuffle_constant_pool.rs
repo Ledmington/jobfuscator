@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use classfile::{
-    attributes::AttributeInfo,
+    attributes::{AttributeInfo, ExceptionTableEntry},
     classfile::ClassFile,
     constant_pool::{ConstantPool, ConstantPoolInfo},
     fields::FieldInfo,
@@ -24,7 +24,7 @@ impl ShuffleConstantPool {
         // We cannot just shuffle all the indices, we need to shuffle just the indices of all entries that are not NULL,
         // Then re-insert them after LONG and DOUBLE entries.
 
-        let non_null_indices: Vec<u16> = (0..cp.entries.len())
+        let non_null_indices: Vec<u16> = (1..(cp.entries.len() + 1))
             .filter(|idx| !matches!(cp[(*idx).try_into().unwrap()], ConstantPoolInfo::Null {}))
             .map(|idx| idx as u16)
             .collect();
@@ -41,7 +41,7 @@ impl ShuffleConstantPool {
 
         // Fix up the implicit Null slots after Long/Double
         // Wherever old_idx is a Long/Double, old_idx+1 must follow new_idx+1
-        for old_idx in 0..cp.entries.len().try_into().unwrap() {
+        for old_idx in 1..(cp.entries.len() + 1).try_into().unwrap() {
             if matches!(
                 cp[old_idx],
                 ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. }
@@ -68,14 +68,20 @@ impl ShuffleConstantPool {
                     string_index: cp_index_map.get(*string_index),
                 },
                 ConstantPoolInfo::Class { name_index } => {
-                    println!(
-                        "Class entry ('{}'): from {} to {}",
-                        cp.get_class_name(*name_index - 1),
-                        name_index,
-                        cp_index_map.get(*name_index)
-                    );
+                    println!(" ### ");
+                    println!(" OLD : '{}'", cp.get_class_name(*name_index));
+                    println!(" {} : {}", name_index - 1, cp[name_index - 1].tag());
+                    println!(" {} : {}", name_index, cp[*name_index].tag());
+                    println!(" {} : {}", name_index + 1, cp[name_index + 1].tag());
+                    println!(" ### ");
+                    // println!(
+                    //     "Class entry ('{}'): from {} to {}",
+                    //     cp.get_class_name(*name_index),
+                    //     name_index,
+                    //     cp_index_map.get(*name_index)
+                    // );
                     ConstantPoolInfo::Class {
-                        name_index: cp_index_map.get(*name_index),
+                        name_index: cp_index_map.get(*name_index - 1),
                     }
                 }
                 ConstantPoolInfo::FieldRef {
@@ -187,7 +193,19 @@ impl ShuffleConstantPool {
                     max_stack: *max_stack,
                     max_locals: *max_locals,
                     code: code.clone(),
-                    exception_table: exception_table.clone(),
+                    exception_table: exception_table
+                        .iter()
+                        .map(|exc_entry| ExceptionTableEntry {
+                            start_pc: exc_entry.start_pc,
+                            end_pc: exc_entry.end_pc,
+                            handler_pc: exc_entry.handler_pc,
+                            catch_type: if exc_entry.catch_type == 0 {
+                                0
+                            } else {
+                                cp_index_map.get(exc_entry.catch_type)
+                            },
+                        })
+                        .collect(),
                     attributes: self.modify_attributes(cp_index_map, cp, attributes),
                 },
                 AttributeInfo::LineNumberTable {
@@ -316,6 +334,7 @@ impl ShuffleConstantPool {
     }
 }
 
+/// A structure to map old CP indices to new CP indices.
 struct CPIndexMap {
     /// Internal mapping of constant pool indices: uses range [[ `0` ; `cp.len()-1` ]].
     map: HashMap<u16, u16>,
@@ -334,6 +353,7 @@ impl ClassFileTransformation for ShuffleConstantPool {
         let cp_index_map: CPIndexMap = self.shuffle_indices(&cf.constant_pool);
 
         {
+            // TODO: only for debug, remove
             let mut keys: Vec<&u16> = cp_index_map.map.keys().collect();
             keys.sort();
             for k in keys.iter() {
@@ -341,25 +361,36 @@ impl ClassFileTransformation for ShuffleConstantPool {
             }
         }
 
+        let new_constant_pool: ConstantPool =
+            self.modify_constant_pool(&cp_index_map, &cf.constant_pool);
+
+        let new_this_class = cp_index_map.get(cf.this_class);
+        let new_super_class = if cf.super_class == 0 {
+            0
+        } else {
+            cp_index_map.get(cf.super_class)
+        };
+        let new_interfaces = cf
+            .interfaces
+            .iter()
+            .map(|interface_index| cp_index_map.get(*interface_index))
+            .collect();
+        let new_fields = self.modify_fields(&cp_index_map, &cf.constant_pool, &cf.fields);
+        let new_methods = self.modify_methods(&cp_index_map, &cf.constant_pool, &cf.methods);
+        let new_attributes =
+            self.modify_attributes(&cp_index_map, &cf.constant_pool, &cf.attributes);
+
         ClassFile {
             minor_version: cf.minor_version,
             major_version: cf.major_version,
-            constant_pool: self.modify_constant_pool(&cp_index_map, &cf.constant_pool),
+            constant_pool: new_constant_pool,
             access_flags: cf.access_flags,
-            this_class: cp_index_map.get(cf.this_class),
-            super_class: if cf.super_class == 0 {
-                0
-            } else {
-                cp_index_map.get(cf.super_class)
-            },
-            interfaces: cf
-                .interfaces
-                .iter()
-                .map(|interface_index| cp_index_map.get(*interface_index))
-                .collect(),
-            fields: self.modify_fields(&cp_index_map, &cf.constant_pool, &cf.fields),
-            methods: self.modify_methods(&cp_index_map, &cf.constant_pool, &cf.methods),
-            attributes: self.modify_attributes(&cp_index_map, &cf.constant_pool, &cf.attributes),
+            this_class: new_this_class,
+            super_class: new_super_class,
+            interfaces: new_interfaces,
+            fields: new_fields,
+            methods: new_methods,
+            attributes: new_attributes,
         }
     }
 }
