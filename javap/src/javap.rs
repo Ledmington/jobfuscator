@@ -5,6 +5,7 @@ use std::time::SystemTime;
 
 use binary_reader::{BinaryReader, Endianness};
 use classfile::access_flags::{ClassAccessFlag, MethodAccessFlag};
+use classfile::attributes::ElementValue;
 use classfile::attributes::{
     AttributeInfo, AttributeKind, StackMapFrame, VerificationTypeInfo, find_attribute,
 };
@@ -160,10 +161,13 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         .print("// ")
         .println(&cf.constant_pool.get_class_name(cf.this_class));
     lw.print("super_class: #")
-        .print(&cf.super_class.to_string())
-        .tab()
-        .print("// ")
-        .println(&cf.constant_pool.get_class_name(cf.super_class));
+        .print(&cf.super_class.to_string());
+    if cf.super_class != 0 {
+        lw.tab()
+            .print("// ")
+            .print(&cf.constant_pool.get_class_name(cf.super_class));
+    }
+    lw.println("");
     lw.print("interfaces: ")
         .print(&cf.interfaces.len().to_string())
         .print(", fields: ")
@@ -189,13 +193,8 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
             Source: <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.4.5>
         */
         if i > 1
-            && (matches!(
-                cp[(i - 1).try_into().unwrap()],
-                ConstantPoolInfo::Long { .. }
-            ) || matches!(
-                cp[(i - 1).try_into().unwrap()],
-                ConstantPoolInfo::Double { .. }
-            ))
+            && (matches!(cp[i.try_into().unwrap()], ConstantPoolInfo::Long { .. })
+                || matches!(cp[i.try_into().unwrap()], ConstantPoolInfo::Double { .. }))
         {
             continue;
         }
@@ -205,7 +204,7 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
             ("#".to_owned() + &(i + 1).to_string())
         ));
 
-        let entry = &cp[i.try_into().unwrap()];
+        let entry = &cp[(i + 1).try_into().unwrap()];
 
         lw.print(&format!(" = {:<18} ", entry.tag().to_string()));
 
@@ -415,7 +414,10 @@ fn print_methods(
         if i > 0 {
             lw.println("");
         }
-        lw.print(&format!("{} ", method.access_flags.modifier_repr()));
+
+        if method.access_flags.to_u16() != 0x00u16 {
+            lw.print(&format!("{} ", method.access_flags.modifier_repr()));
+        }
 
         let is_class_initializer: bool = method_name == "<clinit>";
 
@@ -898,7 +900,7 @@ fn get_double_value(high_bytes: u32, low_bytes: u32) -> f64 {
 }
 
 fn get_constant_string(cp: &ConstantPool, constant_pool_index: u16) -> String {
-    let entry = &cp[constant_pool_index - 1];
+    let entry = &cp[constant_pool_index];
     match entry {
         ConstantPoolInfo::String { string_index } => {
             let string_content: String = cp.get_utf8_content(*string_index).trim_end().to_owned();
@@ -1098,7 +1100,7 @@ fn get_comment(
 
         BytecodeInstruction::GetStatic { field_ref_index } => Some(
             "Field ".to_owned()
-                + &match cp[field_ref_index - 1] {
+                + &match cp[*field_ref_index] {
                     ConstantPoolInfo::FieldRef {
                         class_index,
                         name_and_type_index,
@@ -1114,7 +1116,7 @@ fn get_comment(
         ),
         BytecodeInstruction::PutStatic { field_ref_index } => Some(
             "Field ".to_owned()
-                + &match cp[field_ref_index - 1] {
+                + &match cp[*field_ref_index] {
                     ConstantPoolInfo::FieldRef {
                         class_index,
                         name_and_type_index,
@@ -1130,7 +1132,7 @@ fn get_comment(
         ),
         BytecodeInstruction::GetField { field_ref_index } => Some(
             "Field ".to_owned()
-                + &match cp[field_ref_index - 1] {
+                + &match cp[*field_ref_index] {
                     ConstantPoolInfo::FieldRef {
                         class_index,
                         name_and_type_index,
@@ -1146,7 +1148,7 @@ fn get_comment(
         ),
         BytecodeInstruction::PutField { field_ref_index } => Some(
             "Field ".to_owned()
-                + &match cp[field_ref_index - 1] {
+                + &match cp[*field_ref_index] {
                     ConstantPoolInfo::FieldRef {
                         class_index,
                         name_and_type_index,
@@ -1162,7 +1164,7 @@ fn get_comment(
         ),
         BytecodeInstruction::InvokeSpecial { method_ref_index } => Some(
             "Method ".to_owned()
-                + &match cp[method_ref_index - 1] {
+                + &match cp[*method_ref_index] {
                     ConstantPoolInfo::MethodRef {
                         class_index,
                         name_and_type_index,
@@ -1177,7 +1179,7 @@ fn get_comment(
                 },
         ),
         BytecodeInstruction::InvokeStatic { method_ref_index } => {
-            let method_entry = &cp[method_ref_index - 1];
+            let method_entry = &cp[*method_ref_index];
             Some(
                 get_method_type(method_entry)
                     + " "
@@ -1207,7 +1209,7 @@ fn get_comment(
             )
         }
         BytecodeInstruction::InvokeVirtual { method_ref_index } => {
-            let method_entry = &cp[method_ref_index - 1];
+            let method_entry = &cp[*method_ref_index];
             Some(
                 get_method_type(method_entry)
                     + " "
@@ -1243,7 +1245,7 @@ fn get_comment(
             constant_pool_index,
             ..
         } => {
-            let method_entry = &cp[constant_pool_index - 1];
+            let method_entry = &cp[*constant_pool_index];
             Some(
                 get_method_type(method_entry)
                     + " "
@@ -1422,10 +1424,77 @@ fn print_method_attributes(
                     let mut annotation_type = cp.get_utf8_content(annotation.type_index);
                     annotation_type =
                         annotation_type[1..annotation_type.len() - 1].replace('/', ".");
-                    lw.println(&format!("{}: #{}()", i, annotation.type_index))
-                        .indent(1)
-                        .println(&annotation_type)
-                        .indent(-1);
+                    let has_values = !annotation.element_value_pairs.is_empty();
+                    lw.print(&format!("{}: #{}(", i, annotation.type_index));
+                    if has_values {
+                        for (i, ev) in annotation.element_value_pairs.iter().enumerate() {
+                            if i > 0 {
+                                lw.print(",");
+                            }
+                            lw.print(&format!(
+                                "#{}={}#{}",
+                                ev.element_name_index,
+                                ev.value.tag(),
+                                match &ev.value {
+                                    ElementValue::Byte { .. } => todo!(),
+                                    ElementValue::Char { .. } => todo!(),
+                                    ElementValue::Double { .. } => todo!(),
+                                    ElementValue::Float { .. } => todo!(),
+                                    ElementValue::Int { .. } => todo!(),
+                                    ElementValue::Long { .. } => todo!(),
+                                    ElementValue::Short { .. } => todo!(),
+                                    ElementValue::Boolean { const_value_index } =>
+                                        const_value_index,
+                                    ElementValue::String { const_value_index } => const_value_index,
+                                    ElementValue::Enum { .. } => todo!(),
+                                    ElementValue::Class { .. } => todo!(),
+                                    ElementValue::Annotation { .. } => todo!(),
+                                    ElementValue::Array { .. } => todo!(),
+                                }
+                            ));
+                        }
+                    }
+                    lw.println(")");
+                    lw.indent(1);
+                    lw.print(&annotation_type);
+                    if has_values {
+                        lw.println("(");
+                        lw.indent(1);
+                        for ev in annotation.element_value_pairs.iter() {
+                            lw.println(&format!(
+                                "{}={}",
+                                cp.get_utf8_content(ev.element_name_index),
+                                match &ev.value {
+                                    ElementValue::Byte { .. } => todo!(),
+                                    ElementValue::Char { .. } => todo!(),
+                                    ElementValue::Double { .. } => todo!(),
+                                    ElementValue::Float { .. } => todo!(),
+                                    ElementValue::Int { .. } => todo!(),
+                                    ElementValue::Long { .. } => todo!(),
+                                    ElementValue::Short { .. } => todo!(),
+                                    ElementValue::Boolean { const_value_index } =>
+                                        (if cp.get_integer(*const_value_index) == 0 {
+                                            "false"
+                                        } else {
+                                            "true"
+                                        })
+                                        .to_owned(),
+                                    ElementValue::String { const_value_index } =>
+                                        "\"".to_owned()
+                                            + &cp.get_utf8_content(*const_value_index)
+                                            + "\"",
+                                    ElementValue::Enum { .. } => todo!(),
+                                    ElementValue::Class { .. } => todo!(),
+                                    ElementValue::Annotation { .. } => todo!(),
+                                    ElementValue::Array { .. } => todo!(),
+                                }
+                            ));
+                        }
+                        lw.indent(-1);
+                        lw.print(")");
+                    }
+                    lw.println("");
+                    lw.indent(-1);
                 }
                 lw.indent(-1);
             }
@@ -1441,6 +1510,9 @@ fn print_method_attributes(
                     ));
                 }
                 lw.indent(-1);
+            }
+            AttributeInfo::Deprecated { .. } => {
+                lw.println("Deprecated: true");
             }
             _ => unreachable!("Unknown method attribute {}.", attribute.kind()),
         }
@@ -1678,7 +1750,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                     lw.print(&format!("{}: #{} ", i, method.bootstrap_method_ref));
 
                     // TODO: can we merge this match-case with the one below?
-                    match cp[method.bootstrap_method_ref - 1] {
+                    match cp[method.bootstrap_method_ref] {
                         ConstantPoolInfo::MethodHandle {
                             reference_kind,
                             reference_index,
@@ -1695,7 +1767,7 @@ fn print_class_attributes(lw: &mut LineWriter, cp: &ConstantPool, attributes: &[
                     lw.println("Method arguments:");
                     for arg in method.bootstrap_arguments.iter() {
                         lw.print(&format!("  #{arg} "));
-                        match cp[arg - 1] {
+                        match cp[*arg] {
                             ConstantPoolInfo::String { string_index } => {
                                 lw.println(&cp.get_utf8_content(string_index));
                             }
