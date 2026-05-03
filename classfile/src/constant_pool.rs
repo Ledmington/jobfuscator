@@ -96,13 +96,14 @@ impl ConstantPool {
     }
 
     pub fn get_field_ref(&self, cp_index: u16) -> String {
-        let field_ref_entry: &ConstantPoolInfo = &self[cp_index];
-        match field_ref_entry {
-            ConstantPoolInfo::FieldRef {
-                class_index,
-                name_and_type_index,
-            } => self.get_field_ref_string(*class_index, *name_and_type_index),
-            _ => panic!("Expected entry #{cp_index} to be of Fieldref type but it wasn't."),
+        if let ConstantPoolInfo::FieldRef {
+            class_index,
+            name_and_type_index,
+        } = self.get_entry(cp_index, &[ConstantPoolTag::Fieldref])
+        {
+            self.get_field_ref_string(*class_index, *name_and_type_index)
+        } else {
+            unreachable!();
         }
     }
 
@@ -111,24 +112,26 @@ impl ConstantPool {
     }
 
     pub fn get_field_ref_name_and_type(&self, cp_index: u16) -> String {
-        let field_ref_entry: &ConstantPoolInfo = &self[cp_index];
-        match field_ref_entry {
-            ConstantPoolInfo::FieldRef {
-                name_and_type_index,
-                ..
-            } => self.get_name_and_type(*name_and_type_index),
-            _ => panic!("Expected entry #{cp_index} to be of Fieldref type but it wasn't."),
+        if let ConstantPoolInfo::FieldRef {
+            name_and_type_index,
+            ..
+        } = self.get_entry(cp_index, &[ConstantPoolTag::Fieldref])
+        {
+            self.get_name_and_type(*name_and_type_index)
+        } else {
+            unreachable!();
         }
     }
 
     pub fn get_invoke_dynamic(&self, cp_index: u16) -> String {
-        let invoke_dynamic_entry: &ConstantPoolInfo = &self[cp_index];
-        match invoke_dynamic_entry {
-            ConstantPoolInfo::InvokeDynamic {
-                bootstrap_method_attr_index,
-                name_and_type_index,
-            } => self.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index),
-            _ => panic!("Expected entry #{cp_index} to be of InvokeDynamic type but it wasn't."),
+        if let ConstantPoolInfo::InvokeDynamic {
+            bootstrap_method_attr_index,
+            name_and_type_index,
+        } = self.get_entry(cp_index, &[ConstantPoolTag::InvokeDynamic])
+        {
+            self.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index)
+        } else {
+            unreachable!();
         }
     }
 
@@ -144,13 +147,14 @@ impl ConstantPool {
     }
 
     pub fn get_name_and_type(&self, cp_index: u16) -> String {
-        let name_and_type_entry: &ConstantPoolInfo = &self[cp_index];
-        match name_and_type_entry {
-            ConstantPoolInfo::NameAndType {
-                name_index,
-                descriptor_index,
-            } => self.get_name_and_type_string(*name_index, *descriptor_index),
-            _ => panic!("Expected entry #{cp_index} to be of NameAndType type but it wasn't."),
+        if let ConstantPoolInfo::NameAndType {
+            name_index,
+            descriptor_index,
+        } = self.get_entry(cp_index, &[ConstantPoolTag::NameAndType])
+        {
+            self.get_name_and_type_string(*name_index, *descriptor_index)
+        } else {
+            unreachable!();
         }
     }
 
@@ -174,10 +178,11 @@ impl ConstantPool {
     }
 
     pub fn get_utf8_content(&self, cp_index: u16) -> String {
-        let name_entry: &ConstantPoolInfo = &self[cp_index];
-        match name_entry {
-            ConstantPoolInfo::Utf8 { bytes } => convert_utf8(bytes),
-            _ => panic!("Expected entry #{cp_index} to be of Utf8 type but it wasn't."),
+        if let ConstantPoolInfo::Utf8 { bytes } = self.get_entry(cp_index, &[ConstantPoolTag::Utf8])
+        {
+            convert_utf8(bytes)
+        } else {
+            unreachable!();
         }
     }
 
@@ -211,20 +216,31 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
 #[derive(Clone)]
 pub enum ConstantPoolInfo {
     /// The type of constant pool entry which can be found right after a Long or Double one.
+    /// NOTE: this does not exist in the class file reference.
     Null {},
+
+    /// The constant-pool entry used to represent constant string values.
     Utf8 {
         bytes: Vec<u8>,
     },
+
+    /// The constant pool entry used to represent 4-byte integer constants.
     Integer {
         bytes: u32,
     },
+
+    /// The constant pool entry used to represent 4-byte floating-point constants.
     Float {
         bytes: u32,
     },
+
+    /// The constant pool entry used to represent 8-byte integer constants.
     Long {
         high_bytes: u32,
         low_bytes: u32,
     },
+
+    /// The constant pool entry used to represent 8-byte floating-point constants.
     Double {
         high_bytes: u32,
         low_bytes: u32,
@@ -450,7 +466,14 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
             ConstantPoolInfo::Null {} => {
                 unreachable!("Checking a null CP entry.");
             }
-            ConstantPoolInfo::Utf8 { .. } => {}
+            ConstantPoolInfo::Utf8 { bytes } => {
+                for b in bytes.iter() {
+                    assert!(
+                        *b != 0x00u8 && *b < 0xf0u8,
+                        "Found Invalid bytes in Utf8 constant pool entry content."
+                    );
+                }
+            }
             ConstantPoolInfo::Integer { .. } => {}
             ConstantPoolInfo::Float { .. } => {}
             ConstantPoolInfo::Long { .. } => {
