@@ -160,10 +160,13 @@ fn print_header(lw: &mut LineWriter, cf: &ClassFile) {
         .print("// ")
         .println(&cf.constant_pool.get_class_name(cf.this_class));
     lw.print("super_class: #")
-        .print(&cf.super_class.to_string())
-        .tab()
-        .print("// ")
-        .println(&cf.constant_pool.get_class_name(cf.super_class));
+        .print(&cf.super_class.to_string());
+    if cf.super_class != 0 {
+        lw.tab()
+            .print("// ")
+            .print(&cf.constant_pool.get_class_name(cf.super_class));
+    }
+    lw.println("");
     lw.print("interfaces: ")
         .print(&cf.interfaces.len().to_string())
         .print(", fields: ")
@@ -1439,6 +1442,9 @@ fn print_method_attributes(
                     ));
                 }
                 lw.indent(-1);
+            }
+            AttributeInfo::Deprecated { .. } => {
+                lw.println("Deprecated: true");
             }
             _ => unreachable!("Unknown method attribute {}.", attribute.kind()),
         }

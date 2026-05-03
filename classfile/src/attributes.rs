@@ -80,6 +80,9 @@ pub enum AttributeInfo {
         name_index: u16,
         host_class_index: u16,
     },
+    Deprecated {
+        name_index: u16,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -101,6 +104,7 @@ pub enum AttributeKind {
     Exceptions,
     EnclosingMethod,
     NestHost,
+    Deprecated,
 }
 
 impl std::fmt::Display for AttributeKind {
@@ -131,6 +135,7 @@ impl AttributeInfo {
             AttributeInfo::Exceptions { .. } => AttributeKind::Exceptions,
             AttributeInfo::EnclosingMethod { .. } => AttributeKind::EnclosingMethod,
             AttributeInfo::NestHost { .. } => AttributeKind::NestHost,
+            AttributeInfo::Deprecated { .. } => AttributeKind::Deprecated,
         }
     }
 }
@@ -743,6 +748,12 @@ fn parse_method_attribute(reader: &mut BinaryReader, cp: &ConstantPool) -> Attri
             AttributeInfo::Exceptions {
                 name_index: attribute_name_index,
                 exception_indices,
+            }
+        }
+        "Deprecated" => {
+            check_attribute_length(0, attribute_length, attribute_name);
+            AttributeInfo::Deprecated {
+                name_index: attribute_name_index,
             }
         }
         _ => panic!(

@@ -60,7 +60,10 @@ pub fn parse_class_file(reader: &mut BinaryReader) -> ClassFile {
     constant_pool.assert_valid_and_type(this_class, &[ConstantPoolTag::Class]);
 
     let super_class: u16 = reader.read_u16().unwrap();
-    constant_pool.assert_valid_and_type(super_class, &[ConstantPoolTag::Class]);
+    // java.lang.Object has super_class == 0
+    if super_class != 0 {
+        constant_pool.assert_valid_and_type(super_class, &[ConstantPoolTag::Class]);
+    }
 
     let interfaces_count: u16 = reader.read_u16().unwrap();
     let interfaces: Vec<u16> = reader.read_u16_vec(interfaces_count.into()).unwrap();

@@ -328,6 +328,9 @@ impl ShuffleConstantPool {
                     name_index: cp_index_map.get(*name_index),
                     host_class_index: cp_index_map.get(*host_class_index),
                 },
+                AttributeInfo::Deprecated { name_index } => AttributeInfo::Deprecated {
+                    name_index: cp_index_map.get(*name_index),
+                },
             });
         }
         new_attributes

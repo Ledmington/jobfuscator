@@ -148,9 +148,7 @@ fn write_methods(w: &mut BinaryWriter, methods: &[MethodInfo]) {
     }
 }
 
-/**
- * Computes the total number of bytes required to write the given attribute, excluding the initial six bytes for the name_index field and the attribute_length field.
- */
+/// Computes the total number of bytes required to write the given attribute, excluding the initial six bytes for the name_index field and the attribute_length field.
 fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
     match attribute {
         AttributeInfo::Code {
@@ -215,6 +213,7 @@ fn get_attribute_length(attribute: &AttributeInfo) -> u32 {
         } => 2 + 2 * (exception_indices.len() as u32),
         AttributeInfo::EnclosingMethod { .. } => 2 + 2,
         AttributeInfo::NestHost { .. } => 2,
+        AttributeInfo::Deprecated { .. } => 0,
     }
 }
 
@@ -488,6 +487,10 @@ fn write_attributes(w: &mut BinaryWriter, attributes: &[AttributeInfo]) {
                 w.write_u16(*name_index);
                 w.write_u32(get_attribute_length(attribute));
                 w.write_u16(*host_class_index);
+            }
+            AttributeInfo::Deprecated { name_index } => {
+                w.write_u16(*name_index);
+                w.write_u32(get_attribute_length(attribute));
             }
         }
     }
