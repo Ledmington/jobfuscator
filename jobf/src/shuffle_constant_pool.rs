@@ -131,9 +131,9 @@ impl ShuffleConstantPool {
                 },
             });
         }
-        return ConstantPool {
+        ConstantPool {
             entries: new_cp_entries,
-        };
+        }
     }
 
     fn modify_fields(
@@ -151,7 +151,7 @@ impl ShuffleConstantPool {
                 attributes: self.modify_attributes(cp_index_map, cp, &field.attributes),
             });
         }
-        return new_fields;
+        new_fields
     }
 
     fn modify_methods(
@@ -169,7 +169,7 @@ impl ShuffleConstantPool {
                 attributes: self.modify_attributes(cp_index_map, cp, &method.attributes),
             });
         }
-        return new_methods;
+        new_methods
     }
 
     fn modify_attributes(
@@ -330,7 +330,7 @@ impl ShuffleConstantPool {
                 },
             });
         }
-        return new_attributes;
+        new_attributes
     }
 }
 

@@ -16,15 +16,14 @@ impl ConstantPool {
     // TODO: find a better name
     pub fn assert_valid_and_type(&self, cp_index: u16, expected_tags: &[ConstantPoolTag]) {
         let cp_len = self.len();
-        assert!(expected_tags.len() > 0, "Empty expected tags.");
+        assert!(!expected_tags.is_empty(), "Empty expected tags.");
         assert!(
             cp_index >= 1 && cp_index <= cp_len.try_into().unwrap(),
             "Constant pool index must be >= 1 and <= {cp_len} but was {cp_index} (0x{cp_index:04x})."
         );
         let actual_tag = self[cp_index].tag();
         let mut found: bool = false;
-        for i in 0..expected_tags.len() {
-            let expected_tag = &expected_tags[i];
+        for expected_tag in expected_tags {
             if *expected_tag == actual_tag {
                 found = true;
                 break;
@@ -51,8 +50,7 @@ impl ConstantPool {
 
     fn get_entry(&self, cp_index: u16, expected: &[ConstantPoolTag]) -> &ConstantPoolInfo {
         self.assert_valid_and_type(cp_index, expected);
-        let entry = &self[cp_index];
-        entry
+        &self[cp_index]
     }
 
     pub fn get_class_name(&self, cp_index: u16) -> String {
