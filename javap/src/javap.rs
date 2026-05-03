@@ -5,6 +5,7 @@ use std::time::SystemTime;
 
 use binary_reader::{BinaryReader, Endianness};
 use classfile::access_flags::{ClassAccessFlag, MethodAccessFlag};
+use classfile::attributes::ElementValue;
 use classfile::attributes::{
     AttributeInfo, AttributeKind, StackMapFrame, VerificationTypeInfo, find_attribute,
 };
@@ -1423,10 +1424,77 @@ fn print_method_attributes(
                     let mut annotation_type = cp.get_utf8_content(annotation.type_index);
                     annotation_type =
                         annotation_type[1..annotation_type.len() - 1].replace('/', ".");
-                    lw.println(&format!("{}: #{}()", i, annotation.type_index))
-                        .indent(1)
-                        .println(&annotation_type)
-                        .indent(-1);
+                    let has_values = !annotation.element_value_pairs.is_empty();
+                    lw.print(&format!("{}: #{}(", i, annotation.type_index));
+                    if has_values {
+                        for (i, ev) in annotation.element_value_pairs.iter().enumerate() {
+                            if i > 0 {
+                                lw.print(",");
+                            }
+                            lw.print(&format!(
+                                "#{}={}#{}",
+                                ev.element_name_index,
+                                ev.value.tag(),
+                                match &ev.value {
+                                    ElementValue::Byte { .. } => todo!(),
+                                    ElementValue::Char { .. } => todo!(),
+                                    ElementValue::Double { .. } => todo!(),
+                                    ElementValue::Float { .. } => todo!(),
+                                    ElementValue::Int { .. } => todo!(),
+                                    ElementValue::Long { .. } => todo!(),
+                                    ElementValue::Short { .. } => todo!(),
+                                    ElementValue::Boolean { const_value_index } =>
+                                        const_value_index,
+                                    ElementValue::String { const_value_index } => const_value_index,
+                                    ElementValue::Enum { .. } => todo!(),
+                                    ElementValue::Class { .. } => todo!(),
+                                    ElementValue::Annotation { .. } => todo!(),
+                                    ElementValue::Array { .. } => todo!(),
+                                }
+                            ));
+                        }
+                    }
+                    lw.println(")");
+                    lw.indent(1);
+                    lw.print(&annotation_type);
+                    if has_values {
+                        lw.println("(");
+                        lw.indent(1);
+                        for ev in annotation.element_value_pairs.iter() {
+                            lw.println(&format!(
+                                "{}={}",
+                                cp.get_utf8_content(ev.element_name_index),
+                                match &ev.value {
+                                    ElementValue::Byte { .. } => todo!(),
+                                    ElementValue::Char { .. } => todo!(),
+                                    ElementValue::Double { .. } => todo!(),
+                                    ElementValue::Float { .. } => todo!(),
+                                    ElementValue::Int { .. } => todo!(),
+                                    ElementValue::Long { .. } => todo!(),
+                                    ElementValue::Short { .. } => todo!(),
+                                    ElementValue::Boolean { const_value_index } =>
+                                        (if cp.get_integer(*const_value_index) == 0 {
+                                            "false"
+                                        } else {
+                                            "true"
+                                        })
+                                        .to_owned(),
+                                    ElementValue::String { const_value_index } =>
+                                        "\"".to_owned()
+                                            + &cp.get_utf8_content(*const_value_index)
+                                            + "\"",
+                                    ElementValue::Enum { .. } => todo!(),
+                                    ElementValue::Class { .. } => todo!(),
+                                    ElementValue::Annotation { .. } => todo!(),
+                                    ElementValue::Array { .. } => todo!(),
+                                }
+                            ));
+                        }
+                        lw.indent(-1);
+                        lw.print(")");
+                    }
+                    lw.println("");
+                    lw.indent(-1);
                 }
                 lw.indent(-1);
             }

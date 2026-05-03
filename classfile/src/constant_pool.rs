@@ -184,6 +184,16 @@ impl ConstantPool {
         }
     }
 
+    pub fn get_integer(&self, cp_index: u16) -> i32 {
+        if let ConstantPoolInfo::Integer { bytes } =
+            self.get_entry(cp_index, &[ConstantPoolTag::Integer])
+        {
+            i32::from_be_bytes(bytes.to_be_bytes())
+        } else {
+            unreachable!()
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }
