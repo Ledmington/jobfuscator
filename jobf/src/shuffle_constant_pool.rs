@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use classfile::{
     attributes::{AttributeInfo, ExceptionTableEntry},
@@ -7,7 +7,7 @@ use classfile::{
     fields::FieldInfo,
     methods::MethodInfo,
 };
-use rand::{SeedableRng, rngs::ChaCha8Rng, seq::SliceRandom};
+use rand::{RngExt, SeedableRng, rngs::ChaCha8Rng};
 
 use crate::transformation::ClassFileTransformation;
 
@@ -21,34 +21,83 @@ impl ShuffleConstantPool {
     }
 
     fn shuffle_indices(&self, cp: &ConstantPool) -> CPIndexMap {
-        // We cannot just shuffle all the indices, we need to shuffle just the indices of all entries that are not NULL,
-        // Then re-insert them after LONG and DOUBLE entries.
+        // We cannot just shuffle all the indices, we need to shuffle just the indices of all entries that are not NULL.
 
-        let non_null_indices: Vec<u16> = (1..(cp.entries.len() + 1))
-            .filter(|idx| !matches!(cp[(*idx).try_into().unwrap()], ConstantPoolInfo::Null {}))
-            .map(|idx| idx as u16)
-            .collect();
-
-        let mut shuffled = non_null_indices.clone();
+        let mut indices: Vec<u16> = (1..=(cp.len().try_into().unwrap())).collect();
         let mut rng = ChaCha8Rng::seed_from_u64(self.seed);
-        shuffled.shuffle(&mut rng);
+
+        // Actual shuffle (Fisher-Yates-like)
+        let mut i = indices.len() - 1;
+        while i > 0 {
+            // Skip null slots (they'll be dragged along by their Long/Double)
+            if matches!(cp[indices[i]], ConstantPoolInfo::Null {}) {
+                i -= 1;
+                continue;
+            }
+
+            let i_is_special = matches!(
+                cp[indices[i]],
+                ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. }
+            );
+
+            loop {
+                let j = rng.random_range(0..i);
+
+                let j_is_null = matches!(cp[indices[j]], ConstantPoolInfo::Null {});
+                let j_is_special = matches!(
+                    cp[indices[j]],
+                    ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. }
+                );
+
+                if j_is_null
+                    || (i_is_special && j + 1 == i)
+                    || (j_is_special && i == j + 1)
+                    || (j_is_special && i == indices.len() - 1)
+                {
+                    continue;
+                }
+
+                indices.swap(i, j);
+                if i_is_special || j_is_special {
+                    indices.swap(i + 1, j + 1);
+                }
+                break;
+            }
+
+            // Skip over the null slot if i was a Long/Double pair
+            if i_is_special {
+                i -= 1;
+            }
+            i -= 1;
+        }
 
         // Map old index -> new index
         let mut cp_index_map: HashMap<u16, u16> = HashMap::new();
-        for (new_pos, &old_idx) in shuffled.iter().enumerate() {
-            cp_index_map.insert(old_idx, new_pos.try_into().unwrap());
+        for (new_pos, &old_idx) in indices.iter().enumerate() {
+            // `old_idx` is 1-based, `new_pos` is 0-based
+            cp_index_map.insert(old_idx, (new_pos + 1).try_into().unwrap());
         }
 
-        // Fix up the implicit Null slots after Long/Double
-        // Wherever old_idx is a Long/Double, old_idx+1 must follow new_idx+1
-        for old_idx in 1..(cp.entries.len() + 1).try_into().unwrap() {
-            if matches!(
-                cp[old_idx],
-                ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. }
-            ) {
-                let new_idx = *cp_index_map.get(&old_idx).unwrap();
-                cp_index_map.insert(old_idx + 1, new_idx + 1);
+        {
+            // TODO: only for debug, remove
+            println!(" ### CP_INDEX_MAP ### ");
+            for (k, v) in cp_index_map.iter() {
+                println!("  {k} : {v}");
             }
+            println!(" ### CP_INDEX_MAP ### ");
+        }
+
+        // Make sure that the CP index map does not contain excess elements
+        assert!(cp_index_map.len() == cp.len());
+
+        // Make sure that the CP index map contains a mapping for each starting index
+        assert!((1..=cp.len()).all(|k| cp_index_map.contains_key(&k.try_into().unwrap())));
+
+        // Make sure that the CP index map can map to each new index
+        {
+            let values: HashSet<&u16> = cp_index_map.values().collect();
+            assert!(values.len() == cp.len());
+            assert!((1..=cp.len()).all(|v| values.contains(&(v as u16))));
         }
 
         CPIndexMap { map: cp_index_map }
@@ -345,9 +394,9 @@ struct CPIndexMap {
 
 impl CPIndexMap {
     /// The input index is assumed to be in the range [[ `1` ; `cp.len()` ]].
-    fn get(&self, cp_index: u16) -> u16 {
-        assert!(cp_index >= 1);
-        self.map.get(&(cp_index - 1)).unwrap() + 1
+    fn get(&self, old_cp_index: u16) -> u16 {
+        assert!(old_cp_index >= 1);
+        self.map.get(&(old_cp_index - 1)).unwrap() + 1
     }
 }
 
@@ -356,12 +405,13 @@ impl ClassFileTransformation for ShuffleConstantPool {
         let cp_index_map: CPIndexMap = self.shuffle_indices(&cf.constant_pool);
 
         {
-            // TODO: only for debug, remove
-            let mut keys: Vec<&u16> = cp_index_map.map.keys().collect();
-            keys.sort();
-            for k in keys.iter() {
-                println!(" {}: {}", *k + 1, cp_index_map.get(**k + 1));
+            println!(" ### CP_INDEX_MAP ### ");
+            let mut pairs: Vec<(&u16, &u16)> = cp_index_map.map.iter().collect();
+            pairs.sort_by_key(|&(&k, _)| k);
+            for (k, v) in pairs {
+                println!("  {k} : {v}");
             }
+            println!(" ### CP_INDEX_MAP ### ");
         }
 
         let new_constant_pool: ConstantPool =

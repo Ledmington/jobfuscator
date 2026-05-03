@@ -208,7 +208,7 @@ impl Index<u16> for ConstantPool {
 
     /// The input index is assumed to be in the range [[ `1` ; `cp.len()` ]].
     fn index(&self, index: u16) -> &Self::Output {
-        assert!(index >= 1);
+        assert!(index >= 1 && index <= self.entries.len().try_into().unwrap());
         &self.entries[(index - 1) as usize]
     }
 }
@@ -225,6 +225,7 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
 pub enum ConstantPoolInfo {
     /// The type of constant pool entry which can be found right after a Long or Double one.
     /// NOTE: this does not exist in the class file reference.
+    // TODO: remove this
     Null {},
 
     /// The constant-pool entry used to represent constant string values.
