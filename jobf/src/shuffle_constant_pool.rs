@@ -95,9 +95,13 @@ impl ShuffleConstantPool {
     }
 
     fn modify_constant_pool(&self, cp_index_map: &CPIndexMap, cp: &ConstantPool) -> ConstantPool {
-        let mut new_cp_entries: Vec<ConstantPoolInfo> = Vec::with_capacity(cp.len());
-        for entry in cp.entries.iter() {
-            new_cp_entries.push(match entry {
+        let mut new_cp_entries: Vec<ConstantPoolInfo> = vec![ConstantPoolInfo::Null {}; cp.len()];
+        assert!(new_cp_entries.len() == cp.len());
+        for i in 1..=cp.len() {
+            let old_cp_index: u16 = i.try_into().unwrap();
+            let new_cp_index: u16 = cp_index_map.get(old_cp_index);
+            let entry = &cp[old_cp_index];
+            new_cp_entries[(new_cp_index - 1) as usize] = match entry {
                 ConstantPoolInfo::Utf8 { .. }
                 | ConstantPoolInfo::Integer { .. }
                 | ConstantPoolInfo::Float { .. }
@@ -155,7 +159,7 @@ impl ShuffleConstantPool {
                     bootstrap_method_attr_index: *bootstrap_method_attr_index,
                     name_and_type_index: cp_index_map.get(*name_and_type_index),
                 },
-            });
+            };
         }
         ConstantPool {
             entries: new_cp_entries,
@@ -365,7 +369,7 @@ impl ShuffleConstantPool {
 
 /// A structure to map old CP indices to new CP indices.
 struct CPIndexMap {
-    /// Internal mapping of constant pool indices: uses range [[ `0` ; `cp.len()-1` ]].
+    /// Internal mapping of constant pool indices: uses range [[ `1` ; `cp.len()` ]].
     map: HashMap<u16, u16>,
 }
 
@@ -373,7 +377,7 @@ impl CPIndexMap {
     /// The input index is assumed to be in the range [[ `1` ; `cp.len()` ]].
     fn get(&self, old_cp_index: u16) -> u16 {
         assert!(old_cp_index >= 1);
-        self.map.get(&(old_cp_index - 1)).unwrap() + 1
+        *self.map.get(&old_cp_index).unwrap()
     }
 }
 
