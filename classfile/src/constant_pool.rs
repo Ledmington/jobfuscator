@@ -401,6 +401,7 @@ fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) ->
     match tag {
         ConstantPoolTag::Utf8 => {
             let length: u16 = reader.read_u16().unwrap();
+            // TODO: implement actual conversion from custom UTF-8 to actual UTF-8
             ConstantPoolInfo::Utf8 {
                 bytes: reader.read_u8_vec(length.into()).unwrap(),
             }

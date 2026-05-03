@@ -49,6 +49,7 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
         match entry {
             ConstantPoolInfo::Null {} => {}
             ConstantPoolInfo::Utf8 { bytes } => {
+                // TODO: implement actual conversion from actual UTF-8 to custom UTF-8
                 w.write_u16(bytes.len().try_into().unwrap());
                 w.write_u8_vec(bytes);
             }
