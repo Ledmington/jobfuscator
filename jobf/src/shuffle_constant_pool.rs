@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use classfile::{
-    attributes::{AttributeInfo, ExceptionTableEntry},
+    attributes::{AttributeInfo, AttributeKind, ExceptionTableEntry, find_attribute},
     bytecode::BytecodeInstruction,
     classfile::ClassFile,
     constant_pool::{ConstantPool, ConstantPoolInfo},
@@ -21,8 +21,27 @@ impl ShuffleConstantPool {
         ShuffleConstantPool { seed }
     }
 
-    fn shuffle_indices(&self, cp: &ConstantPool) -> CPIndexMap {
-        // We cannot just shuffle all the indices, we need to shuffle just the indices of all entries that are not NULL.
+    fn shuffle_indices(&self, cf: &ClassFile) -> CPIndexMap {
+        // Collect all "special" indices to fix later (instructions like ldc require a u8 constant_pool_index,
+        // meaning that their argument must fit into a byte, therefore the mapped index must be <256)
+        let mut special_indices: HashSet<u16> = HashSet::new();
+        for method in cf.methods.iter() {
+            let attr = find_attribute(&method.attributes, AttributeKind::Code);
+            if let Some(AttributeInfo::Code { code, .. }) = attr {
+                for (_, inst) in code {
+                    match inst {
+                        BytecodeInstruction::Ldc {
+                            constant_pool_index,
+                        } => {
+                            special_indices.insert(*constant_pool_index as u16);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        let cp: &ConstantPool = &cf.constant_pool;
 
         let mut indices: Vec<u16> = (1..=(cp.len().try_into().unwrap())).collect();
         let mut rng = ChaCha8Rng::seed_from_u64(self.seed);
@@ -36,37 +55,41 @@ impl ShuffleConstantPool {
                 continue;
             }
 
-            let i_is_special = matches!(
+            let i_is_big_entry = matches!(
                 cp[indices[i]],
                 ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. }
             );
+            let i_is_special = special_indices.contains(&indices[i]);
 
             loop {
                 let j = rng.random_range(0..i);
 
                 let j_is_null = matches!(cp[indices[j]], ConstantPoolInfo::Null {});
-                let j_is_special = matches!(
+                let j_is_big_entry = matches!(
                     cp[indices[j]],
                     ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. }
                 );
+                let j_is_special = special_indices.contains(&indices[j]);
 
                 if j_is_null
-                    || (i_is_special && j + 1 == i)
-                    || (j_is_special && i == j + 1)
-                    || (j_is_special && i == indices.len() - 1)
+                    || (i_is_big_entry && j + 1 == i)
+                    || (j_is_big_entry && i == j + 1)
+                    || (j_is_big_entry && i == indices.len() - 1)
+                    || (i_is_special && j >= 256)
+                    || (j_is_special && i >= 256)
                 {
                     continue;
                 }
 
                 indices.swap(i, j);
-                if i_is_special || j_is_special {
+                if i_is_big_entry || j_is_big_entry {
                     indices.swap(i + 1, j + 1);
                 }
                 break;
             }
 
             // Skip over the null slot if i was a Long/Double pair
-            if i_is_special {
+            if i_is_big_entry {
                 i -= 1;
             }
             i -= 1;
@@ -379,12 +402,15 @@ impl ShuffleConstantPool {
                 match inst {
                     BytecodeInstruction::Ldc {
                         constant_pool_index,
-                    } => BytecodeInstruction::Ldc {
-                        constant_pool_index: cp_index_map
-                            .get(*constant_pool_index as u16)
-                            .try_into()
-                            .unwrap(),
-                    },
+                    } => {
+                        BytecodeInstruction::Ldc {
+                            constant_pool_index: cp_index_map
+                                .get(*constant_pool_index as u16)
+                                // this conversion is guaranteed to work from shuffle_indices
+                                .try_into()
+                                .unwrap(),
+                        }
+                    }
                     BytecodeInstruction::LdcW {
                         constant_pool_index,
                     } => BytecodeInstruction::LdcW {
@@ -609,7 +635,7 @@ impl CPIndexMap {
 
 impl ClassFileTransformation for ShuffleConstantPool {
     fn transform(&self, cf: &ClassFile) -> ClassFile {
-        let cp_index_map: CPIndexMap = self.shuffle_indices(&cf.constant_pool);
+        let cp_index_map: CPIndexMap = self.shuffle_indices(cf);
 
         let new_constant_pool: ConstantPool =
             self.modify_constant_pool(&cp_index_map, &cf.constant_pool);
