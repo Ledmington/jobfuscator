@@ -29,13 +29,11 @@ impl ShuffleConstantPool {
             let attr = find_attribute(&method.attributes, AttributeKind::Code);
             if let Some(AttributeInfo::Code { code, .. }) = attr {
                 for (_, inst) in code {
-                    match inst {
-                        BytecodeInstruction::Ldc {
-                            constant_pool_index,
-                        } => {
-                            special_indices.insert(*constant_pool_index as u16);
-                        }
-                        _ => {}
+                    if let BytecodeInstruction::Ldc {
+                        constant_pool_index,
+                    } = inst
+                    {
+                        special_indices.insert(*constant_pool_index as u16);
                     }
                 }
             }
@@ -190,19 +188,14 @@ impl ShuffleConstantPool {
         }
     }
 
-    fn modify_fields(
-        &self,
-        cp_index_map: &CPIndexMap,
-        cp: &ConstantPool,
-        fields: &Vec<FieldInfo>,
-    ) -> Vec<FieldInfo> {
+    fn modify_fields(&self, cp_index_map: &CPIndexMap, fields: &Vec<FieldInfo>) -> Vec<FieldInfo> {
         let mut new_fields = Vec::with_capacity(fields.len());
         for field in fields {
             new_fields.push(FieldInfo {
                 access_flags: field.access_flags,
                 name_index: cp_index_map.get(field.name_index),
                 descriptor_index: cp_index_map.get(field.descriptor_index),
-                attributes: self.modify_attributes(cp_index_map, cp, &field.attributes),
+                attributes: self.modify_attributes(cp_index_map, &field.attributes),
             });
         }
         new_fields
@@ -211,7 +204,6 @@ impl ShuffleConstantPool {
     fn modify_methods(
         &self,
         cp_index_map: &CPIndexMap,
-        cp: &ConstantPool,
         methods: &Vec<MethodInfo>,
     ) -> Vec<MethodInfo> {
         let mut new_methods = Vec::with_capacity(methods.len());
@@ -220,7 +212,7 @@ impl ShuffleConstantPool {
                 access_flags: method.access_flags,
                 name_index: cp_index_map.get(method.name_index),
                 descriptor_index: cp_index_map.get(method.descriptor_index),
-                attributes: self.modify_attributes(cp_index_map, cp, &method.attributes),
+                attributes: self.modify_attributes(cp_index_map, &method.attributes),
             });
         }
         new_methods
@@ -229,7 +221,6 @@ impl ShuffleConstantPool {
     fn modify_attributes(
         &self,
         cp_index_map: &CPIndexMap,
-        cp: &ConstantPool,
         attributes: &Vec<AttributeInfo>,
     ) -> Vec<AttributeInfo> {
         let mut new_attributes: Vec<AttributeInfo> = Vec::with_capacity(attributes.len());
@@ -260,7 +251,7 @@ impl ShuffleConstantPool {
                             },
                         })
                         .collect(),
-                    attributes: self.modify_attributes(cp_index_map, cp, attributes),
+                    attributes: self.modify_attributes(cp_index_map, attributes),
                 },
                 AttributeInfo::LineNumberTable {
                     name_index,
@@ -393,7 +384,7 @@ impl ShuffleConstantPool {
     fn modify_code(
         &self,
         cp_index_map: &CPIndexMap,
-        old_code: &Vec<(u32, BytecodeInstruction)>,
+        old_code: &[(u32, BytecodeInstruction)],
     ) -> Vec<(u32, BytecodeInstruction)> {
         let mut new_code: Vec<(u32, BytecodeInstruction)> = Vec::with_capacity(old_code.len());
         for (pos, inst) in old_code.iter() {
@@ -403,6 +394,11 @@ impl ShuffleConstantPool {
                     BytecodeInstruction::Ldc {
                         constant_pool_index,
                     } => {
+                        println!(
+                            "LDC {} -> {}",
+                            constant_pool_index,
+                            cp_index_map.get(*constant_pool_index as u16)
+                        );
                         BytecodeInstruction::Ldc {
                             constant_pool_index: cp_index_map
                                 .get(*constant_pool_index as u16)
@@ -651,10 +647,9 @@ impl ClassFileTransformation for ShuffleConstantPool {
             .iter()
             .map(|interface_index| cp_index_map.get(*interface_index))
             .collect();
-        let new_fields = self.modify_fields(&cp_index_map, &cf.constant_pool, &cf.fields);
-        let new_methods = self.modify_methods(&cp_index_map, &cf.constant_pool, &cf.methods);
-        let new_attributes =
-            self.modify_attributes(&cp_index_map, &cf.constant_pool, &cf.attributes);
+        let new_fields = self.modify_fields(&cp_index_map, &cf.fields);
+        let new_methods = self.modify_methods(&cp_index_map, &cf.methods);
+        let new_attributes = self.modify_attributes(&cp_index_map, &cf.attributes);
 
         ClassFile {
             minor_version: cf.minor_version,
