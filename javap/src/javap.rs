@@ -326,7 +326,6 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
                     ),
                 );
             }
-            ConstantPoolInfo::Null {} => unreachable!(),
         }
     }
 

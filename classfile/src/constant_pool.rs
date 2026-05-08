@@ -193,14 +193,6 @@ impl ConstantPool {
             unreachable!()
         }
     }
-
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
 }
 
 impl Index<u16> for ConstantPool {
@@ -223,11 +215,6 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
 
 #[derive(Clone)]
 pub enum ConstantPoolInfo {
-    /// The type of constant pool entry which can be found right after a Long or Double one.
-    /// NOTE: this does not exist in the class file reference.
-    // TODO: remove this
-    Null {},
-
     /// The constant-pool entry used to represent constant string values.
     Utf8 {
         bytes: Vec<u8>,
@@ -292,7 +279,6 @@ pub enum ConstantPoolInfo {
 impl ConstantPoolInfo {
     pub fn tag(&self) -> ConstantPoolTag {
         match self {
-            ConstantPoolInfo::Null {} => panic!("Null entries have no tag"),
             ConstantPoolInfo::Utf8 { .. } => ConstantPoolTag::Utf8,
             ConstantPoolInfo::Integer { .. } => ConstantPoolTag::Integer,
             ConstantPoolInfo::Float { .. } => ConstantPoolTag::Float,
@@ -307,6 +293,15 @@ impl ConstantPoolInfo {
             ConstantPoolInfo::MethodHandle { .. } => ConstantPoolTag::MethodHandle,
             ConstantPoolInfo::MethodType { .. } => ConstantPoolTag::MethodType,
             ConstantPoolInfo::InvokeDynamic { .. } => ConstantPoolTag::InvokeDynamic,
+        }
+    }
+
+    /// Returns the number of slots required to encode this constant pool info entry.
+    /// Specifically, returns 2 for Long and Double entries and 1 for anything else.
+    pub fn size(&self) -> usize {
+        match self {
+            ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. } => 2,
+            _ => 1,
         }
     }
 }
@@ -392,18 +387,14 @@ impl std::fmt::Display for ConstantPoolTag {
     }
 }
 
-pub fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> ConstantPool {
-    let mut entries: Vec<ConstantPoolInfo> = Vec::with_capacity(cp_count);
+pub fn parse_constant_pool(reader: &mut BinaryReader, num_cp_slots: usize) -> ConstantPool {
+    let mut entries: Vec<ConstantPoolInfo> = Vec::with_capacity(num_cp_slots);
     let mut i = 0;
-    while i < cp_count {
+    while i < num_cp_slots {
         let tag = ConstantPoolTag::try_from(reader.read_u8().unwrap()).unwrap();
-        entries.push(parse_constant_pool_entry(reader, tag.clone()));
-
-        if matches!(tag, ConstantPoolTag::Long) || matches!(tag, ConstantPoolTag::Double) {
-            entries.push(ConstantPoolInfo::Null {});
-            i += 1;
-        }
-        i += 1;
+        let entry = parse_constant_pool_entry(reader, tag.clone());
+        i += entry.size();
+        entries.push(entry);
     }
     ConstantPool { entries }
 }
@@ -473,9 +464,6 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
     while i < cp.len() {
         let entry = &cp[(i + 1).try_into().unwrap()];
         match entry {
-            ConstantPoolInfo::Null {} => {
-                unreachable!("Checking a null CP entry.");
-            }
             ConstantPoolInfo::Utf8 { bytes } => {
                 for b in bytes.iter() {
                     assert!(

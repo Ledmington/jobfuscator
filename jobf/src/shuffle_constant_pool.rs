@@ -39,6 +39,8 @@ impl ShuffleConstantPool {
             }
         }
 
+        todo!();
+
         let cp: &ConstantPool = &cf.constant_pool;
 
         let mut indices: Vec<u16> = (1..=(cp.len().try_into().unwrap())).collect();

@@ -41,13 +41,8 @@ pub fn write_class_file(cf: &ClassFile) -> Vec<u8> {
 
 fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
     for entry in cp.entries.iter() {
-        if matches!(entry, ConstantPoolInfo::Null {}) {
-            continue;
-        }
-
         w.write_u8(entry.tag().into());
         match entry {
-            ConstantPoolInfo::Null {} => {}
             ConstantPoolInfo::Utf8 { bytes } => {
                 // TODO: implement actual conversion from actual UTF-8 to custom UTF-8
                 w.write_u16(bytes.len().try_into().unwrap());
