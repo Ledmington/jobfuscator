@@ -41,6 +41,7 @@ impl ShuffleConstantPool {
 
         todo!();
 
+        /*
         let cp: &ConstantPool = &cf.constant_pool;
 
         let mut indices: Vec<u16> = (1..=(cp.len().try_into().unwrap())).collect();
@@ -116,12 +117,16 @@ impl ShuffleConstantPool {
         }
 
         CPIndexMap { map: cp_index_map }
+
+        */
     }
 
     fn modify_constant_pool(&self, cp_index_map: &CPIndexMap, cp: &ConstantPool) -> ConstantPool {
-        let mut new_cp_entries: Vec<ConstantPoolInfo> = vec![ConstantPoolInfo::Null {}; cp.len()];
-        assert!(new_cp_entries.len() == cp.len());
-        for i in 1..=cp.len() {
+        let mut new_cp_entries: Vec<ConstantPoolInfo> =
+            vec![ConstantPoolInfo::Integer { bytes: 0 }; cp.num_entries()];
+        assert!(new_cp_entries.len() == cp.num_entries());
+
+        for i in 1..=cp.num_slots() {
             let old_cp_index: u16 = i.try_into().unwrap();
             let new_cp_index: u16 = cp_index_map.get(old_cp_index);
             let entry = &cp[old_cp_index];
@@ -130,8 +135,7 @@ impl ShuffleConstantPool {
                 | ConstantPoolInfo::Integer { .. }
                 | ConstantPoolInfo::Float { .. }
                 | ConstantPoolInfo::Long { .. }
-                | ConstantPoolInfo::Double { .. }
-                | ConstantPoolInfo::Null {} => entry.clone(),
+                | ConstantPoolInfo::Double { .. } => entry.clone(),
                 ConstantPoolInfo::String { string_index } => ConstantPoolInfo::String {
                     string_index: cp_index_map.get(*string_index),
                 },

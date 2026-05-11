@@ -184,9 +184,9 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
     lw.println("Constant pool:");
     lw.indent(1);
 
-    let width = cp.len().to_string().len() + 1;
+    let width = cp.num_slots().to_string().len() + 1;
 
-    for i in 0..cp.len() {
+    for i in 0..cp.num_slots() {
         /*
             We skip entries right after Long and Double. Why?
             > In retrospect, making 8-byte constants take two constant pool entries was a poor choice.

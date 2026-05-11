@@ -15,11 +15,11 @@ pub struct ConstantPool {
 impl ConstantPool {
     // TODO: find a better name
     pub fn assert_valid_and_type(&self, cp_index: u16, expected_tags: &[ConstantPoolTag]) {
-        let cp_len = self.len();
+        let cp_num_slots = self.num_slots();
         assert!(!expected_tags.is_empty(), "Empty expected tags.");
         assert!(
-            cp_index >= 1 && cp_index <= cp_len.try_into().unwrap(),
-            "Constant pool index must be >= 1 and <= {cp_len} but was {cp_index} (0x{cp_index:04x})."
+            cp_index >= 1 && cp_index <= cp_num_slots.try_into().unwrap(),
+            "Constant pool index must be >= 1 and <= {cp_num_slots} but was {cp_index} (0x{cp_index:04x})."
         );
         let actual_tag = self[cp_index].tag();
         let mut found: bool = false;
@@ -192,6 +192,17 @@ impl ConstantPool {
         } else {
             unreachable!()
         }
+    }
+
+    /// Returns the number of slots required to encode this ConstantPool.
+    /// Note: Long and Double entries occupy 2 slots each, while any other entry occupies 1 slot.
+    pub fn num_slots(&self) -> usize {
+        self.entries.iter().map(|e| e.size()).sum()
+    }
+
+    /// Returns the number of entries in this ConstantPool.
+    pub fn num_entries(&self) -> usize {
+        self.entries.len()
     }
 }
 
@@ -460,8 +471,7 @@ fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) ->
 }
 
 pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo]) {
-    let mut i = 0;
-    while i < cp.len() {
+    for i in 0..cp.num_entries() {
         let entry = &cp[(i + 1).try_into().unwrap()];
         match entry {
             ConstantPoolInfo::Utf8 { bytes } => {
@@ -474,12 +484,8 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
             }
             ConstantPoolInfo::Integer { .. } => {}
             ConstantPoolInfo::Float { .. } => {}
-            ConstantPoolInfo::Long { .. } => {
-                i += 1;
-            }
-            ConstantPoolInfo::Double { .. } => {
-                i += 1;
-            }
+            ConstantPoolInfo::Long { .. } => {}
+            ConstantPoolInfo::Double { .. } => {}
             ConstantPoolInfo::String { string_index } => {
                 cp.assert_valid_and_type(*string_index, &[ConstantPoolTag::Utf8]);
             }
@@ -565,7 +571,5 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
                 cp.assert_valid_and_type(*name_and_type_index, &[ConstantPoolTag::NameAndType]);
             }
         }
-
-        i += 1;
     }
 }
