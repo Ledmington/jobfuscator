@@ -6,10 +6,7 @@ use std::{
 use binary_reader::BinaryReader;
 use binary_writer::BinaryWriter;
 
-use crate::{
-    assert_valid_and_type,
-    constant_pool::{ConstantPool, ConstantPoolTag},
-};
+use crate::constant_pool::{ConstantPool, ConstantPoolTag};
 
 /**
  * Reference available at <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-6.html#jvms-6.5>
@@ -677,7 +674,7 @@ pub fn parse_bytecode(
             0xb1 => BytecodeInstruction::Return {},
             0xb2 => {
                 let field_ref_index: u16 = reader.read_u16().unwrap();
-                assert_valid_and_type!(cp, field_ref_index, ConstantPoolTag::Fieldref);
+                cp.assert_valid_and_type(field_ref_index, &[ConstantPoolTag::Fieldref]);
                 BytecodeInstruction::GetStatic { field_ref_index }
             }
             0xb3 => BytecodeInstruction::PutStatic {

@@ -18,6 +18,10 @@ struct TestCase {
 
 const TEST_CASES: &[TestCase] = &[
     TestCase {
+        name: "Empty",
+        executable: false,
+    },
+    TestCase {
         name: "HelloWorld",
         executable: true,
     },
@@ -52,6 +56,10 @@ const TEST_CASES: &[TestCase] = &[
     TestCase {
         name: "Calculator",
         executable: true,
+    },
+    TestCase {
+        name: "Object",
+        executable: false,
     },
 ];
 
@@ -136,7 +144,7 @@ fn jobf_shuffle(env: &TestEnv, input: &Path, output: &Path, flag: &str) -> Resul
         .arg("--output")
         .arg(output)
         .arg("--quiet=true")
-        .arg("--seed=0x01020304")
+        .arg("--seed=0x12345678")
         .arg(flag)
         .arg("--force"));
 
@@ -469,6 +477,16 @@ fn main() {
         &env,
         "method-shuffle",
         "--shuffle-methods=true",
+    ));
+    failures.extend(run_shuffle_javap_tests(
+        &env,
+        "constant-pool-shuffle",
+        "--shuffle-constant-pool=true",
+    ));
+    failures.extend(run_shuffle_execution_tests(
+        &env,
+        "constant_pool-shuffle",
+        "--shuffle-constant-pool=true",
     ));
 
     if failures.is_empty() {
