@@ -187,25 +187,11 @@ fn print_constant_pool(lw: &mut LineWriter, cp: &ConstantPool) {
 
     let width = cp.num_slots().to_string().len() + 1;
 
-    for i in 0..cp.num_slots() {
-        /*
-            We skip entries right after Long and Double. Why?
-            > In retrospect, making 8-byte constants take two constant pool entries was a poor choice.
-            Source: <https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.4.5>
-        */
-        if i > 1
-            && (matches!(cp[i.try_into().unwrap()], ConstantPoolInfo::Long { .. })
-                || matches!(cp[i.try_into().unwrap()], ConstantPoolInfo::Double { .. }))
-        {
-            continue;
-        }
-
+    for (entry_index, entry) in cp.entries.iter() {
         lw.print(&format!(
             "{:>width$}",
-            ("#".to_owned() + &(i + 1).to_string())
+            ("#".to_owned() + &entry_index.to_string())
         ));
-
-        let entry = &cp[(i + 1).try_into().unwrap()];
 
         lw.print(&format!(" = {:<18} ", entry.tag().to_string()));
 
