@@ -40,7 +40,7 @@ pub fn write_class_file(cf: &ClassFile) -> Vec<u8> {
 }
 
 fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
-    for entry in cp.entries.iter() {
+    for (_, entry) in cp.entries.iter() {
         w.write_u8(entry.tag().into());
         match entry {
             ConstantPoolInfo::Utf8 { bytes } => {

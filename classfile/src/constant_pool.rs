@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ops::Index;
 
 use binary_reader::BinaryReader;
@@ -9,11 +10,10 @@ use crate::{
 
 #[derive(Clone)]
 pub struct ConstantPool {
-    pub entries: Vec<ConstantPoolInfo>,
+    pub entries: BTreeMap<u16, ConstantPoolInfo>,
 }
 
 impl ConstantPool {
-    // TODO: find a better name
     pub fn assert_valid_and_type(&self, cp_index: u16, expected_tags: &[ConstantPoolTag]) {
         let cp_num_slots = self.num_slots();
         assert!(!expected_tags.is_empty(), "Empty expected tags.");
@@ -21,8 +21,13 @@ impl ConstantPool {
             cp_index >= 1 && cp_index <= cp_num_slots.try_into().unwrap(),
             "Constant pool index must be >= 1 and <= {cp_num_slots} but was {cp_index} (0x{cp_index:04x})."
         );
+        // Also assert the key actually exists (slot N+1 of a Long/Double is absent)
+        assert!(
+            self.entries.contains_key(&cp_index),
+            "Constant pool index {cp_index} is a continuation slot of a Long or Double entry and cannot be referenced directly."
+        );
         let actual_tag = self[cp_index].tag();
-        let mut found: bool = false;
+        let mut found = false;
         for expected_tag in expected_tags {
             if *expected_tag == actual_tag {
                 found = true;
@@ -194,10 +199,13 @@ impl ConstantPool {
         }
     }
 
-    /// Returns the number of slots required to encode this ConstantPool.
-    /// Note: Long and Double entries occupy 2 slots each, while any other entry occupies 1 slot.
+    /// Returns the number of slots required to encode this ConstantPool in the JVM class file
+    /// format. Long and Double entries occupy 2 slots each; all other entries occupy 1 slot.
     pub fn num_slots(&self) -> usize {
-        self.entries.iter().map(|e| e.size()).sum()
+        match self.entries.iter().next_back() {
+            None => 0,
+            Some((last_key, last_entry)) => *last_key as usize + last_entry.size(),
+        }
     }
 
     /// Returns the number of entries in this ConstantPool.
@@ -209,10 +217,12 @@ impl ConstantPool {
 impl Index<u16> for ConstantPool {
     type Output = ConstantPoolInfo;
 
-    /// The input index is assumed to be in the range [[ `1` ; `cp.len()` ]].
+    /// The input index must be a valid slot key present in the map.
+    /// Continuation slots (N+1 of Long/Double) are not present and will panic.
     fn index(&self, index: u16) -> &Self::Output {
-        assert!(index >= 1 && index <= self.entries.len().try_into().unwrap());
-        &self.entries[(index - 1) as usize]
+        self.entries
+            .get(&index)
+            .unwrap_or_else(|| panic!("No constant pool entry at index {index}."))
     }
 }
 
@@ -399,13 +409,15 @@ impl std::fmt::Display for ConstantPoolTag {
 }
 
 pub fn parse_constant_pool(reader: &mut BinaryReader, num_cp_slots: usize) -> ConstantPool {
-    let mut entries: Vec<ConstantPoolInfo> = Vec::with_capacity(num_cp_slots);
-    let mut i = 0;
-    while i < num_cp_slots {
+    let mut entries: BTreeMap<u16, ConstantPoolInfo> = BTreeMap::new();
+    // Slot indices in the JVM constant pool are 1-based.
+    let mut slot: u16 = 1;
+    while (slot as usize) <= num_cp_slots {
         let tag = ConstantPoolTag::try_from(reader.read_u8().unwrap()).unwrap();
-        let entry = parse_constant_pool_entry(reader, tag.clone());
-        i += entry.size();
-        entries.push(entry);
+        let entry = parse_constant_pool_entry(reader, tag);
+        let next_slot = slot + entry.size() as u16;
+        entries.insert(slot, entry);
+        slot = next_slot;
     }
     ConstantPool { entries }
 }
@@ -471,14 +483,14 @@ fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) ->
 }
 
 pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo]) {
-    for i in 0..cp.num_entries() {
-        let entry = &cp[(i + 1).try_into().unwrap()];
+    // Iterate in slot order (BTreeMap guarantees ascending key order).
+    for (_, entry) in &cp.entries {
         match entry {
             ConstantPoolInfo::Utf8 { bytes } => {
                 for b in bytes.iter() {
                     assert!(
                         *b != 0x00u8 && *b < 0xf0u8,
-                        "Found Invalid bytes in Utf8 constant pool entry content."
+                        "Found invalid bytes in Utf8 constant pool entry content."
                     );
                 }
             }
@@ -557,7 +569,9 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
                 name_and_type_index,
             } => {
                 let bootstrap_method_attribute =
-                    find_attribute(attributes,AttributeKind::BootstrapMethods).expect("The presence of an InvokeDynamic entry in the constant pool implies the presence of a BootstrapMethods attribute in the class file, which is not present.");
+                    find_attribute(attributes, AttributeKind::BootstrapMethods).expect(
+                        "The presence of an InvokeDynamic entry in the constant pool implies the presence of a BootstrapMethods attribute in the class file, which is not present.",
+                    );
                 match bootstrap_method_attribute {
                     AttributeInfo::BootstrapMethods { methods, .. } => {
                         let num_bootstrap_methods = methods.len();

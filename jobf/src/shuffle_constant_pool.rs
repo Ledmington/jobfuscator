@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use classfile::{
     attributes::{AttributeInfo, AttributeKind, ExceptionTableEntry, find_attribute},
@@ -122,72 +122,75 @@ impl ShuffleConstantPool {
     }
 
     fn modify_constant_pool(&self, cp_index_map: &CPIndexMap, cp: &ConstantPool) -> ConstantPool {
-        let mut new_cp_entries: Vec<ConstantPoolInfo> =
-            vec![ConstantPoolInfo::Integer { bytes: 0 }; cp.num_entries()];
-        assert!(new_cp_entries.len() == cp.num_entries());
+        let mut new_cp_entries: BTreeMap<u16, ConstantPoolInfo> = BTreeMap::new();
 
         for i in 1..=cp.num_slots() {
             let old_cp_index: u16 = i.try_into().unwrap();
             let new_cp_index: u16 = cp_index_map.get(old_cp_index);
             let entry = &cp[old_cp_index];
-            new_cp_entries[(new_cp_index - 1) as usize] = match entry {
-                ConstantPoolInfo::Utf8 { .. }
-                | ConstantPoolInfo::Integer { .. }
-                | ConstantPoolInfo::Float { .. }
-                | ConstantPoolInfo::Long { .. }
-                | ConstantPoolInfo::Double { .. } => entry.clone(),
-                ConstantPoolInfo::String { string_index } => ConstantPoolInfo::String {
-                    string_index: cp_index_map.get(*string_index),
+            new_cp_entries.insert(
+                new_cp_index,
+                match entry {
+                    ConstantPoolInfo::Utf8 { .. }
+                    | ConstantPoolInfo::Integer { .. }
+                    | ConstantPoolInfo::Float { .. }
+                    | ConstantPoolInfo::Long { .. }
+                    | ConstantPoolInfo::Double { .. } => entry.clone(),
+                    ConstantPoolInfo::String { string_index } => ConstantPoolInfo::String {
+                        string_index: cp_index_map.get(*string_index),
+                    },
+                    ConstantPoolInfo::Class { name_index } => ConstantPoolInfo::Class {
+                        name_index: cp_index_map.get(*name_index),
+                    },
+                    ConstantPoolInfo::FieldRef {
+                        class_index,
+                        name_and_type_index,
+                    } => ConstantPoolInfo::FieldRef {
+                        class_index: cp_index_map.get(*class_index),
+                        name_and_type_index: cp_index_map.get(*name_and_type_index),
+                    },
+                    ConstantPoolInfo::MethodRef {
+                        class_index,
+                        name_and_type_index,
+                    } => ConstantPoolInfo::MethodRef {
+                        class_index: cp_index_map.get(*class_index),
+                        name_and_type_index: cp_index_map.get(*name_and_type_index),
+                    },
+                    ConstantPoolInfo::InterfaceMethodRef {
+                        class_index,
+                        name_and_type_index,
+                    } => ConstantPoolInfo::InterfaceMethodRef {
+                        class_index: cp_index_map.get(*class_index),
+                        name_and_type_index: cp_index_map.get(*name_and_type_index),
+                    },
+                    ConstantPoolInfo::NameAndType {
+                        name_index,
+                        descriptor_index,
+                    } => ConstantPoolInfo::NameAndType {
+                        name_index: cp_index_map.get(*name_index),
+                        descriptor_index: cp_index_map.get(*descriptor_index),
+                    },
+                    ConstantPoolInfo::MethodType { descriptor_index } => {
+                        ConstantPoolInfo::MethodType {
+                            descriptor_index: cp_index_map.get(*descriptor_index),
+                        }
+                    }
+                    ConstantPoolInfo::MethodHandle {
+                        reference_kind,
+                        reference_index,
+                    } => ConstantPoolInfo::MethodHandle {
+                        reference_kind: *reference_kind,
+                        reference_index: cp_index_map.get(*reference_index),
+                    },
+                    ConstantPoolInfo::InvokeDynamic {
+                        bootstrap_method_attr_index,
+                        name_and_type_index,
+                    } => ConstantPoolInfo::InvokeDynamic {
+                        bootstrap_method_attr_index: *bootstrap_method_attr_index,
+                        name_and_type_index: cp_index_map.get(*name_and_type_index),
+                    },
                 },
-                ConstantPoolInfo::Class { name_index } => ConstantPoolInfo::Class {
-                    name_index: cp_index_map.get(*name_index),
-                },
-                ConstantPoolInfo::FieldRef {
-                    class_index,
-                    name_and_type_index,
-                } => ConstantPoolInfo::FieldRef {
-                    class_index: cp_index_map.get(*class_index),
-                    name_and_type_index: cp_index_map.get(*name_and_type_index),
-                },
-                ConstantPoolInfo::MethodRef {
-                    class_index,
-                    name_and_type_index,
-                } => ConstantPoolInfo::MethodRef {
-                    class_index: cp_index_map.get(*class_index),
-                    name_and_type_index: cp_index_map.get(*name_and_type_index),
-                },
-                ConstantPoolInfo::InterfaceMethodRef {
-                    class_index,
-                    name_and_type_index,
-                } => ConstantPoolInfo::InterfaceMethodRef {
-                    class_index: cp_index_map.get(*class_index),
-                    name_and_type_index: cp_index_map.get(*name_and_type_index),
-                },
-                ConstantPoolInfo::NameAndType {
-                    name_index,
-                    descriptor_index,
-                } => ConstantPoolInfo::NameAndType {
-                    name_index: cp_index_map.get(*name_index),
-                    descriptor_index: cp_index_map.get(*descriptor_index),
-                },
-                ConstantPoolInfo::MethodType { descriptor_index } => ConstantPoolInfo::MethodType {
-                    descriptor_index: cp_index_map.get(*descriptor_index),
-                },
-                ConstantPoolInfo::MethodHandle {
-                    reference_kind,
-                    reference_index,
-                } => ConstantPoolInfo::MethodHandle {
-                    reference_kind: *reference_kind,
-                    reference_index: cp_index_map.get(*reference_index),
-                },
-                ConstantPoolInfo::InvokeDynamic {
-                    bootstrap_method_attr_index,
-                    name_and_type_index,
-                } => ConstantPoolInfo::InvokeDynamic {
-                    bootstrap_method_attr_index: *bootstrap_method_attr_index,
-                    name_and_type_index: cp_index_map.get(*name_and_type_index),
-                },
-            };
+            );
         }
         ConstantPool {
             entries: new_cp_entries,
