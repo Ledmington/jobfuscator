@@ -16,7 +16,7 @@ pub fn write_class_file(cf: &ClassFile) -> Vec<u8> {
     w.write_u16(cf.minor_version);
     w.write_u16(cf.major_version);
 
-    w.write_u16((cf.constant_pool.num_slots() + 1).try_into().unwrap());
+    w.write_u16(cf.constant_pool.num_slots().try_into().unwrap());
     write_constant_pool(&mut w, &cf.constant_pool);
 
     w.write_u16(cf.access_flags.to_u16());
@@ -60,6 +60,9 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
             } => {
                 w.write_u32(*high_bytes);
                 w.write_u32(*low_bytes);
+
+                // Write NULL entry tag
+                w.write_u8(0x00);
             }
             ConstantPoolInfo::Double {
                 high_bytes,
@@ -67,6 +70,9 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
             } => {
                 w.write_u32(*high_bytes);
                 w.write_u32(*low_bytes);
+
+                // Write NULL entry tag
+                w.write_u8(0x00);
             }
             ConstantPoolInfo::String { string_index } => {
                 w.write_u16(*string_index);
