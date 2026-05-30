@@ -29,7 +29,8 @@ const BYTECODE_INDEX_LENGTH: usize = 4;
 pub(crate) fn print_class_file(filename: String) {
     let mut lw: LineWriter = LineWriter::new();
 
-    let abs_file_path: PathBuf = absolute_no_symlinks(Path::new(&filename)).unwrap();
+    let abs_file_path: PathBuf = absolute_no_symlinks(Path::new(&filename))
+        .unwrap_or_else(|e| panic!("Error opening file '{}': {}", filename, e));
     let absolute_file_path: String = abs_file_path.to_str().unwrap().to_owned();
     lw.println(&("Classfile ".to_owned() + &absolute_file_path.to_string()));
 
