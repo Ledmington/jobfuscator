@@ -39,62 +39,42 @@ impl ShuffleConstantPool {
             }
         }
 
-        todo!();
-
-        /*
         let cp: &ConstantPool = &cf.constant_pool;
 
-        let mut indices: Vec<u16> = (1..=(cp.len().try_into().unwrap())).collect();
+        let mut indices: Vec<u16> = cp.entries.keys().map(|k| *k).collect();
         let mut rng = ChaCha8Rng::seed_from_u64(self.seed);
 
-        // Actual shuffle (Fisher-Yates-like)
-        let mut i = indices.len() - 1;
-        while i > 0 {
-            // Skip null slots (they'll be dragged along by their Long/Double)
-            if matches!(cp[indices[i]], ConstantPoolInfo::Null {}) {
-                i -= 1;
-                continue;
-            }
+        // Partition into special and non-special indices
+        let mut special: Vec<u16> = indices
+            .iter()
+            .copied()
+            .filter(|i| special_indices.contains(i))
+            .collect();
+        let mut normal: Vec<u16> = indices
+            .iter()
+            .copied()
+            .filter(|i| !special_indices.contains(i))
+            .collect();
 
-            let i_is_big_entry = matches!(
-                cp[indices[i]],
-                ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. }
-            );
-            let i_is_special = special_indices.contains(&indices[i]);
+        // Verify special indices will fit in u8 positions (1-based, so max position = special.len())
+        assert!(
+            special.len() < 256,
+            "Too many special (ldc) indices to fit within u8 range."
+        );
 
-            loop {
-                let j = rng.random_range(0..i);
-
-                let j_is_null = matches!(cp[indices[j]], ConstantPoolInfo::Null {});
-                let j_is_big_entry = matches!(
-                    cp[indices[j]],
-                    ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. }
-                );
-                let j_is_special = special_indices.contains(&indices[j]);
-
-                if j_is_null
-                    || (i_is_big_entry && j + 1 == i)
-                    || (j_is_big_entry && i == j + 1)
-                    || (j_is_big_entry && i == indices.len() - 1)
-                    || (i_is_special && j >= 256)
-                    || (j_is_special && i >= 256)
-                {
-                    continue;
-                }
-
-                indices.swap(i, j);
-                if i_is_big_entry || j_is_big_entry {
-                    indices.swap(i + 1, j + 1);
-                }
-                break;
-            }
-
-            // Skip over the null slot if i was a Long/Double pair
-            if i_is_big_entry {
-                i -= 1;
-            }
-            i -= 1;
+        // Fisher-Yates shuffle each partition independently
+        for i in (1..special.len()).rev() {
+            let j = rng.random_range(0..=i);
+            special.swap(i, j);
         }
+        for i in (1..normal.len()).rev() {
+            let j = rng.random_range(0..=i);
+            normal.swap(i, j);
+        }
+
+        // Reassemble: special entries occupy the first slots (positions 1..=special.len()),
+        // normal entries fill the rest — guaranteeing all special mapped indices fit in u8
+        indices = special.into_iter().chain(normal).collect();
 
         // Map old index -> new index
         let mut cp_index_map: HashMap<u16, u16> = HashMap::new();
@@ -104,30 +84,30 @@ impl ShuffleConstantPool {
         }
 
         // Make sure that the CP index map does not contain excess elements
-        assert!(cp_index_map.len() == cp.len());
+        assert!(cp_index_map.len() == cp.entries.len());
 
         // Make sure that the CP index map contains a mapping for each starting index
-        assert!((1..=cp.len()).all(|k| cp_index_map.contains_key(&k.try_into().unwrap())));
+        assert!(
+            cp.entries
+                .keys()
+                .all(|k| cp_index_map.contains_key(k.try_into().unwrap()))
+        );
 
         // Make sure that the CP index map can map to each new index
         {
             let values: HashSet<&u16> = cp_index_map.values().collect();
-            assert!(values.len() == cp.len());
-            assert!((1..=cp.len()).all(|v| values.contains(&(v as u16))));
+            assert!(values.len() == cp.entries.len());
+            assert!(cp.entries.keys().all(|v| values.contains(v)));
         }
 
         CPIndexMap { map: cp_index_map }
-
-        */
     }
 
     fn modify_constant_pool(&self, cp_index_map: &CPIndexMap, cp: &ConstantPool) -> ConstantPool {
         let mut new_cp_entries: BTreeMap<u16, ConstantPoolInfo> = BTreeMap::new();
 
-        for i in 1..=cp.num_slots() {
-            let old_cp_index: u16 = i.try_into().unwrap();
-            let new_cp_index: u16 = cp_index_map.get(old_cp_index);
-            let entry = &cp[old_cp_index];
+        for (old_cp_index, entry) in cp.entries.iter() {
+            let new_cp_index: u16 = cp_index_map.get(*old_cp_index);
             new_cp_entries.insert(
                 new_cp_index,
                 match entry {
@@ -634,7 +614,9 @@ impl CPIndexMap {
     /// The input index is assumed to be in the range [[ `1` ; `cp.len()` ]].
     fn get(&self, old_cp_index: u16) -> u16 {
         assert!(old_cp_index >= 1);
-        *self.map.get(&old_cp_index).unwrap()
+        *self.map.get(&old_cp_index).unwrap_or_else(|| {
+            panic!("Could not retrieve new CP index for old index {old_cp_index}.");
+        })
     }
 }
 
