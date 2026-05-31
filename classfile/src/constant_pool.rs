@@ -484,7 +484,7 @@ fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) ->
 
 pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo]) {
     // Iterate in slot order (BTreeMap guarantees ascending key order).
-    for (_, entry) in &cp.entries {
+    for entry in cp.entries.values() {
         match entry {
             ConstantPoolInfo::Utf8 { bytes } => {
                 for b in bytes.iter() {
