@@ -60,9 +60,6 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
             } => {
                 w.write_u32(*high_bytes);
                 w.write_u32(*low_bytes);
-
-                // Write NULL entry tag
-                w.write_u8(0x00);
             }
             ConstantPoolInfo::Double {
                 high_bytes,
@@ -70,9 +67,6 @@ fn write_constant_pool(w: &mut BinaryWriter, cp: &ConstantPool) {
             } => {
                 w.write_u32(*high_bytes);
                 w.write_u32(*low_bytes);
-
-                // Write NULL entry tag
-                w.write_u8(0x00);
             }
             ConstantPoolInfo::String { string_index } => {
                 w.write_u16(*string_index);
