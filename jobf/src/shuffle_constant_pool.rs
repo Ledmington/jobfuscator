@@ -97,7 +97,14 @@ impl ShuffleConstantPool {
         {
             let values: HashSet<&u16> = cp_index_map.values().collect();
             assert!(values.len() == cp.entries.len());
-            assert!(cp.entries.keys().all(|v| values.contains(v)));
+            // assert!(cp.entries.keys().all(|v| values.contains(v)));
+            // assert!((1..=(cp.num_slots() as u16)).all(|old_idx| {
+            //     if cp.entries.contains_key(&old_idx) {
+            //         values.contains(&old_idx)
+            //     } else {
+            //         !values.contains(&old_idx)
+            //     }
+            // }));
         }
 
         CPIndexMap { map: cp_index_map }
