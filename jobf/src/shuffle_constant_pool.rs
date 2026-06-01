@@ -12,6 +12,44 @@ use rand::{RngExt, SeedableRng, rngs::ChaCha8Rng};
 
 use crate::transformation::ClassFileTransformation;
 
+fn collect_special_indices(cf: &ClassFile) -> HashSet<u16> {
+    // Collect all "special" indices to fix later (instructions like ldc require a u8 constant_pool_index,
+    // meaning that their argument must fit into a byte, therefore the mapped index must be <256)
+    let mut special_indices: HashSet<u16> = HashSet::new();
+    for method in cf.methods.iter() {
+        let attr = find_attribute(&method.attributes, AttributeKind::Code);
+        if let Some(AttributeInfo::Code { code, .. }) = attr {
+            for (_, inst) in code {
+                if let BytecodeInstruction::Ldc {
+                    constant_pool_index,
+                } = inst
+                {
+                    special_indices.insert(*constant_pool_index as u16);
+                }
+            }
+        }
+    }
+    special_indices
+}
+
+fn shuffle_indices(
+    seed: u64,
+    indices: &HashSet<u16>,
+    special_indices: &HashSet<u16>,
+) -> CPIndexMap {
+    assert!(
+        !indices.contains(&0),
+        "Constant Pool indices to be shuffled are expected to be 1-based."
+    );
+    assert!(
+        special_indices
+            .iter()
+            .all(|special_index| indices.contains(special_index))
+    );
+
+    todo!()
+}
+
 pub(crate) struct ShuffleConstantPool {
     seed: u64,
 }
@@ -19,95 +57,6 @@ pub(crate) struct ShuffleConstantPool {
 impl ShuffleConstantPool {
     pub fn new(seed: u64) -> Self {
         ShuffleConstantPool { seed }
-    }
-
-    fn shuffle_indices(&self, cf: &ClassFile) -> CPIndexMap {
-        // Collect all "special" indices to fix later (instructions like ldc require a u8 constant_pool_index,
-        // meaning that their argument must fit into a byte, therefore the mapped index must be <256)
-        let mut special_indices: HashSet<u16> = HashSet::new();
-        for method in cf.methods.iter() {
-            let attr = find_attribute(&method.attributes, AttributeKind::Code);
-            if let Some(AttributeInfo::Code { code, .. }) = attr {
-                for (_, inst) in code {
-                    if let BytecodeInstruction::Ldc {
-                        constant_pool_index,
-                    } = inst
-                    {
-                        special_indices.insert(*constant_pool_index as u16);
-                    }
-                }
-            }
-        }
-
-        let cp: &ConstantPool = &cf.constant_pool;
-
-        let mut indices: Vec<u16> = cp.entries.keys().map(|k| *k).collect();
-        let mut rng = ChaCha8Rng::seed_from_u64(self.seed);
-
-        // Partition into special and non-special indices
-        let mut special: Vec<u16> = indices
-            .iter()
-            .copied()
-            .filter(|i| special_indices.contains(i))
-            .collect();
-        let mut normal: Vec<u16> = indices
-            .iter()
-            .copied()
-            .filter(|i| !special_indices.contains(i))
-            .collect();
-
-        // Verify special indices will fit in u8 positions (1-based, so max position = special.len())
-        assert!(
-            special.len() < 256,
-            "Too many special (ldc) indices to fit within u8 range."
-        );
-
-        // Fisher-Yates shuffle each partition independently
-        for i in (1..special.len()).rev() {
-            let j = rng.random_range(0..=i);
-            special.swap(i, j);
-        }
-        for i in (1..normal.len()).rev() {
-            let j = rng.random_range(0..=i);
-            normal.swap(i, j);
-        }
-
-        // Reassemble: special entries occupy the first slots (positions 1..=special.len()),
-        // normal entries fill the rest — guaranteeing all special mapped indices fit in u8
-        indices = special.into_iter().chain(normal).collect();
-
-        // Map old index -> new index
-        let mut cp_index_map: HashMap<u16, u16> = HashMap::new();
-        for (new_pos, &old_idx) in indices.iter().enumerate() {
-            // `old_idx` is 1-based, `new_pos` is 0-based
-            cp_index_map.insert(old_idx, (new_pos + 1).try_into().unwrap());
-        }
-
-        // Make sure that the CP index map does not contain excess elements
-        assert!(cp_index_map.len() == cp.entries.len());
-
-        // Make sure that the CP index map contains a mapping for each starting index
-        assert!(
-            cp.entries
-                .keys()
-                .all(|k| cp_index_map.contains_key(k.try_into().unwrap()))
-        );
-
-        // Make sure that the CP index map can map to each new index
-        {
-            let values: HashSet<&u16> = cp_index_map.values().collect();
-            assert!(values.len() == cp.entries.len());
-            // assert!(cp.entries.keys().all(|v| values.contains(v)));
-            // assert!((1..=(cp.num_slots() as u16)).all(|old_idx| {
-            //     if cp.entries.contains_key(&old_idx) {
-            //         values.contains(&old_idx)
-            //     } else {
-            //         !values.contains(&old_idx)
-            //     }
-            // }));
-        }
-
-        CPIndexMap { map: cp_index_map }
     }
 
     fn modify_constant_pool(&self, cp_index_map: &CPIndexMap, cp: &ConstantPool) -> ConstantPool {
@@ -390,11 +339,6 @@ impl ShuffleConstantPool {
                     BytecodeInstruction::Ldc {
                         constant_pool_index,
                     } => {
-                        println!(
-                            "LDC {} -> {}",
-                            constant_pool_index,
-                            cp_index_map.get(*constant_pool_index as u16)
-                        );
                         BytecodeInstruction::Ldc {
                             constant_pool_index: cp_index_map
                                 .get(*constant_pool_index as u16)
@@ -629,7 +573,17 @@ impl CPIndexMap {
 
 impl ClassFileTransformation for ShuffleConstantPool {
     fn transform(&self, cf: &ClassFile) -> ClassFile {
-        let cp_index_map: CPIndexMap = self.shuffle_indices(cf);
+        let special_indices: HashSet<u16> = collect_special_indices(cf);
+
+        let cp_index_map: CPIndexMap = shuffle_indices(
+            self.seed,
+            &cf.constant_pool
+                .entries
+                .keys()
+                .cloned()
+                .collect::<HashSet<u16>>(),
+            &special_indices,
+        );
 
         let new_constant_pool: ConstantPool =
             self.modify_constant_pool(&cp_index_map, &cf.constant_pool);
@@ -661,5 +615,27 @@ impl ClassFileTransformation for ShuffleConstantPool {
             methods: new_methods,
             attributes: new_attributes,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::Rng;
+
+    use super::*;
+
+    #[test]
+    fn boh() {
+        let seed: u64 = rand::rng().next_u64();
+        let indices = HashSet::new();
+        let special_indices = HashSet::new();
+        let new_indices = shuffle_indices(seed, &indices, &special_indices).map;
+
+        assert!(
+            indices.len() == new_indices.len(),
+            "Call to shuffle_indices() with seed=0x{seed:016x} returned a different number of indices: expected {} but was {}.",
+            indices.len(),
+            new_indices.len()
+        );
     }
 }
