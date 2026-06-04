@@ -44,10 +44,33 @@ fn shuffle_indices(
     assert!(
         special_indices
             .iter()
-            .all(|special_index| indices.contains(special_index))
+            .all(|special_index| indices.contains(special_index)),
+        "All special indices must be contained within indices."
     );
 
-    todo!()
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+
+    // linearize indices
+    let mut indices_vec: Vec<u16> = indices.iter().copied().collect();
+    indices_vec.sort();
+
+    // one pass of Fisher-Yates
+    for i in 0..(indices_vec.len() - 2) {
+        let j = rng.random_range(i..=(indices_vec.len() - 1));
+        indices_vec.swap(i, j);
+    }
+
+    if !special_indices.is_empty() {
+        todo!("Don't know what to do with special indices");
+    }
+
+    // build the index map
+    let mut new_indices = HashMap::new();
+    for (new_idx, old_idx) in indices_vec.iter().enumerate() {
+        new_indices.insert(*old_idx, (new_idx + 1).try_into().unwrap());
+    }
+
+    CPIndexMap { map: new_indices }
 }
 
 pub(crate) struct ShuffleConstantPool {
@@ -339,12 +362,13 @@ impl ShuffleConstantPool {
                     BytecodeInstruction::Ldc {
                         constant_pool_index,
                     } => {
+                        let new_index=cp_index_map
+                                .get(*constant_pool_index as u16);
                         BytecodeInstruction::Ldc {
-                            constant_pool_index: cp_index_map
-                                .get(*constant_pool_index as u16)
+                            constant_pool_index: new_index
                                 // this conversion is guaranteed to work from shuffle_indices
                                 .try_into()
-                                .unwrap(),
+                                .unwrap_or_else(|e| panic!("Could not convert constant pool index {new_index} into u8: {e}.")),
                         }
                     }
                     BytecodeInstruction::LdcW {
@@ -625,17 +649,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn boh() {
-        let seed: u64 = rand::rng().next_u64();
-        let indices = HashSet::new();
-        let special_indices = HashSet::new();
-        let new_indices = shuffle_indices(seed, &indices, &special_indices).map;
+    fn shuffle_constant_pool_indices() {
+        let test_cases: Vec<(HashSet<u16>, HashSet<u16>)> =
+            vec![([1, 2, 3].into_iter().collect(), [].into_iter().collect())];
 
-        assert!(
-            indices.len() == new_indices.len(),
-            "Call to shuffle_indices() with seed=0x{seed:016x} returned a different number of indices: expected {} but was {}.",
-            indices.len(),
-            new_indices.len()
-        );
+        for (indices, special_indices) in test_cases {
+            let seed: u64 = rand::rng().next_u64();
+            let new_indices = shuffle_indices(seed, &indices, &special_indices).map;
+
+            assert!(
+                indices.len() == new_indices.len(),
+                "Call to shuffle_indices() with seed=0x{seed:016x} returned a different number of indices: expected {} but was {}.",
+                indices.len(),
+                new_indices.len()
+            );
+            for old_idx in indices {
+                assert!(
+                    new_indices.contains_key(&old_idx),
+                    "Call to shuffle_indices() with seed=0x{seed:016x} returned a map in which the index {old_idx} is not present.",
+                );
+            }
+            for special_idx in special_indices {
+                let new_idx = new_indices.get(&special_idx).unwrap();
+                assert!(
+                    special_idx < 256,
+                    "Call to shuffle_indices() with seed=0x{seed:016x} returned a map in which the special index {special_idx} maps to {new_idx}, which cannot be a special index.",
+                );
+            }
+        }
     }
 }
