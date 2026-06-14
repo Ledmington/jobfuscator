@@ -32,45 +32,102 @@ fn collect_special_indices(cf: &ClassFile) -> HashSet<u16> {
     special_indices
 }
 
-fn shuffle_indices(
-    seed: u64,
-    indices: &HashSet<u16>,
-    special_indices: &HashSet<u16>,
-) -> CPIndexMap {
-    assert!(
-        !indices.contains(&0),
-        "Constant Pool indices to be shuffled are expected to be 1-based."
-    );
-    assert!(
-        special_indices
-            .iter()
-            .all(|special_index| indices.contains(special_index)),
-        "All special indices must be contained within indices."
-    );
+enum CPEntryType {
+    Small, // entries which occupy 1 slot
+    Big,   // entries which occupy 2 slots (Long and Double)
+}
 
+impl CPEntryType {
+    fn size(&self) -> u16 {
+        match self {
+            CPEntryType::Small => 1,
+            CPEntryType::Big => 2,
+        }
+    }
+}
+
+struct CPEntry {
+    entry_type: CPEntryType,
+    is_special: bool,
+}
+
+fn shuffle_indices(seed: u64, entries: &Vec<CPEntry>) -> CPIndexMap {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
-    // linearize indices
-    let mut indices_vec: Vec<u16> = indices.iter().copied().collect();
-    indices_vec.sort();
+    // Work with a mutable list of (original_index, CPEntry) pairs.
+    // CP indices are 1-based, so entry at position i in the vec has original index i+1.
+    let mut indexed: Vec<(u16, &CPEntry)> = Vec::with_capacity(entries.len());
+    indexed.push((1u16, &entries[0]));
+    for i in 1..entries.len() {
+        indexed.push((
+            indexed[indexed.len() - 1].0 + (indexed[indexed.len() - 1].1.entry_type.size()),
+            &entries[i],
+        ));
+    }
+    // entries
+    //     .iter()
+    //     .enumerate()
+    //     .map(|(i, e)| ((i + 1) as u16, e))
+    //     .collect();
 
-    // one pass of Fisher-Yates
-    for i in 0..(indices_vec.len() - 2) {
-        let j = rng.random_range(i..=(indices_vec.len() - 1));
-        indices_vec.swap(i, j);
+    let n = indexed.len();
+
+    // Fisher-Yates shuffle, respecting the constraint that special entries
+    // must land at positions 0..255 (i.e. new 1-based index <= 255, fitting in a u8).
+    //
+    // Strategy: when placing position i, if the entry is special we pick a swap
+    // target j in [i, 255]; otherwise we pick j in [i, n-1], skipping special
+    // entries when i >= 256 to avoid pushing them out of range.
+    for i in 0..n.saturating_sub(1) {
+        let j = if indexed[i].1.is_special {
+            // Must land at a 1-based index <= 255, i.e. 0-based position <= 254.
+            // Pick from [i, 254], ensuring we don't go out of bounds.
+            let hi = 254usize.min(n - 1);
+            assert!(
+                i <= hi,
+                "Too many special entries to fit within the first 255 CP slots."
+            );
+            let mut candidate = rng.random_range(i..=hi);
+            // Skip other special entries already in the safe zone so we don't
+            // waste safe slots — accept the first non-special at or after candidate.
+            while candidate < n && candidate != i && indexed[candidate].1.is_special {
+                candidate += 1;
+                if candidate > hi {
+                    candidate = i; // fallback: keep in place
+                    break;
+                }
+            }
+            candidate
+        } else {
+            // Non-special: can go anywhere from i onward, but must not displace
+            // a special entry that hasn't been placed yet into a slot >= 255.
+            let mut candidate = rng.random_range(i..n);
+            // If we're at position >= 255 and we'd pick up a special entry, keep
+            // searching until we find a non-special one.
+            if i >= 255 {
+                let mut attempts = 0;
+                while indexed[candidate].1.is_special {
+                    candidate = rng.random_range(i..n);
+                    attempts += 1;
+                    assert!(
+                        attempts < n * 4,
+                        "Could not find a non-special entry to place at position {i}."
+                    );
+                }
+            }
+            candidate
+        };
+        indexed.swap(i, j);
     }
 
-    if !special_indices.is_empty() {
-        todo!("Don't know what to do with special indices");
-    }
+    // Build the index map: old CP index -> new CP index (1-based position after shuffle).
+    let map: HashMap<u16, u16> = indexed
+        .iter()
+        .enumerate()
+        .map(|(new_pos, (old_idx, _))| (*old_idx, (new_pos + 1) as u16))
+        .collect();
 
-    // build the index map
-    let mut new_indices = HashMap::new();
-    for (new_idx, old_idx) in indices_vec.iter().enumerate() {
-        new_indices.insert(*old_idx, (new_idx + 1).try_into().unwrap());
-    }
-
-    CPIndexMap { map: new_indices }
+    CPIndexMap { map }
 }
 
 pub(crate) struct ShuffleConstantPool {
@@ -599,15 +656,22 @@ impl ClassFileTransformation for ShuffleConstantPool {
     fn transform(&self, cf: &ClassFile) -> ClassFile {
         let special_indices: HashSet<u16> = collect_special_indices(cf);
 
-        let cp_index_map: CPIndexMap = shuffle_indices(
-            self.seed,
-            &cf.constant_pool
-                .entries
-                .keys()
-                .cloned()
-                .collect::<HashSet<u16>>(),
-            &special_indices,
-        );
+        let entries: Vec<CPEntry> = cf
+            .constant_pool
+            .entries
+            .iter()
+            .map(|(idx, info)| CPEntry {
+                entry_type: match info {
+                    ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. } => {
+                        CPEntryType::Big
+                    }
+                    _ => CPEntryType::Small,
+                },
+                is_special: special_indices.contains(idx),
+            })
+            .collect();
+
+        let cp_index_map = shuffle_indices(self.seed, &entries);
 
         let new_constant_pool: ConstantPool =
             self.modify_constant_pool(&cp_index_map, &cf.constant_pool);
@@ -644,38 +708,79 @@ impl ClassFileTransformation for ShuffleConstantPool {
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
-
     use super::*;
+    use rand::Rng;
+    use rstest::rstest;
 
-    #[test]
-    fn shuffle_constant_pool_indices() {
-        let test_cases: Vec<(HashSet<u16>, HashSet<u16>)> =
-            vec![([1, 2, 3].into_iter().collect(), [].into_iter().collect())];
+    fn make_entries(
+        count: usize,
+        special_positions: &HashSet<usize>,
+        big_entries: &HashSet<usize>,
+    ) -> Vec<CPEntry> {
+        (0..count)
+            .map(|i| CPEntry {
+                entry_type: if big_entries.contains(&i) {
+                    CPEntryType::Big
+                } else {
+                    CPEntryType::Small
+                },
+                is_special: special_positions.contains(&i),
+            })
+            .collect()
+    }
 
-        for (indices, special_indices) in test_cases {
-            let seed: u64 = rand::rng().next_u64();
-            let new_indices = shuffle_indices(seed, &indices, &special_indices).map;
+    #[rstest]
+    #[case(0, HashSet::new(), HashSet::new())]
+    #[case(5, HashSet::new(), HashSet::new())]
+    #[case(1000, [0, 2].into_iter().collect(), HashSet::new())]
+    #[case(1000, [999].into_iter().collect(), HashSet::new())]
+    #[case(5, HashSet::new(), [2].into_iter().collect())]
+    #[case(5, HashSet::new(), [2, 4].into_iter().collect())]
+    #[case(1000, [500, 999].into_iter().collect(), [400].into_iter().collect())]
+    #[case(1000, [500].into_iter().collect(), [400, 999].into_iter().collect())]
+    #[case(1000, [500, 999].into_iter().collect(), [400, 999].into_iter().collect())]
+    fn shuffle_constant_pool_indices(
+        #[case] count: usize,
+        #[case] special_positions: HashSet<usize>,
+        #[case] big_entries: HashSet<usize>,
+    ) {
+        let entries = make_entries(count, &special_positions, &big_entries);
 
+        let seed: u64 = rand::rng().next_u64();
+        let result = shuffle_indices(seed, &entries).map;
+
+        assert_eq!(
+            result.len(),
+            count,
+            "seed=0x{seed:016x}: expected {count} mapped indices but were {}.",
+            result.len()
+        );
+
+        // Every old index must be present as a key.
+        for old_idx in 1..=(count as u16) {
             assert!(
-                indices.len() == new_indices.len(),
-                "Call to shuffle_indices() with seed=0x{seed:016x} returned a different number of indices: expected {} but was {}.",
-                indices.len(),
-                new_indices.len()
+                result.contains_key(&old_idx),
+                "seed=0x{seed:016x}: old index {old_idx} missing from map."
             );
-            for old_idx in indices {
-                assert!(
-                    new_indices.contains_key(&old_idx),
-                    "Call to shuffle_indices() with seed=0x{seed:016x} returned a map in which the index {old_idx} is not present.",
-                );
-            }
-            for special_idx in special_indices {
-                let new_idx = new_indices.get(&special_idx).unwrap();
-                assert!(
-                    special_idx < 256,
-                    "Call to shuffle_indices() with seed=0x{seed:016x} returned a map in which the special index {special_idx} maps to {new_idx}, which cannot be a special index.",
-                );
-            }
+        }
+
+        // The new indices must be a permutation of 1..=count (bijection).
+        let mut new_indices: Vec<u16> = result.values().cloned().collect();
+        new_indices.sort_unstable();
+        let expected: Vec<u16> = (1..=(count as u16)).collect();
+        assert_eq!(
+            new_indices, expected,
+            "seed=0x{seed:016x}: new indices are not a permutation of 1..={count}."
+        );
+
+        // Special entries must map to a new index that fits in a u8 (<= 255).
+        for special_pos in &special_positions {
+            let old_idx = (*special_pos + 1) as u16; // convert 0-based pos to 1-based CP index
+            let new_idx = result[&old_idx];
+            assert!(
+                new_idx <= 255,
+                "seed=0x{seed:016x}: special old index {old_idx} mapped to {new_idx}, which does not fit in u8."
+            );
         }
     }
 }

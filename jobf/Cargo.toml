@@ -9,3 +9,6 @@ cli_parser = { path = "../cli_parser" }
 classfile = { path = "../classfile" }
 zip = "8.5.1"
 rand = { version = "0.10.1", features = ["chacha"] }
+
+[dev-dependencies]
+rstest = "0.26.1"

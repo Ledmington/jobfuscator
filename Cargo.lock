@@ -501,6 +501,7 @@ dependencies = [
  "classfile",
  "cli_parser",
  "rand",
+ "rstest",
  "zip",
 ]
 
