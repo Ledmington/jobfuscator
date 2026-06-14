@@ -96,7 +96,8 @@ fn make_attribute_public(attribute: &AttributeInfo) -> AttributeInfo {
         | AttributeInfo::ConstantValue { .. }
         | AttributeInfo::Exceptions { .. }
         | AttributeInfo::EnclosingMethod { .. }
-        | AttributeInfo::NestHost { .. } => attribute.clone(),
+        | AttributeInfo::NestHost { .. }
+        | AttributeInfo::Deprecated { .. } => attribute.clone(),
         AttributeInfo::Code {
             name_index,
             max_stack,

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ops::Index;
 
 use binary_reader::BinaryReader;
@@ -9,21 +10,74 @@ use crate::{
 
 #[derive(Clone)]
 pub struct ConstantPool {
-    pub(crate) entries: Vec<ConstantPoolInfo>,
+    pub entries: BTreeMap<u16, ConstantPoolInfo>,
 }
 
 impl ConstantPool {
+    pub fn assert_valid_and_type(&self, cp_index: u16, expected_tags: &[ConstantPoolTag]) {
+        let cp_num_slots = self.num_slots();
+        assert!(!expected_tags.is_empty(), "Empty expected tags.");
+        assert!(
+            cp_index >= 1 && cp_index <= cp_num_slots.try_into().unwrap(),
+            "Constant pool index must be >= 1 and <= {cp_num_slots} but was {cp_index} (0x{cp_index:04x})."
+        );
+        // Also assert the key actually exists (slot N+1 of a Long/Double is absent)
+        assert!(
+            self.entries.contains_key(&cp_index),
+            "Constant pool index {cp_index} is a continuation slot of a Long or Double entry and cannot be referenced directly."
+        );
+        let actual_tag = self[cp_index].tag();
+        let mut found = false;
+        for expected_tag in expected_tags {
+            if *expected_tag == actual_tag {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            if expected_tags.len() == 1 {
+                panic!(
+                    "Expected an entry with tag {:?} at index {cp_index} but was {actual_tag}.",
+                    expected_tags[0]
+                );
+            } else {
+                panic!(
+                    "Expected an entry with any of the tags {} at index {cp_index} but was {actual_tag}.",
+                    expected_tags
+                        .iter()
+                        .map(|t| format!("{t:?}"))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                );
+            }
+        }
+    }
+
+    fn get_entry(&self, cp_index: u16, expected: &[ConstantPoolTag]) -> &ConstantPoolInfo {
+        self.assert_valid_and_type(cp_index, expected);
+        &self[cp_index]
+    }
+
     pub fn get_class_name(&self, cp_index: u16) -> String {
-        let class_entry: &ConstantPoolInfo = &self[cp_index - 1];
-        match class_entry {
-            ConstantPoolInfo::Class { name_index } => self.get_wrapped_utf8_content(*name_index),
-            _ => panic!("Expected entry #{cp_index} to be of Class type but it wasn't."),
+        if let ConstantPoolInfo::Class { name_index } =
+            self.get_entry(cp_index, &[ConstantPoolTag::Class])
+        {
+            self.get_wrapped_utf8_content(*name_index)
+        } else {
+            unreachable!()
         }
     }
 
     pub fn get_method_ref(&self, cp_index: u16) -> String {
-        let method_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
-        match method_ref_entry {
+        let entry = self.get_entry(
+            cp_index,
+            &[
+                ConstantPoolTag::Fieldref,
+                ConstantPoolTag::Methodref,
+                ConstantPoolTag::InterfaceMethodref,
+            ],
+        );
+        match entry {
             ConstantPoolInfo::FieldRef {
                 class_index,
                 name_and_type_index,
@@ -45,13 +99,14 @@ impl ConstantPool {
     }
 
     pub fn get_field_ref(&self, cp_index: u16) -> String {
-        let field_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
-        match field_ref_entry {
-            ConstantPoolInfo::FieldRef {
-                class_index,
-                name_and_type_index,
-            } => self.get_field_ref_string(*class_index, *name_and_type_index),
-            _ => panic!("Expected entry #{cp_index} to be of Fieldref type but it wasn't."),
+        if let ConstantPoolInfo::FieldRef {
+            class_index,
+            name_and_type_index,
+        } = self.get_entry(cp_index, &[ConstantPoolTag::Fieldref])
+        {
+            self.get_field_ref_string(*class_index, *name_and_type_index)
+        } else {
+            unreachable!();
         }
     }
 
@@ -60,24 +115,26 @@ impl ConstantPool {
     }
 
     pub fn get_field_ref_name_and_type(&self, cp_index: u16) -> String {
-        let field_ref_entry: &ConstantPoolInfo = &self[cp_index - 1];
-        match field_ref_entry {
-            ConstantPoolInfo::FieldRef {
-                name_and_type_index,
-                ..
-            } => self.get_name_and_type(*name_and_type_index),
-            _ => panic!("Expected entry #{cp_index} to be of Fieldref type but it wasn't."),
+        if let ConstantPoolInfo::FieldRef {
+            name_and_type_index,
+            ..
+        } = self.get_entry(cp_index, &[ConstantPoolTag::Fieldref])
+        {
+            self.get_name_and_type(*name_and_type_index)
+        } else {
+            unreachable!();
         }
     }
 
     pub fn get_invoke_dynamic(&self, cp_index: u16) -> String {
-        let invoke_dynamic_entry: &ConstantPoolInfo = &self[cp_index - 1];
-        match invoke_dynamic_entry {
-            ConstantPoolInfo::InvokeDynamic {
-                bootstrap_method_attr_index,
-                name_and_type_index,
-            } => self.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index),
-            _ => panic!("Expected entry #{cp_index} to be of InvokeDynamic type but it wasn't."),
+        if let ConstantPoolInfo::InvokeDynamic {
+            bootstrap_method_attr_index,
+            name_and_type_index,
+        } = self.get_entry(cp_index, &[ConstantPoolTag::InvokeDynamic])
+        {
+            self.get_invoke_dynamic_string(*bootstrap_method_attr_index, *name_and_type_index)
+        } else {
+            unreachable!();
         }
     }
 
@@ -93,13 +150,14 @@ impl ConstantPool {
     }
 
     pub fn get_name_and_type(&self, cp_index: u16) -> String {
-        let name_and_type_entry: &ConstantPoolInfo = &self[cp_index - 1];
-        match name_and_type_entry {
-            ConstantPoolInfo::NameAndType {
-                name_index,
-                descriptor_index,
-            } => self.get_name_and_type_string(*name_index, *descriptor_index),
-            _ => panic!("Expected entry #{cp_index} to be of NameAndType type but it wasn't."),
+        if let ConstantPoolInfo::NameAndType {
+            name_index,
+            descriptor_index,
+        } = self.get_entry(cp_index, &[ConstantPoolTag::NameAndType])
+        {
+            self.get_name_and_type_string(*name_index, *descriptor_index)
+        } else {
+            unreachable!();
         }
     }
 
@@ -123,27 +181,48 @@ impl ConstantPool {
     }
 
     pub fn get_utf8_content(&self, cp_index: u16) -> String {
-        let name_entry: &ConstantPoolInfo = &self[cp_index - 1];
-        match name_entry {
-            ConstantPoolInfo::Utf8 { bytes } => convert_utf8(bytes),
-            _ => panic!("Expected entry #{cp_index} to be of Utf8 type but it wasn't."),
+        if let ConstantPoolInfo::Utf8 { bytes } = self.get_entry(cp_index, &[ConstantPoolTag::Utf8])
+        {
+            convert_utf8(bytes)
+        } else {
+            unreachable!();
         }
     }
 
-    pub fn len(&self) -> usize {
-        self.entries.len()
+    pub fn get_integer(&self, cp_index: u16) -> i32 {
+        if let ConstantPoolInfo::Integer { bytes } =
+            self.get_entry(cp_index, &[ConstantPoolTag::Integer])
+        {
+            i32::from_be_bytes(bytes.to_be_bytes())
+        } else {
+            unreachable!()
+        }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+    /// Returns the number of slots required to encode this ConstantPool in the JVM class file
+    /// format. Long and Double entries occupy 2 slots each; all other entries occupy 1 slot.
+    pub fn num_slots(&self) -> usize {
+        match self.entries.iter().next_back() {
+            None => 0,
+            Some((last_key, last_entry)) => *last_key as usize + last_entry.size(),
+        }
+    }
+
+    /// Returns the number of entries in this ConstantPool.
+    pub fn num_entries(&self) -> usize {
+        self.entries.len()
     }
 }
 
 impl Index<u16> for ConstantPool {
     type Output = ConstantPoolInfo;
 
+    /// The input index must be a valid slot key present in the map.
+    /// Continuation slots (N+1 of Long/Double) are not present and will panic.
     fn index(&self, index: u16) -> &Self::Output {
-        &self.entries[index as usize]
+        self.entries
+            .get(&index)
+            .unwrap_or_else(|| panic!("No constant pool entry at index {index}."))
     }
 }
 
@@ -157,23 +236,28 @@ pub fn convert_utf8(utf8_bytes: &[u8]) -> String {
 
 #[derive(Clone)]
 pub enum ConstantPoolInfo {
-    /**
-     * The type of constant pool entry which can be found right after a Long or Double one.
-     */
-    Null {},
+    /// The constant-pool entry used to represent constant string values.
     Utf8 {
         bytes: Vec<u8>,
     },
+
+    /// The constant pool entry used to represent 4-byte integer constants.
     Integer {
         bytes: u32,
     },
+
+    /// The constant pool entry used to represent 4-byte floating-point constants.
     Float {
         bytes: u32,
     },
+
+    /// The constant pool entry used to represent 8-byte integer constants.
     Long {
         high_bytes: u32,
         low_bytes: u32,
     },
+
+    /// The constant pool entry used to represent 8-byte floating-point constants.
     Double {
         high_bytes: u32,
         low_bytes: u32,
@@ -216,7 +300,6 @@ pub enum ConstantPoolInfo {
 impl ConstantPoolInfo {
     pub fn tag(&self) -> ConstantPoolTag {
         match self {
-            ConstantPoolInfo::Null {} => panic!("Null entries have no tag"),
             ConstantPoolInfo::Utf8 { .. } => ConstantPoolTag::Utf8,
             ConstantPoolInfo::Integer { .. } => ConstantPoolTag::Integer,
             ConstantPoolInfo::Float { .. } => ConstantPoolTag::Float,
@@ -231,6 +314,15 @@ impl ConstantPoolInfo {
             ConstantPoolInfo::MethodHandle { .. } => ConstantPoolTag::MethodHandle,
             ConstantPoolInfo::MethodType { .. } => ConstantPoolTag::MethodType,
             ConstantPoolInfo::InvokeDynamic { .. } => ConstantPoolTag::InvokeDynamic,
+        }
+    }
+
+    /// Returns the number of slots required to encode this constant pool info entry.
+    /// Specifically, returns 2 for Long and Double entries and 1 for anything else.
+    pub fn size(&self) -> usize {
+        match self {
+            ConstantPoolInfo::Long { .. } | ConstantPoolInfo::Double { .. } => 2,
+            _ => 1,
         }
     }
 }
@@ -316,18 +408,16 @@ impl std::fmt::Display for ConstantPoolTag {
     }
 }
 
-pub fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> ConstantPool {
-    let mut entries: Vec<ConstantPoolInfo> = Vec::with_capacity(cp_count);
-    let mut i = 0;
-    while i < cp_count {
+pub fn parse_constant_pool(reader: &mut BinaryReader, num_cp_slots: usize) -> ConstantPool {
+    let mut entries: BTreeMap<u16, ConstantPoolInfo> = BTreeMap::new();
+    // Slot indices in the JVM constant pool are 1-based.
+    let mut slot: u16 = 1;
+    while (slot as usize) <= num_cp_slots {
         let tag = ConstantPoolTag::try_from(reader.read_u8().unwrap()).unwrap();
-        entries.push(parse_constant_pool_entry(reader, tag.clone()));
-
-        if matches!(tag, ConstantPoolTag::Long) || matches!(tag, ConstantPoolTag::Double) {
-            entries.push(ConstantPoolInfo::Null {});
-            i += 1;
-        }
-        i += 1;
+        let entry = parse_constant_pool_entry(reader, tag);
+        let next_slot = slot + entry.size() as u16;
+        entries.insert(slot, entry);
+        slot = next_slot;
     }
     ConstantPool { entries }
 }
@@ -336,6 +426,7 @@ fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) ->
     match tag {
         ConstantPoolTag::Utf8 => {
             let length: u16 = reader.read_u16().unwrap();
+            // TODO: implement actual conversion from custom UTF-8 to actual UTF-8
             ConstantPoolInfo::Utf8 {
                 bytes: reader.read_u8_vec(length.into()).unwrap(),
             }
@@ -391,91 +482,58 @@ fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) ->
     }
 }
 
-// TODO: find a better name
-#[macro_export]
-macro_rules! assert_valid_and_type {
-    ($cp:expr, $cp_index:expr, $($expected_tag:expr),+) => {{
-        let cp = $cp;
-        let cp_index = $cp_index;
-        let cp_len = cp.len();
-        let expected_tags = &[$($expected_tag),+];
-        assert!(expected_tags.len() > 0, "Empty expected tags.");
-        assert!(
-            cp_index >= 1 && cp_index <= (cp_len as u16),
-            "Constant pool index must be >= 1 and <= {cp_len} but was {cp_index} (0x{cp_index:04x})."
-        );
-        let actual_tag = cp[cp_index - 1].tag();
-        let mut found: bool = false;
-        for i in 0..expected_tags.len() {
-            let expected_tag = &expected_tags[i];
-            if *expected_tag == actual_tag {
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            if expected_tags.len() == 1 {
-                panic!("Expected an entry with tag {:?} at index {cp_index} but was {actual_tag}.", expected_tags[0]);
-            } else {
-                panic!("Expected an entry with any of the tags {} at index {cp_index} but was {actual_tag}.", expected_tags.iter().map(|t| format!("{t:?}")).collect::<Vec<String>>().join(", "));
-            }
-        }
-    }};
-}
-
 pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo]) {
-    let mut i = 0;
-    while i < cp.len() {
-        let entry = &cp[i.try_into().unwrap()];
+    // Iterate in slot order (BTreeMap guarantees ascending key order).
+    for entry in cp.entries.values() {
         match entry {
-            ConstantPoolInfo::Null {} => {
-                unreachable!("Checking a null CP entry.");
+            ConstantPoolInfo::Utf8 { bytes } => {
+                for b in bytes.iter() {
+                    assert!(
+                        *b != 0x00u8 && *b < 0xf0u8,
+                        "Found invalid bytes in Utf8 constant pool entry content."
+                    );
+                }
             }
-            ConstantPoolInfo::Utf8 { .. } => {}
             ConstantPoolInfo::Integer { .. } => {}
             ConstantPoolInfo::Float { .. } => {}
-            ConstantPoolInfo::Long { .. } => {
-                i += 1;
-            }
-            ConstantPoolInfo::Double { .. } => {
-                i += 1;
-            }
+            ConstantPoolInfo::Long { .. } => {}
+            ConstantPoolInfo::Double { .. } => {}
             ConstantPoolInfo::String { string_index } => {
-                assert_valid_and_type!(cp, *string_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(*string_index, &[ConstantPoolTag::Utf8]);
             }
             ConstantPoolInfo::Class { name_index } => {
-                assert_valid_and_type!(cp, *name_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(*name_index, &[ConstantPoolTag::Utf8]);
             }
             ConstantPoolInfo::FieldRef {
                 class_index,
                 name_and_type_index,
             } => {
-                assert_valid_and_type!(cp, *class_index, ConstantPoolTag::Class);
-                assert_valid_and_type!(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+                cp.assert_valid_and_type(*class_index, &[ConstantPoolTag::Class]);
+                cp.assert_valid_and_type(*name_and_type_index, &[ConstantPoolTag::NameAndType]);
             }
             ConstantPoolInfo::MethodRef {
                 class_index,
                 name_and_type_index,
             } => {
-                assert_valid_and_type!(cp, *class_index, ConstantPoolTag::Class);
-                assert_valid_and_type!(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+                cp.assert_valid_and_type(*class_index, &[ConstantPoolTag::Class]);
+                cp.assert_valid_and_type(*name_and_type_index, &[ConstantPoolTag::NameAndType]);
             }
             ConstantPoolInfo::InterfaceMethodRef {
                 class_index,
                 name_and_type_index,
             } => {
-                assert_valid_and_type!(cp, *class_index, ConstantPoolTag::Class);
-                assert_valid_and_type!(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+                cp.assert_valid_and_type(*class_index, &[ConstantPoolTag::Class]);
+                cp.assert_valid_and_type(*name_and_type_index, &[ConstantPoolTag::NameAndType]);
             }
             ConstantPoolInfo::NameAndType {
                 name_index,
                 descriptor_index,
             } => {
-                assert_valid_and_type!(cp, *name_index, ConstantPoolTag::Utf8);
-                assert_valid_and_type!(cp, *descriptor_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(*name_index, &[ConstantPoolTag::Utf8]);
+                cp.assert_valid_and_type(*descriptor_index, &[ConstantPoolTag::Utf8]);
             }
             ConstantPoolInfo::MethodType { descriptor_index } => {
-                assert_valid_and_type!(cp, *descriptor_index, ConstantPoolTag::Utf8);
+                cp.assert_valid_and_type(*descriptor_index, &[ConstantPoolTag::Utf8]);
             }
             ConstantPoolInfo::MethodHandle {
                 reference_kind,
@@ -485,24 +543,24 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
                 | ReferenceKind::GetStatic
                 | ReferenceKind::PutField
                 | ReferenceKind::PutStatic => {
-                    assert_valid_and_type!(cp, *reference_index, ConstantPoolTag::Fieldref);
+                    cp.assert_valid_and_type(*reference_index, &[ConstantPoolTag::Fieldref]);
                 }
                 ReferenceKind::InvokeVirtual | ReferenceKind::NewInvokeSpecial => {
-                    assert_valid_and_type!(cp, *reference_index, ConstantPoolTag::Methodref);
+                    cp.assert_valid_and_type(*reference_index, &[ConstantPoolTag::Methodref]);
                 }
                 ReferenceKind::InvokeStatic | ReferenceKind::InvokeSpecial => {
-                    assert_valid_and_type!(
-                        cp,
+                    cp.assert_valid_and_type(
                         *reference_index,
-                        ConstantPoolTag::Methodref,
-                        ConstantPoolTag::InterfaceMethodref
+                        &[
+                            ConstantPoolTag::Methodref,
+                            ConstantPoolTag::InterfaceMethodref,
+                        ],
                     );
                 }
                 ReferenceKind::InvokeInterface => {
-                    assert_valid_and_type!(
-                        cp,
+                    cp.assert_valid_and_type(
                         *reference_index,
-                        ConstantPoolTag::InterfaceMethodref
+                        &[ConstantPoolTag::InterfaceMethodref],
                     );
                 }
             },
@@ -511,7 +569,9 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
                 name_and_type_index,
             } => {
                 let bootstrap_method_attribute =
-                    find_attribute(attributes,AttributeKind::BootstrapMethods).expect("The presence of an InvokeDynamic entry in the constant pool implies the presence of a BootstrapMethods attribute in the class file, which is not present.");
+                    find_attribute(attributes, AttributeKind::BootstrapMethods).expect(
+                        "The presence of an InvokeDynamic entry in the constant pool implies the presence of a BootstrapMethods attribute in the class file, which is not present.",
+                    );
                 match bootstrap_method_attribute {
                     AttributeInfo::BootstrapMethods { methods, .. } => {
                         let num_bootstrap_methods = methods.len();
@@ -522,10 +582,8 @@ pub(crate) fn check_constant_pool(cp: &ConstantPool, attributes: &[AttributeInfo
                     }
                     _ => unreachable!(),
                 }
-                assert_valid_and_type!(cp, *name_and_type_index, ConstantPoolTag::NameAndType);
+                cp.assert_valid_and_type(*name_and_type_index, &[ConstantPoolTag::NameAndType]);
             }
         }
-
-        i += 1;
     }
 }
