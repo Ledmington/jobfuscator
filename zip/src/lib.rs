@@ -137,7 +137,7 @@ impl std::fmt::Display for MsDosTime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{:02}/{:02}/{:02}",
+            "{:02}:{:02}:{:02}",
             self.hours,
             self.minutes,
             self.seconds * 2
@@ -154,7 +154,7 @@ struct MsDosDate {
 
 impl std::fmt::Display for MsDosDate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:02}:{:02}:{}", self.day, self.month, self.year)
+        write!(f, "{:02}/{:02}/{}", self.day, self.month, self.year)
     }
 }
 
@@ -256,7 +256,7 @@ struct LocalFileHeader {
     last_modification_date: MsDosDate,
     compressed_size: u32,
     uncompressed_size: u32,
-    filename: String,
+    filename_bytes: Vec<u8>,
     extra_fields: Vec<ExtraField>,
 }
 
@@ -278,16 +278,16 @@ struct CentralDirectoryRecord {
     internal_file_attributes: u16,
     external_file_attributes: u32,
     local_file_header_offset: u32,
-    filename: String,
+    filename_bytes: Vec<u8>,
     extra_fields: Vec<ExtraField>,
-    file_comment: String,
+    file_comment_bytes: Vec<u8>,
 }
 
 struct EndOfCentralDirectoryRecord {
     total_central_directory_records: u16,
     central_directory_size: u32,
     central_directory_offset: u32,
-    comment: String,
+    comment_bytes: Vec<u8>,
 }
 
 pub struct ZipFile {
@@ -311,14 +311,18 @@ pub struct ZipEntry {
     compression_method: CompressionMethod,
     last_modification_time: MsDosTime,
     last_modification_date: MsDosDate,
-    pub compressed_content: Vec<u8>,
-    filename: String,
-    comment: String,
+    compressed_content: Vec<u8>,
+    filename_bytes: Vec<u8>,
+    comment_bytes: Vec<u8>,
 }
 
 impl ZipEntry {
-    pub fn name(&self) -> &String {
-        &self.filename
+    pub fn name_bytes(&self) -> &Vec<u8> {
+        &self.filename_bytes
+    }
+
+    pub fn compressed_content(&self) -> &Vec<u8> {
+        &self.compressed_content
     }
 
     pub fn compressed_size(&self) -> usize {
@@ -349,7 +353,7 @@ impl ZipEntry {
         self.last_modification_time.to_string()
     }
 
-    pub fn comment(&self) -> String {
-        self.comment.clone()
+    pub fn comment_bytes(&self) -> &Vec<u8> {
+        &self.comment_bytes
     }
 }

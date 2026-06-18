@@ -13,7 +13,14 @@ pub fn main() {
     let num_entries = file.num_entries();
     for (i, entry) in file.entries().iter().enumerate() {
         println!("Entry n. {} / {}", i + 1, num_entries);
-        println!("  Name: '{}'", entry.name());
+        println!(
+            "  Name: '{}'",
+            entry
+                .name_bytes()
+                .iter()
+                .map(|c| *c as char)
+                .collect::<String>()
+        );
         println!("  Version made by: {}", entry.version_made_by());
         println!("  Minimum version: {}", entry.minimum_version());
         println!("  Flags: 0x{:04x}", entry.bit_flags());
@@ -24,16 +31,17 @@ pub fn main() {
             entry.last_modification_time()
         );
         println!("  C. Size: {} bytes", entry.compressed_size());
-        let uncompressed_content = decompress(&entry.compressed_content);
+        let uncompressed_content = decompress(&entry.compressed_content());
         println!("  U. Size: {} bytes", uncompressed_content.len());
+        let comment = entry
+            .comment_bytes()
+            .iter()
+            .map(|c| *c as char)
+            .collect::<String>();
         println!(
             "  Comment: '{}'{}",
-            entry.comment(),
-            if entry.comment().is_empty() {
-                " (empty)"
-            } else {
-                ""
-            }
+            comment,
+            if comment.is_empty() { " (empty)" } else { "" }
         );
         println!();
     }

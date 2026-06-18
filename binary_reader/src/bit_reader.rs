@@ -21,6 +21,11 @@ impl<'a> BitReader<'a> {
         self.buf.len()
     }
 
+    /// Moves to the next byte boundary
+    pub fn align_to_byte(&mut self) {
+        self.set_byte_position(self.get_byte_position() + 1);
+    }
+
     pub fn get_byte_position(&self) -> usize {
         self.bit_position / 8
     }

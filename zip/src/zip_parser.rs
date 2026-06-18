@@ -95,10 +95,7 @@ fn parse_local_file_header(reader: &mut ByteReader) -> LocalFileHeader {
 
     let extra_field_length = reader.read_u16().unwrap();
 
-    let mut filename = String::new();
-    for _ in 0..file_name_length {
-        filename.push(reader.read_u8().unwrap() as char);
-    }
+    let filename_bytes = reader.read_u8_vec(file_name_length as usize).unwrap();
 
     let extra_fields: Vec<ExtraField> = parse_extra_fields(reader, extra_field_length);
 
@@ -110,7 +107,7 @@ fn parse_local_file_header(reader: &mut ByteReader) -> LocalFileHeader {
         last_modification_date,
         compressed_size,
         uncompressed_size,
-        filename,
+        filename_bytes,
         extra_fields,
     }
 }
@@ -147,10 +144,10 @@ fn check_local_file_header(cdr: &CentralDirectoryRecord, lfh: &LocalFileHeader) 
             cdr.last_modification_date, lfh.last_modification_date
         );
     }
-    if cdr.filename != lfh.filename {
+    if cdr.filename_bytes != lfh.filename_bytes {
         panic!(
-            "Different filenames in CDR ('{}') and LFH ('{}').",
-            cdr.filename, lfh.filename
+            "Different filenames in CDR ('{:?}') and LFH ('{:?}').",
+            cdr.filename_bytes, lfh.filename_bytes
         );
     }
     if cdr.extra_fields.len() != lfh.extra_fields.len() {
@@ -213,8 +210,8 @@ fn parse_zip_buf(reader: &mut ByteReader) -> ZipFile {
             last_modification_time: cdr.last_modification_time,
             last_modification_date: cdr.last_modification_date,
             compressed_content,
-            filename: cdr.filename,
-            comment: cdr.file_comment,
+            filename_bytes: cdr.filename_bytes,
+            comment_bytes: cdr.file_comment_bytes,
         });
     }
 
@@ -312,7 +309,7 @@ fn parse_extra_fields(reader: &mut ByteReader, extra_fields_bytes: u16) -> Vec<E
         ef.push(ExtraField { field_type, data });
     }
 
-    return ef;
+    ef
 }
 
 fn parse_central_directory_record(reader: &mut ByteReader) -> CentralDirectoryRecord {
@@ -397,17 +394,11 @@ fn parse_central_directory_record(reader: &mut ByteReader) -> CentralDirectoryRe
         );
     }
 
-    let mut filename = String::new();
-    for _ in 0..file_name_length {
-        filename.push(reader.read_u8().unwrap() as char);
-    }
+    let filename_bytes = reader.read_u8_vec(file_name_length as usize).unwrap();
 
     let extra_fields: Vec<ExtraField> = parse_extra_fields(reader, extra_field_length);
 
-    let mut file_comment = String::new();
-    for _ in 0..file_comment_length {
-        file_comment.push(reader.read_u8().unwrap() as char);
-    }
+    let file_comment_bytes = reader.read_u8_vec(file_comment_length as usize).unwrap();
 
     CentralDirectoryRecord {
         version_made_by,
@@ -421,9 +412,9 @@ fn parse_central_directory_record(reader: &mut ByteReader) -> CentralDirectoryRe
         internal_file_attributes,
         external_file_attributes,
         local_file_header_offset,
-        filename,
+        filename_bytes,
         extra_fields,
-        file_comment,
+        file_comment_bytes,
     }
 }
 
@@ -435,7 +426,7 @@ fn parse_end_of_central_directory_record(reader: &mut ByteReader) -> EndOfCentra
          * ends included), depending on the length of the comment field which is
          * indicated by a 2-bytes unsigned integer.
          * So, to find the start of EOCD (the signature 0x06054b50) we start at the byte
-         * 65536 bytes from the end and scan forward.
+         * 65536 bytes from the end and scan backwards.
          */
         const EXPECTED_SIGNATURE: u32 = 0x06054b50;
         const MINIMUM_EOCDR_LENGTH: usize = 22;
@@ -495,15 +486,12 @@ fn parse_end_of_central_directory_record(reader: &mut ByteReader) -> EndOfCentra
     let central_directory_offset = reader.read_u32().unwrap();
 
     let comment_length = reader.read_u16().unwrap();
-    let mut comment = String::new();
-    for _ in 0..comment_length {
-        comment.push(reader.read_u8().unwrap() as char);
-    }
+    let comment_bytes = reader.read_u8_vec(comment_length as usize).unwrap();
 
     EndOfCentralDirectoryRecord {
         total_central_directory_records,
         central_directory_size,
         central_directory_offset,
-        comment,
+        comment_bytes,
     }
 }
