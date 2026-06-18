@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-use binary_reader::BinaryReader;
+use binary_reader::byte_reader::ByteReader;
 
 use crate::{
     attributes::{AttributeInfo, AttributeKind, find_attribute},
@@ -316,7 +316,7 @@ impl std::fmt::Display for ConstantPoolTag {
     }
 }
 
-pub fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> ConstantPool {
+pub fn parse_constant_pool(reader: &mut ByteReader, cp_count: usize) -> ConstantPool {
     let mut entries: Vec<ConstantPoolInfo> = Vec::with_capacity(cp_count);
     let mut i = 0;
     while i < cp_count {
@@ -332,7 +332,7 @@ pub fn parse_constant_pool(reader: &mut BinaryReader, cp_count: usize) -> Consta
     ConstantPool { entries }
 }
 
-fn parse_constant_pool_entry(reader: &mut BinaryReader, tag: ConstantPoolTag) -> ConstantPoolInfo {
+fn parse_constant_pool_entry(reader: &mut ByteReader, tag: ConstantPoolTag) -> ConstantPoolInfo {
     match tag {
         ConstantPoolTag::Utf8 => {
             let length: u16 = reader.read_u16().unwrap();

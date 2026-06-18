@@ -1,0 +1,10 @@
+[package]
+name = "zip"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+binary_reader = { path = "../binary_reader" }
+binary_writer = { path = "../binary_writer" }
+
+[dev-dependencies]

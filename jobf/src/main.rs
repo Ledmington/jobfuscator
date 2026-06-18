@@ -12,7 +12,7 @@ use std::{
     path::Path,
 };
 
-use binary_reader::BinaryReader;
+use binary_reader::byte_reader::ByteReader;
 use classfile::{
     classfile::{ClassFile, parse_class_file},
     writer::write_class_file,
@@ -33,7 +33,7 @@ fn is_zip_file(bytes: &[u8]) -> bool {
     bytes.starts_with(&[0x50, 0x4B, 0x03, 0x04])
 }
 
-fn parse_and_rewrite(reader: &mut BinaryReader, pipeline: &TransformationPipeline) -> Vec<u8> {
+fn parse_and_rewrite(reader: &mut ByteReader, pipeline: &TransformationPipeline) -> Vec<u8> {
     let in_cf: ClassFile = parse_class_file(reader);
     let out_cf = pipeline.execute(&in_cf);
     write_class_file(&out_cf)
@@ -176,7 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut file_bytes = Vec::new();
         file.read_to_end(&mut file_bytes)?;
 
-        let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endianness::Big);
+        let mut reader = ByteReader::new(&file_bytes, binary_reader::Endianness::Big);
         let out_bytes = parse_and_rewrite(&mut reader, &pipeline);
         log!(
             quiet,
@@ -215,7 +215,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut file_bytes = Vec::new();
             entry.read_to_end(&mut file_bytes)?;
 
-            let mut reader = BinaryReader::new(&file_bytes, binary_reader::Endianness::Big);
+            let mut reader = ByteReader::new(&file_bytes, binary_reader::Endianness::Big);
             let out_bytes = parse_and_rewrite(&mut reader, &pipeline);
             log!(quiet, "{} ({} bytes) OK", name, file_bytes.len());
 
